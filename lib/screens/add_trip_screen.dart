@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
 import '../widgets/calendar_range_picker.dart';
 import '../widgets/country_chip.dart';
+import '../widgets/screen_top_bar.dart';
 import '../widgets/sheets.dart';
 import '../widgets/won_input_formatter.dart';
 
@@ -78,7 +79,7 @@ class _AddTripScreenState extends State<AddTripScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _topBar(),
+            const ScreenTopBar(title: '새 여행 추가'),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -106,31 +107,6 @@ class _AddTripScreenState extends State<AddTripScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _topBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 20, 16),
-      child: Row(
-        children: [
-          InkResponse(
-            onTap: () => Navigator.of(context).pop(),
-            radius: 22,
-            child: const Icon(Icons.arrow_back_rounded,
-                size: 24, color: AppColors.textPrimary),
-          ),
-          const SizedBox(width: 12),
-          const Text(
-            '새 여행 추가',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
       ),
     );
   }

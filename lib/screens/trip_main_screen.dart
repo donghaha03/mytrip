@@ -5,6 +5,8 @@ import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../widgets/budget_card.dart';
 import '../widgets/rate_info_tooltip.dart';
+import 'ledger_screen.dart';
+import 'more_screen.dart';
 
 /// 03. 여행 하나를 선택했을 때의 메인 페이지.
 class TripMainScreen extends StatelessWidget {
@@ -31,12 +33,11 @@ class TripMainScreen extends StatelessWidget {
                   BudgetCard(trip: trip),
                   const SizedBox(height: 20),
                   _LedgerButton(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('장부 상세 페이지는 다음 단계에서 구현')),
-                      );
-                    },
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => LedgerScreen(trip: trip),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -134,28 +135,28 @@ class _TopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        const _MenuButton(),
+        _MenuButton(trip: trip),
       ],
     );
   }
 }
 
 class _MenuButton extends StatelessWidget {
-  const _MenuButton();
+  const _MenuButton({required this.trip});
+
+  final Trip trip;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: AppColors.white,
-      shape: CircleBorder(
+      shape: const CircleBorder(
         side: BorderSide(color: AppColors.border),
       ),
       child: InkWell(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('설정 화면은 다음 단계에서 구현')),
-          );
-        },
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => MoreScreen(trip: trip)),
+        ),
         customBorder: const CircleBorder(),
         child: const SizedBox(
           width: 40,

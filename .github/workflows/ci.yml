@@ -1,0 +1,31 @@
+name: CI
+
+# main 으로 보내는 PR 과 main 자체를 검사한다.
+# 두 사람이 각자 만든 걸 합칠 때 깨진 채로 들어가는 걸 막는 용도.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # 경고 하나라도 있으면 실패시킨다. 지금 저장소는 0건 상태다.
+      - run: flutter analyze --fatal-infos --fatal-warnings
+
+      - run: flutter test
+
+      # 웹 빌드까지 되는지 확인 (배포가 웹이라서)
+      - run: flutter build web --release --no-wasm-dry-run

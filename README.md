@@ -39,6 +39,19 @@ node tool/serve.js     # http://localhost:8099
 | `widgets/sheets.dart` → `DateRangeSheet` | 05 | 기간 선택 (드래그) |
 | `widgets/sheets.dart` → `TripEditSheet` | 06 | 이름 인라인 수정 + 삭제 |
 | `widgets/rate_info_tooltip.dart` | 07 | 환율 갱신 안내 툴팁 |
+| `screens/ledger_screen.dart` | 08 | 여행 장부 상세 — **구현 전** |
+| `screens/more_screen.dart` | 09 | 더보기 — **구현 전** |
+
+## 팀 작업
+
+08·09 는 각자 담당이 나뉘어 있다. 누가 어떤 파일을 건드리고, 어떤 파일이
+공용이라 미리 얘기해야 하는지는 **[CONTRIBUTING.md](CONTRIBUTING.md)** 참고.
+
+요약하면:
+
+- 자기 화면 파일만 고치면 충돌 안 난다
+- `lib/models`, `lib/data`, `lib/theme`, `lib/widgets`, `trip_main_screen.dart` 는 공용
+- `main` 직접 push 금지, 브랜치 → PR → CI 초록불 → merge
 
 ## 확인해볼 것
 

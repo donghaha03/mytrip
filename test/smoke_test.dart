@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripapp/data/trip_store.dart';
 import 'package:tripapp/main.dart';
 import 'package:tripapp/screens/add_trip_screen.dart';
+import 'package:tripapp/screens/ledger_screen.dart';
+import 'package:tripapp/screens/more_screen.dart';
 import 'package:tripapp/screens/trip_list_screen.dart';
 import 'package:tripapp/screens/trip_main_screen.dart';
 import 'package:tripapp/models/country.dart';
@@ -140,6 +142,37 @@ void main() {
 
     expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
     expect(find.text('\$1 = ₩1,350'), findsOneWidget);
+  });
+
+  // 08/09 는 각자 담당자가 채운다. 아래 두 테스트는 "03 에서 진입할 수 있고
+  // 뒤로 돌아온다" 는 연결만 확인한다 — 페이지 내용은 자유롭게 바꿔도 된다.
+  testWidgets('08 장부 페이지로 들어가고 나온다', (tester) async {
+    await tester.pumpWidget(const TripApp());
+    await tester.tap(find.text('일본 여행'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('📒  여행 장부 보기'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LedgerScreen), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('남은 예산'), findsOneWidget);
+  });
+
+  testWidgets('09 더보기 페이지로 들어가고 나온다', (tester) async {
+    await tester.pumpWidget(const TripApp());
+    await tester.tap(find.text('일본 여행'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.menu_rounded));
+    await tester.pumpAndSettle();
+    expect(find.byType(MoreScreen), findsOneWidget);
+    expect(find.text('더보기'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('남은 예산'), findsOneWidget);
   });
 
   testWidgets('07 환율 정보 툴팁', (tester) async {
