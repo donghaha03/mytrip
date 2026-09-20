@@ -162,14 +162,18 @@ class _AddTripScreenState extends State<AddTripScreen> {
       ),
     ];
 
-    return GridView.count(
-      crossAxisCount: 4,
+    return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 1.15,
-      children: cells,
+      padding: EdgeInsets.zero,
+      itemCount: cells.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        mainAxisExtent: kCountryChipHeight,
+      ),
+      itemBuilder: (_, i) => cells[i],
     );
   }
 

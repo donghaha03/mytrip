@@ -4,6 +4,10 @@ import '../models/country.dart';
 import '../theme/app_colors.dart';
 import 'dashed_border.dart';
 
+/// 국가 그리드 한 칸의 높이. 비율(childAspectRatio) 로 잡으면 화면이 넓어질수록
+/// 칸이 같이 커져서 국기가 허공에 뜨기 때문에 px 로 고정한다.
+const kCountryChipHeight = 70.0;
+
 /// 국기 + 통화코드가 세로로 쌓인 선택 칩.
 class CountryChip extends StatelessWidget {
   const CountryChip({
@@ -41,9 +45,10 @@ class CountryChip extends StatelessWidget {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // height 를 고정하지 않으면 이모지 폰트 메트릭 때문에
-              // 그리드 칸(childAspectRatio 1.15)을 살짝 넘겨서 overflow 가 난다.
+              // 칸 높이를 살짝 넘겨서 overflow 가 난다.
               Text(country.flag,
                   style: TextStyle(
                     fontSize: compact ? 18 : 20,
@@ -98,6 +103,7 @@ class MoreCountryChip extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   picked?.flag ?? '···',

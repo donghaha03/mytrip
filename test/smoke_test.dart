@@ -6,7 +6,10 @@ import 'package:tripapp/main.dart';
 import 'package:tripapp/screens/add_trip_screen.dart';
 import 'package:tripapp/screens/trip_list_screen.dart';
 import 'package:tripapp/screens/trip_main_screen.dart';
+import 'package:tripapp/models/country.dart';
 import 'package:tripapp/theme/app_theme.dart';
+import 'package:tripapp/widgets/country_chip.dart';
+import 'package:tripapp/widgets/sheets.dart';
 
 Widget _wrap(Widget child) =>
     MaterialApp(theme: buildAppTheme(), home: child);
@@ -146,6 +149,36 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('환율 갱신 정보'), findsOneWidget);
     expect(find.text('환율은 24시간마다 한 번 갱신돼요'), findsOneWidget);
+  });
+
+  testWidgets('데스크톱 폭에서도 폰 폭으로 묶인다', (tester) async {
+    final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
+    view.physicalSize = const Size(2580, 2000); // 1290x1000 @2x
+    view.devicePixelRatio = 2.0;
+
+    await tester.pumpWidget(const TripApp());
+    // 화면이 아무리 넓어도 본문은 kPhoneWidth 를 넘지 않는다
+    final body = tester.getSize(find.byType(Scaffold).first);
+    expect(body.width, lessThanOrEqualTo(kPhoneWidth));
+
+    // 02 국가 그리드 칸은 폭과 무관하게 높이가 고정
+    await tester.tap(find.text('여행 선택하기'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(find.byType(CountryChip).first).height,
+      kCountryChipHeight,
+    );
+
+    // 04 더보기 시트도 같은 칸 높이 (overflow 나면 여기서 깨진다)
+    await tester.tap(find.text('더보기'));
+    await tester.pumpAndSettle();
+    expect(find.text('국가 더보기'), findsOneWidget);
+    final sheetChips = find.descendant(
+      of: find.byType(MoreCountrySheet),
+      matching: find.byType(CountryChip),
+    );
+    expect(sheetChips, findsNWidgets(kMoreCountries.length));
+    expect(tester.getSize(sheetChips.first).height, kCountryChipHeight);
   });
 
   test('환율 환산 / 포맷', () {

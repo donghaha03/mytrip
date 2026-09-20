@@ -33,21 +33,26 @@ class _MoreCountrySheetState extends State<MoreCountrySheet> {
     return AppSheet(
       title: '국가 더보기',
       children: [
-        GridView.count(
-          crossAxisCount: 4,
+        GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 1.15,
-          children: kMoreCountries
-              .map((c) => CountryChip(
-                    country: c,
-                    compact: true,
-                    selected: _selected?.currency == c.currency,
-                    onTap: () => setState(() => _selected = c),
-                  ))
-              .toList(),
+          padding: EdgeInsets.zero,
+          itemCount: kMoreCountries.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            mainAxisExtent: kCountryChipHeight,
+          ),
+          itemBuilder: (_, i) {
+            final c = kMoreCountries[i];
+            return CountryChip(
+              country: c,
+              compact: true,
+              selected: _selected?.currency == c.currency,
+              onTap: () => setState(() => _selected = c),
+            );
+          },
         ),
         const SizedBox(height: 16),
         SheetPrimaryButton(

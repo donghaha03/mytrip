@@ -7,6 +7,9 @@ class AppColors {
   static const bg = Color(0xFFF7F8FA);
   static const white = Color(0xFFFFFFFF);
 
+  /// 데스크톱 폭에서 폰 화면 바깥에 깔리는 여백 색
+  static const frame = Color(0xFFE7EAF0);
+
   static const primary = Color(0xFF2F6FED);
   static const primarySoft = Color(0xFFEAF0FD); // 칩/배지 배경
   static const primaryLight = Color(0xFFD4E0F9); // 달력 range 배경
