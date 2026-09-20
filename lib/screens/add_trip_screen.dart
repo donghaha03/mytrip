@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../data/trip_store.dart';
 import '../models/country.dart';
@@ -10,6 +9,7 @@ import '../widgets/app_sheet.dart';
 import '../widgets/calendar_range_picker.dart';
 import '../widgets/country_chip.dart';
 import '../widgets/sheets.dart';
+import '../widgets/won_input_formatter.dart';
 
 /// 02. 새 여행 추가.
 class AddTripScreen extends StatefulWidget {
@@ -244,7 +244,7 @@ class _AddTripScreenState extends State<AddTripScreen> {
     return TextField(
       controller: _budgetController,
       keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      inputFormatters: const [WonInputFormatter()],
       cursorColor: AppColors.primary,
       onChanged: (_) => setState(() {}),
       style: const TextStyle(

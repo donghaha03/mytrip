@@ -1,5 +1,7 @@
 import '../theme/app_theme.dart';
 
+const kWonSymbol = '₩';
+
 /// 여행 국가 + 통화 + 환율.
 ///
 /// 환율은 "unitAmount 단위당 krwPerUnit 원" 형태로 저장한다.
@@ -30,9 +32,12 @@ class Country {
   /// "¥1,200"
   String formatForeign(num amount) => '$symbol${formatNumber(amount)}';
 
-  /// "100엔 = 950원"
+  /// "¥100 = ₩950"
+  ///
+  /// 국기·여행 이름 바로 옆에 붙는 자리라 한글 단위명("100엔 = 950원")은 길고
+  /// 투박해서 통화 기호로 쓴다.
   String get rateLabel =>
-      '${formatNumber(unitAmount)}$unitLabel = ${formatNumber(krwPerUnit)}원';
+      '${formatForeign(unitAmount)} = $kWonSymbol${formatNumber(krwPerUnit)}';
 }
 
 /// 02 화면에 기본 노출되는 7개국 (마지막 칸은 "더보기")

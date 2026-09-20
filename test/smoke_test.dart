@@ -10,6 +10,7 @@ import 'package:tripapp/models/country.dart';
 import 'package:tripapp/theme/app_theme.dart';
 import 'package:tripapp/widgets/country_chip.dart';
 import 'package:tripapp/widgets/sheets.dart';
+import 'package:tripapp/widgets/won_input_formatter.dart';
 
 Widget _wrap(Widget child) =>
     MaterialApp(theme: buildAppTheme(), home: child);
@@ -57,7 +58,7 @@ void main() {
     final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
     await tester.pumpWidget(_wrap(TripMainScreen(trip: japan)));
     expect(find.text('남은 예산'), findsOneWidget);
-    expect(find.text('100엔 = 950원'), findsOneWidget);
+    expect(find.text('¥100 = ₩950'), findsOneWidget);
     expect(find.text('📒  여행 장부 보기'), findsOneWidget);
     expect(find.text('이치란 라멘'), findsOneWidget);
     expect(find.text('11,400원'), findsOneWidget); // ¥1,200 환산
@@ -131,14 +132,14 @@ void main() {
   testWidgets('03 이름이 최대 길이여도 상단바가 안 넘친다', (tester) async {
     // 뒤로가기 + 국기 + 이름(20자) + 환율 + i + 햄버거가 한 줄에 들어가야 한다.
     // 넘치면 RenderFlex overflow 로 이 테스트가 깨진다.
-    final trip = tripStore.trips.firstWhere((t) => t.id == 't1'); // 1달러 = 1,350원
+    final trip = tripStore.trips.firstWhere((t) => t.id == 't1'); // $1 = ₩1,350
     tripStore.rename(trip.id, '가' * 20);
     await tester.pumpWidget(const TripApp());
     await tester.tap(find.text('가' * 20));
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-    expect(find.text('1달러 = 1,350원'), findsOneWidget);
+    expect(find.text('\$1 = ₩1,350'), findsOneWidget);
   });
 
   testWidgets('07 환율 정보 툴팁', (tester) async {
@@ -181,11 +182,78 @@ void main() {
     expect(tester.getSize(sheetChips.first).height, kCountryChipHeight);
   });
 
+  testWidgets('02 예산 입력에 콤마가 즉시 찍힌다', (tester) async {
+    await tester.pumpWidget(_wrap(const AddTripScreen()));
+    final field = find.widgetWithText(TextField, '1,200,000'); // hint
+    await tester.enterText(field, '1200000');
+    await tester.pump();
+    expect(find.text('1,200,000'), findsWidgets);
+
+    // 콤마가 붙어도 여행 생성 시 숫자로 되읽을 수 있어야 한다
+    await tester.enterText(field, '850000');
+    await tester.pump();
+    expect(find.text('850,000'), findsOneWidget);
+  });
+
+  group('WonInputFormatter', () {
+    const f = WonInputFormatter();
+
+    TextEditingValue type(String text, {int? caret}) => f.formatEditUpdate(
+          TextEditingValue.empty,
+          TextEditingValue(
+            text: text,
+            selection:
+                TextSelection.collapsed(offset: caret ?? text.length),
+          ),
+        );
+
+    test('천 단위마다 콤마', () {
+      expect(type('1200000').text, '1,200,000');
+      expect(type('999').text, '999');
+      expect(type('1000').text, '1,000');
+      expect(type('').text, '');
+    });
+
+    test('숫자가 아닌 입력은 걸러낸다', () {
+      expect(type('12a3!4').text, '1,234');
+    });
+
+    test('선행 0 제거', () {
+      expect(type('007').text, '7');
+      expect(type('0').text, '0');
+    });
+
+    test('커서가 맨 뒤로 튀지 않는다', () {
+      // "1,234,567" 에서 맨 앞 '1' 뒤(숫자 1개 지난 지점)에 커서
+      final v = type('1234567', caret: 1);
+      expect(v.text, '1,234,567');
+      expect(v.selection.baseOffset, 1);
+
+      // 숫자 4개 지난 지점 -> "1,234|,567"
+      final v2 = type('1234567', caret: 4);
+      expect(v2.text, '1,234,567');
+      expect(v2.text.substring(0, v2.selection.baseOffset), '1,234');
+    });
+
+    test('자릿수 상한을 넘기면 입력을 무시', () {
+      const old = TextEditingValue(text: '999,999,999,999');
+      final v = f.formatEditUpdate(
+        old,
+        const TextEditingValue(text: '9999999999999'), // 13자리
+      );
+      expect(v.text, old.text);
+    });
+  });
+
   test('환율 환산 / 포맷', () {
     final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
     // 100엔 = 950원 이므로 ¥1,200 -> 11,400원
     expect(japan.country.toKrw(1200), 11400);
-    expect(japan.country.rateLabel, '100엔 = 950원');
+    expect(japan.country.rateLabel, '¥100 = ₩950');
+    expect(
+      kPrimaryCountries.firstWhere((c) => c.currency == 'USD').rateLabel,
+      '\$1 = ₩1,350',
+    );
     expect(formatWon(742300), '742,300원');
     expect(formatNumber(-1234567), '-1,234,567');
   });
