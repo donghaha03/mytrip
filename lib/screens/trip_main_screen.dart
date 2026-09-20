@@ -76,7 +76,7 @@ class TripMainScreen extends StatelessWidget {
   }
 }
 
-/// 여행 이름 + 환율 + i 아이콘 / 우측 햄버거 메뉴
+/// 뒤로가기 + 여행 이름 + 환율 + i 아이콘 / 우측 햄버거 메뉴
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.trip});
 
@@ -87,6 +87,16 @@ class _TopBar extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        // 01 여행 리스트에서 밀고 들어온 화면이라 돌아갈 곳이 있을 때만 띄운다.
+        if (Navigator.of(context).canPop()) ...[
+          InkResponse(
+            onTap: () => Navigator.of(context).pop(),
+            radius: 22,
+            child: const Icon(Icons.arrow_back_rounded,
+                size: 24, color: AppColors.textPrimary),
+          ),
+          const SizedBox(width: 10),
+        ],
         Expanded(
           child: Row(
             children: [

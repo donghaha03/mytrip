@@ -108,6 +108,36 @@ void main() {
     expect(find.text('가족 여행'), findsNothing);
   });
 
+  testWidgets('03 뒤로가기로 01 리스트에 돌아온다', (tester) async {
+    await tester.pumpWidget(const TripApp());
+    await tester.tap(find.text('일본 여행'));
+    await tester.pumpAndSettle();
+    expect(find.text('남은 예산'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('내 여행'), findsOneWidget);
+  });
+
+  testWidgets('03 을 루트로 띄우면 뒤로가기가 없다', (tester) async {
+    final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
+    await tester.pumpWidget(_wrap(TripMainScreen(trip: japan)));
+    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
+  });
+
+  testWidgets('03 이름이 최대 길이여도 상단바가 안 넘친다', (tester) async {
+    // 뒤로가기 + 국기 + 이름(20자) + 환율 + i + 햄버거가 한 줄에 들어가야 한다.
+    // 넘치면 RenderFlex overflow 로 이 테스트가 깨진다.
+    final trip = tripStore.trips.firstWhere((t) => t.id == 't1'); // 1달러 = 1,350원
+    tripStore.rename(trip.id, '가' * 20);
+    await tester.pumpWidget(const TripApp());
+    await tester.tap(find.text('가' * 20));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+    expect(find.text('1달러 = 1,350원'), findsOneWidget);
+  });
+
   testWidgets('07 환율 정보 툴팁', (tester) async {
     final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
     await tester.pumpWidget(_wrap(TripMainScreen(trip: japan)));
