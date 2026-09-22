@@ -32,6 +32,12 @@
 같은 함수(`authService.signIn/signUp`)와 같은 에러 문구를 쓰게 맞춰 놨으니, 로컬에서
 되면 Firebase 에서도 된다.
 
+키를 채운 뒤에도 콘솔 설정이 덜 됐거나 오프라인일 때는 강제로 로컬 모드로 띄울 수 있다:
+
+```bash
+flutter run -d chrome --dart-define=LOCAL_MODE=true
+```
+
 ### 공용 파일
 
 여러 명이 같이 쓰는 파일이라 **말없이 고치면 충돌 난다.** 바꿔야 하면 먼저 얘기할 것:
@@ -91,10 +97,11 @@ git push
 ## 작업 전 확인
 
 ```bash
-. C:\Users\dongb\dev\flutter-env.ps1   # 이 PC 기준. 각자 환경에 맞게
 flutter pub get
-flutter run
+flutter run -d chrome
 ```
+
+Flutter 버전은 CI 와 같은 **3.47.5** 를 권장한다 (`flutter --version`).
 
 ## 테스트
 

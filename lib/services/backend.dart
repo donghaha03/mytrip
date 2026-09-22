@@ -22,7 +22,13 @@ class Backend {
   static BackendMode mode = BackendMode.local;
   static bool get isFirebase => mode == BackendMode.firebase;
 
+  /// 키가 있어도 강제로 로컬 모드로 띄운다. Firebase 콘솔 설정이 덜 됐거나
+  /// 오프라인에서 화면만 만질 때:
+  ///   flutter run -d chrome --dart-define=LOCAL_MODE=true
+  static const _forceLocal = bool.fromEnvironment('LOCAL_MODE');
+
   static Future<BackendMode> init() async {
+    if (_forceLocal) return mode = BackendMode.local;
     try {
       final options = DefaultFirebaseOptions.currentPlatform;
       if (options.apiKey.isEmpty || options.projectId.isEmpty) {

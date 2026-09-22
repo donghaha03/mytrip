@@ -20,13 +20,14 @@ Figma `환율 여행 장부앱 - PBL1` 을 옮긴 Flutter 앱.
 | 표시 | 로그인 화면에 파란 "로컬 임시 모드" 안내 | 안내 없음 |
 
 조원은 Firebase 키 없이 로컬 모드로 바로 작업하면 된다.
+키를 채운 뒤에도 `--dart-define=LOCAL_MODE=true` 를 주면 강제로 로컬 모드로 뜬다.
 
 ## 실행
 
 ```powershell
-. C:\Users\dongb\dev\flutter-env.ps1   # 이 PC 기준. flutter 가 PATH 에 있으면 생략
 flutter pub get
 flutter run -d chrome
+flutter run -d chrome --dart-define=LOCAL_MODE=true   # 키가 있어도 로컬로
 ```
 
 ## 처음 한 번: Firebase 연결 (팀장)
@@ -62,23 +63,27 @@ flutterfire configure --project=<firebase 프로젝트 id> --platforms=web,andro
 
 **Authentication → 설정 → 승인된 도메인 → 도메인 추가** → `<계정>.github.io`
 
-## 처음 한 번: GitHub 에 올리기 (팀장)
+## 처음 한 번: GitHub 에 올리기
 
 1. github.com 에서 새 repo — **README·.gitignore·license 모두 체크 해제**
 2. 올리기:
 
    ```powershell
    git remote add origin https://github.com/<계정>/<repo>.git
-   git push -u origin main feat/login feat/more
+   git push -u origin main
    ```
 
-   `feat/login`, `feat/more` 는 조원 작업용으로 미리 만들어 둔 브랜치다.
 3. repo **Settings → Pages → Source: GitHub Actions**
-4. repo **Settings → Collaborators** 에서 조원 초대
-5. (권장) **Settings → Branches → main 보호 규칙**: PR 필수 + `CI` 통과 필수
 
 Actions 탭에서 "Deploy to GitHub Pages" 가 초록불이 되면
 `https://<계정>.github.io/<repo>/` 에서 열린다.
+
+## 나중에 조원과 공유할 때
+
+1. repo **Settings → Collaborators** 에서 조원 초대
+2. (권장) **Settings → Branches → main 보호 규칙**: PR 필수 + `CI` 통과 필수
+3. 조원은 clone 후 각자 브랜치에서 작업 (`feat/login`, `feat/more` — [CONTRIBUTING.md](CONTRIBUTING.md))
+4. Firebase 를 붙였다면 조원도 콘솔에서 보게 하려면: Firebase **프로젝트 설정 → 사용자 및 권한** 에서 추가
 
 ## 화면 구성
 
