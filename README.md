@@ -3,7 +3,8 @@
 Figma `환율 여행 장부앱 - PBL1` 을 옮긴 Flutter 앱.
 로그인은 Firebase Auth, 데이터는 Firestore, 배포는 GitHub Pages.
 
-- **배포 주소**: `https://<계정>.github.io/<repo>/` — `main` 에 합쳐지면 1~2분 뒤 자동 반영
+- **배포 주소**: https://donghaha03.github.io/mytrip/ — `main` 에 합쳐지면 1~2분 뒤 자동 반영
+- **저장소**: https://github.com/donghaha03/mytrip
 - **팀 작업 규칙**: [CONTRIBUTING.md](CONTRIBUTING.md) — 누가 어떤 파일을 맡는지
 
 ## 두 가지 모드
