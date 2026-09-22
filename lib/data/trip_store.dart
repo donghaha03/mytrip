@@ -58,6 +58,24 @@ class TripStore extends ChangeNotifier {
     _push(_repo?.renameTrip(id, newName));
   }
 
+  /// 06 여행 편집에서 이름·기간·예산을 한 번에 바꾼다. 준 것만 바뀐다.
+  void update(
+    String id, {
+    String? name,
+    DateTime? start,
+    DateTime? end,
+    int? budgetKrw,
+  }) {
+    final trip = byId(id);
+    if (trip == null) return;
+    if (name != null) trip.name = name;
+    if (start != null) trip.start = start;
+    if (end != null) trip.end = end;
+    if (budgetKrw != null) trip.budgetKrw = budgetKrw;
+    notifyListeners();
+    _push(_repo?.updateTrip(trip));
+  }
+
   void addExpense(String tripId, Expense expense) {
     final trip = byId(tripId);
     if (trip == null) return;

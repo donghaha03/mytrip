@@ -23,7 +23,13 @@ class TripListScreen extends StatelessWidget {
 
     switch (result.action) {
       case TripEditAction.save:
-        tripStore.rename(trip.id, result.name!);
+        tripStore.update(
+          trip.id,
+          name: result.name,
+          start: result.range!.start,
+          end: result.range!.end,
+          budgetKrw: result.budgetKrw,
+        );
       case TripEditAction.delete:
         tripStore.remove(trip.id);
     }

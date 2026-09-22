@@ -12,6 +12,9 @@ abstract class TripRepository {
 
   Future<void> saveTrip(Trip trip);
   Future<void> renameTrip(String tripId, String name);
+
+  /// 이름·기간·예산 (지출과 생성 시각은 그대로)
+  Future<void> updateTrip(Trip trip);
   Future<void> deleteTrip(String tripId);
   Future<void> saveExpense(String tripId, Expense expense);
 }
@@ -61,6 +64,15 @@ class FirestoreTripRepository implements TripRepository {
   @override
   Future<void> renameTrip(String tripId, String name) =>
       _trips.doc(tripId).update({'name': name});
+
+  // set() 이 아니라 update() — createdAt 을 덮어쓰지 않으려고
+  @override
+  Future<void> updateTrip(Trip t) => _trips.doc(t.id).update({
+        'name': t.name,
+        'start': Timestamp.fromDate(t.start),
+        'end': Timestamp.fromDate(t.end),
+        'budgetKrw': t.budgetKrw,
+      });
 
   /// 문서를 지워도 하위 컬렉션은 안 지워지는 게 Firestore 규칙이라
   /// records 를 먼저 같이 지운다.

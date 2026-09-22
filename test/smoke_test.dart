@@ -13,6 +13,8 @@ import 'package:tripapp/theme/app_theme.dart';
 import 'package:tripapp/widgets/country_chip.dart';
 import 'package:tripapp/widgets/sheets.dart';
 import 'package:tripapp/widgets/quick_converter.dart';
+import 'package:tripapp/widgets/rate_info_tooltip.dart';
+import 'package:tripapp/widgets/today_budget_sheet.dart';
 import 'package:tripapp/widgets/won_input_formatter.dart';
 
 Widget _wrap(Widget child) =>
@@ -96,7 +98,7 @@ void main() {
     expect(find.text('여행 삭제'), findsOneWidget);
     expect(find.text('5 / 20자'), findsOneWidget); // '가족 여행'
 
-    await tester.enterText(find.byType(TextField), '방콕 여행');
+    await tester.enterText(find.byType(TextField).first, '방콕 여행'); // 이름 칸
     await tester.pump();
     await tester.tap(find.text('저장'));
     await tester.pumpAndSettle();
@@ -197,24 +199,149 @@ void main() {
     expect(find.text('내 여행'), findsOneWidget);
   });
 
-  testWidgets('여행 홈: 편집 버튼으로 06 시트를 열어 이름을 바꾼다', (tester) async {
+  testWidgets('여행 홈: 편집 시트에서 이름과 예산을 바꾼다', (tester) async {
     final thai = tripStore.trips.firstWhere((t) => t.id == 't3');
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: thai)));
 
-    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.tap(find.byTooltip('여행 편집'));
     await tester.pumpAndSettle();
     expect(find.text('여행 편집'), findsOneWidget);
+    expect(find.text('여행 기간'), findsOneWidget);
+    expect(find.text('1,800,000'), findsOneWidget); // 예산 칸이 현재 값으로 채워져 있다
 
-    // 화면에 계산기 입력칸도 있어서 시트 안의 입력칸으로 좁힌다
-    await tester.enterText(
-      find.descendant(
-          of: find.byType(TripEditSheet), matching: find.byType(TextField)),
-      '치앙마이 여행',
-    );
+    // 화면에 계산기 입력칸도 있어서 시트 안으로 좁힌다. 시트 안: [이름, 예산]
+    final fields = find.descendant(
+        of: find.byType(TripEditSheet), matching: find.byType(TextField));
+    await tester.enterText(fields.at(0), '치앙마이 여행');
+    await tester.enterText(fields.at(1), '2000000');
     await tester.pump();
+    expect(find.text('2,000,000'), findsOneWidget); // 예산 칸도 콤마
+
     await tester.tap(find.text('저장'));
     await tester.pumpAndSettle();
     expect(find.text('🇹🇭 치앙마이 여행'), findsOneWidget);
+    // 지출이 없는 여행이라 예산과 남은 금액이 둘 다 2,000,000원
+    expect(find.text('2,000,000원'), findsNWidgets(2));
+    expect(tripStore.byId('t3')!.budgetKrw, 2000000);
+  });
+
+  testWidgets('여행 홈: 편집 시트에서 기간 칸을 누르면 05 달력이 뜬다', (tester) async {
+    final thai = tripStore.trips.firstWhere((t) => t.id == 't3');
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: thai)));
+    await tester.tap(find.byTooltip('여행 편집'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.calendar_today_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('여행 기간 선택'), findsOneWidget);
+    // 현재 기간이 선택된 채로 열린다 (5박 6일)
+    expect(find.text('5박 6일'), findsWidgets);
+  });
+
+  testWidgets('편집 결과가 기간까지 반영된다', (tester) async {
+    tripStore.update('t3',
+        start: DateTime(2027, 1, 10), end: DateTime(2027, 1, 12), budgetKrw: 300000);
+    final t = tripStore.byId('t3')!;
+    expect(t.durationLabel, '2박 3일');
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: t)));
+    expect(find.textContaining('01.10 – 01.12'), findsOneWidget);
+    expect(find.text('하루 100,000원'), findsOneWidget);
+  });
+
+  testWidgets('여행 홈: 여행 이름 옆 환율 + ⓘ 툴팁 (07)', (tester) async {
+    final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: japan)));
+    expect(find.text('¥100 = ₩950'), findsOneWidget);
+
+    await tester.tap(find.text('i'));
+    await tester.pumpAndSettle();
+    expect(find.text('환율 갱신 정보'), findsOneWidget);
+    expect(find.textContaining('최근 갱신: '), findsOneWidget);
+    expect(find.text('환율은 24시간마다 한 번 갱신돼요'), findsOneWidget);
+
+    // 바깥을 누르면 닫힌다
+    await tester.tapAt(const Offset(200, 700));
+    await tester.pumpAndSettle();
+    expect(find.text('환율 갱신 정보'), findsNothing);
+  });
+
+  test('환율 갱신 시각: 매일 06:00', () {
+    expect(lastRateUpdate(DateTime(2026, 9, 20, 14, 30)),
+        DateTime(2026, 9, 20, 6));
+    expect(lastRateUpdate(DateTime(2026, 9, 20, 5, 59)),
+        DateTime(2026, 9, 19, 6)); // 아직 오늘 갱신 전
+    expect(lastRateUpdate(DateTime(2026, 9, 1, 3)),
+        DateTime(2026, 8, 31, 6)); // 달이 넘어가도
+  });
+
+  testWidgets('여행 홈: 오늘 예산 아이콘 -> 남은 예산 ÷ 남은 날', (tester) async {
+    final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: japan)));
+
+    await tester.tap(find.byTooltip('오늘 예산'));
+    await tester.pumpAndSettle();
+    // 출발 전(D-11): 남은 743,050원 ÷ 5일 = 148,610원
+    expect(find.text('하루 예산'), findsOneWidget);
+    expect(find.text('하루 148,610원'), findsOneWidget);
+    expect(find.text('남은 743,050원 ÷ 5일'), findsOneWidget);
+
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    expect(find.text('하루 148,610원'), findsNothing);
+  });
+
+  group('todayBudget', () {
+    Trip trip({int budget = 100000, List<Expense>? expenses}) => Trip(
+          id: 'x',
+          name: 'x',
+          country: countryByCode('JPY')!, // ¥100 = ₩950
+          start: DateTime(2026, 10, 1),
+          end: DateTime(2026, 10, 5), // 5일
+          budgetKrw: budget,
+          expenses: expenses,
+        );
+    Expense spend(double yen, DateTime at) =>
+        Expense(id: '$yen$at', icon: '·', place: '·', amount: yen, date: at);
+
+    test('출발 전: 전체 일수로 나눈다', () {
+      final b = todayBudget(trip(), DateTime(2026, 9, 20));
+      expect(b.phase, TodayPhase.beforeTrip);
+      expect(b.daysLeft, 5);
+      expect(b.allowanceKrw, 20000);
+    });
+
+    test('여행 중: 오늘 아침 기준으로 나누고, 오늘 쓴 만큼 뺀다', () {
+      // 3일차. 1일차에 ¥2,000(19,000원), 오늘 ¥1,000(9,500원)
+      final t = trip(expenses: [
+        spend(2000, DateTime(2026, 10, 1, 12)),
+        spend(1000, DateTime(2026, 10, 3, 9)),
+      ]);
+      final b = todayBudget(t, DateTime(2026, 10, 3, 18));
+      expect(b.phase, TodayPhase.during);
+      expect(b.daysLeft, 3); // 3·4·5일
+      // 아침 기준 남은 돈 = 100,000 - 19,000 = 81,000 -> ÷3 = 27,000
+      expect(b.allowanceKrw, 27000);
+      expect(b.spentTodayKrw, 9500);
+      expect(b.leftTodayKrw, 17500);
+    });
+
+    test('마지막 날은 남은 돈 전부', () {
+      final b = todayBudget(trip(), DateTime(2026, 10, 5, 23));
+      expect(b.daysLeft, 1);
+      expect(b.allowanceKrw, 100000);
+    });
+
+    test('예산을 이미 다 썼으면 0', () {
+      final t = trip(budget: 10000, expenses: [spend(2000, DateTime(2026, 10, 1))]);
+      final b = todayBudget(t, DateTime(2026, 10, 2));
+      expect(b.phase, TodayPhase.overBudget);
+      expect(b.allowanceKrw, 0);
+    });
+
+    test('끝난 여행', () {
+      final b = todayBudget(trip(), DateTime(2026, 10, 6));
+      expect(b.phase, TodayPhase.finished);
+    });
   });
 
   testWidgets('여행 홈: 이름이 최대 길이여도 안 넘친다', (tester) async {
@@ -247,18 +374,14 @@ void main() {
     Widget converter(String code) =>
         _wrap(Scaffold(body: QuickConverter(country: countryByCode(code)!)));
 
-    testWidgets('엔 -> 원, 빠른 금액 칩', (tester) async {
+    testWidgets('엔 -> 원', (tester) async {
       await tester.pumpWidget(converter('JPY'));
-      expect(find.text('¥100 = ₩950 기준'), findsOneWidget);
+      expect(find.text('¥'), findsOneWidget); // 빈 칸이어도 통화 기호는 보인다
 
       await tester.enterText(find.byType(TextField), '1500');
       await tester.pump();
       expect(find.text('1,500'), findsOneWidget); // 입력칸도 콤마
       expect(find.text('14,250원'), findsOneWidget);
-
-      await tester.tap(find.text('¥1,000'));
-      await tester.pump();
-      expect(find.text('9,500원'), findsOneWidget);
     });
 
     testWidgets('방향을 바꾸면 지금 결과가 새 입력이 된다', (tester) async {

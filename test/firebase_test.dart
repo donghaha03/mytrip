@@ -114,6 +114,28 @@ void main() {
       expect(held.expenses.single.amount, 3500.0);
     });
 
+    test('여행 편집(이름·기간·예산)이 저장되고 createdAt 은 그대로', () async {
+      store.connect(FirestoreTripRepository(uid: 'u1', db: db));
+      await settle();
+      store.add(_trip('t1'));
+      await settle();
+      final createdAt = (await tripsOf('u1').doc('t1').get())['createdAt'];
+
+      store.update('t1',
+          name: '오사카 여행',
+          start: DateTime(2026, 11, 1),
+          end: DateTime(2026, 11, 3),
+          budgetKrw: 500000);
+      await settle();
+
+      final doc = await tripsOf('u1').doc('t1').get();
+      expect(doc['name'], '오사카 여행');
+      expect((doc['start'] as Timestamp).toDate(), DateTime(2026, 11, 1));
+      expect((doc['end'] as Timestamp).toDate(), DateTime(2026, 11, 3));
+      expect(doc['budgetKrw'], 500000);
+      expect(doc['createdAt'], createdAt);
+    });
+
     test('여행 삭제 시 records 도 같이 지운다', () async {
       store.connect(FirestoreTripRepository(uid: 'u1', db: db));
       await settle();

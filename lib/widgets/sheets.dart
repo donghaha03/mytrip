@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 import 'app_sheet.dart';
 import 'calendar_range_picker.dart';
 import 'country_chip.dart';
+import 'won_input_formatter.dart';
 
 // ---------------------------------------------------------------------------
 // 04. 국가 더보기
@@ -152,14 +154,29 @@ class _DateRangeSheetState extends State<DateRangeSheet> {
 }
 
 // ---------------------------------------------------------------------------
-// 06. 여행 편집 (이름 인라인 수정 + 삭제)
+// 06. 여행 편집 (이름 · 기간 · 예산 수정 + 삭제)
 // ---------------------------------------------------------------------------
 enum TripEditAction { save, delete }
 
 class TripEditResult {
-  const TripEditResult(this.action, [this.name]);
+  const TripEditResult.save({
+    required String this.name,
+    required DateRange this.range,
+    required int this.budgetKrw,
+  }) : action = TripEditAction.save;
+
+  const TripEditResult.delete()
+      : action = TripEditAction.delete,
+        name = null,
+        range = null,
+        budgetKrw = null;
+
   final TripEditAction action;
+
+  /// save 일 때만 채워진다
   final String? name;
+  final DateRange? range;
+  final int? budgetKrw;
 }
 
 class TripEditSheet extends StatefulWidget {
@@ -173,15 +190,21 @@ class TripEditSheet extends StatefulWidget {
 
 class _TripEditSheetState extends State<TripEditSheet> {
   late final TextEditingController _controller;
+  late final TextEditingController _budget;
   late final FocusNode _focusNode;
+  late DateRange _range;
   static const _maxLength = 20;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.trip.name)
+    final t = widget.trip;
+    _controller = TextEditingController(text: t.name)
       ..addListener(() => setState(() {}));
-    // 시트가 열리자마자 바로 수정할 수 있도록 커서를 올려 둔다.
+    _budget = TextEditingController(text: formatNumber(t.budgetKrw))
+      ..addListener(() => setState(() {}));
+    _range = DateRange(t.start, t.end);
+    // 시트가 열리자마자 바로 이름을 고칠 수 있도록 커서를 올려 둔다.
     _focusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
@@ -193,113 +216,206 @@ class _TripEditSheetState extends State<TripEditSheet> {
   @override
   void dispose() {
     _controller.dispose();
+    _budget.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  int get _budgetValue => parseAmount(_budget.text).round();
+
+  bool get _canSave => _controller.text.trim().isNotEmpty && _budgetValue > 0;
+
+  Future<void> _pickRange() async {
+    final picked = await showAppSheet<DateRange>(
+      context: context,
+      builder: (_) => DateRangeSheet(initialRange: _range),
+    );
+    if (picked != null) setState(() => _range = picked);
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       // 키보드가 올라와도 시트가 가려지지 않게
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: AppSheet(
-        title: '여행 편집',
-        children: [
-          const Text(
-            '여행 이름',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _controller,
-            focusNode: _focusNode,
-            maxLength: _maxLength,
-            cursorColor: AppColors.primary,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: AppColors.white,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              suffixIcon: _controller.text.isEmpty
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.cancel,
-                          size: 20, color: AppColors.handle),
-                      onPressed: () => _controller.clear(),
-                    ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide:
-                    const BorderSide(color: AppColors.border, width: 1),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide:
-                    const BorderSide(color: AppColors.primary, width: 2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${_controller.text.length} / $_maxLength자',
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textTertiary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          SheetPrimaryButton(
-            label: '저장',
-            onTap: () {
-              final name = _controller.text.trim();
-              if (name.isEmpty) return;
-              Navigator.of(context)
-                  .pop(TripEditResult(TripEditAction.save, name));
-            },
-          ),
-          const SizedBox(height: 8),
-          Material(
-            color: AppColors.dangerSoft,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              onTap: () => Navigator.of(context)
-                  .pop(const TripEditResult(TripEditAction.delete)),
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                height: 50,
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.delete_outline_rounded,
-                        size: 18, color: AppColors.danger),
-                    SizedBox(width: 6),
-                    Text(
-                      '여행 삭제',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.danger,
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      // 칸이 늘어서 작은 화면 + 키보드면 넘칠 수 있다 -> 스크롤
+      child: SingleChildScrollView(
+        child: AppSheet(
+          title: '여행 편집',
+          children: [
+            const _FieldLabel('여행 이름'),
+            TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              maxLength: _maxLength,
+              cursorColor: AppColors.primary,
+              style: _fieldText,
+              decoration: _fieldDecoration(
+                suffixIcon: _controller.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.cancel,
+                            size: 20, color: AppColors.handle),
+                        onPressed: () => _controller.clear(),
                       ),
-                    ),
-                  ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${_controller.text.length} / $_maxLength자',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const _FieldLabel('여행 기간'),
+            Material(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                onTap: _pickRange,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${formatShortDateWithWeekday(_range.start)} – '
+                          '${formatShortDateWithWeekday(_range.end)}',
+                          style: _fieldText,
+                        ),
+                      ),
+                      Text(
+                        _range.durationLabel,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.calendar_today_rounded,
+                          size: 16, color: AppColors.textTertiary),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 14),
+            const _FieldLabel('예산 (원화)'),
+            TextField(
+              controller: _budget,
+              keyboardType: TextInputType.number,
+              inputFormatters: const [WonInputFormatter()],
+              cursorColor: AppColors.primary,
+              style: _fieldText,
+              decoration: _fieldDecoration(suffixText: '원'),
+            ),
+            const SizedBox(height: 18),
+            Opacity(
+              opacity: _canSave ? 1 : 0.4,
+              child: SheetPrimaryButton(
+                label: '저장',
+                onTap: () {
+                  if (!_canSave) return;
+                  Navigator.of(context).pop(TripEditResult.save(
+                    name: _controller.text.trim(),
+                    range: _range,
+                    budgetKrw: _budgetValue,
+                  ));
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Material(
+              color: AppColors.dangerSoft,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                onTap: () =>
+                    Navigator.of(context).pop(const TripEditResult.delete()),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  height: 50,
+                  alignment: Alignment.center,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.delete_outline_rounded,
+                          size: 18, color: AppColors.danger),
+                      SizedBox(width: 6),
+                      Text(
+                        '여행 삭제',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.danger,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+const _fieldText = TextStyle(
+  fontSize: 16,
+  fontWeight: FontWeight.w600,
+  color: AppColors.textPrimary,
+);
+
+InputDecoration _fieldDecoration({Widget? suffixIcon, String? suffixText}) =>
+    InputDecoration(
+      counterText: '',
+      filled: true,
+      fillColor: AppColors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      suffixIcon: suffixIcon,
+      suffixText: suffixText,
+      suffixStyle: const TextStyle(
+        color: AppColors.textSecondary,
+        fontWeight: FontWeight.w600,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.border, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+      ),
+    );
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }

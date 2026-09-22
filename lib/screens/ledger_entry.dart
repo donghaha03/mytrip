@@ -17,21 +17,22 @@ enum LedgerStart {
 /// 누르면 "준비 중" 안내만 뜬다.
 ///
 /// ───────────────────────────────────────────────────────────────
-///  장부 담당이 만들 것 (Figma 03_메인_페이지 + 07_환율_정보_툴팁):
+///  장부 담당이 만들 것:
 ///   - 지출 목록 (최근 결제가 위로, 날짜별 묶기 등)
 ///   - 지출 기록 입력 (카테고리, 사용처, 금액 / 날짜는 시스템 시각)
-///   - 상단 "¥100 = ₩950 ⓘ" + 환율 갱신 안내 툴팁
 ///   - (선택) 어제 대비 증감, 카테고리별 합계
 ///
-///  ⚠ 사용한 금액 · 예산 대비 진행 바 · 남은 금액 요약은 여행 홈이 이미 보여준다
-///    (trip_home_screen.dart 의 _SpendingCard). 장부에서 같은 카드를 또 만들
-///    필요는 없다 — 목록과 입력에 집중하면 된다. 여행 홈은 trip.expenses 를
-///    읽기만 하므로 장부에서 tripStore.addExpense 로 기록하면 자동으로 갱신된다.
+///  ⚠ 여행 홈에 이미 있는 것 — 장부에서 또 만들 필요 없다:
+///    - 사용한 금액 · 예산 대비 진행 바 · 남은 금액 (trip_home_screen.dart)
+///    - 오늘 예산 (widgets/today_budget_sheet.dart)
+///    - "¥100 = ₩950 ⓘ" + 07 환율 갱신 툴팁 (widgets/rate_info_tooltip.dart)
+///      장부 화면 상단에도 필요하면 RateInfoButton 을 그대로 가져다 쓰면 된다.
+///    여행 홈은 trip.expenses 를 읽기만 하므로, 장부에서 tripStore.addExpense 로
+///    기록하면 여행 홈 숫자는 자동으로 갱신된다.
 ///
-///  예전에 이 저장소에 있던 03/07 구현을 그대로 가져다 써도 된다:
+///  예전 03 구현(지출 목록 한 줄 위젯 ExpenseTile 포함)을 참고해도 된다:
 ///   git show 6fe2ac6:lib/screens/trip_main_screen.dart
-///   git show 6fe2ac6:lib/widgets/budget_card.dart         (예산 카드, ExpenseTile)
-///   git show 6fe2ac6:lib/widgets/rate_info_tooltip.dart   (07 툴팁)
+///   git show 6fe2ac6:lib/widgets/budget_card.dart         (ExpenseTile)
 ///
 ///  연결은 이 파일만 고치면 된다. 여행 홈 화면은 건드릴 필요 없다.
 ///   1. lib/screens/ledger_screen.dart 에 LedgerScreen(trip:, start:) 을 만든다

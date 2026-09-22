@@ -6,8 +6,10 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
 import '../widgets/quick_converter.dart';
+import '../widgets/rate_info_tooltip.dart';
 import '../widgets/screen_top_bar.dart';
 import '../widgets/sheets.dart';
+import '../widgets/today_budget_sheet.dart';
 import 'ledger_entry.dart';
 import 'more_screen.dart';
 
@@ -42,7 +44,13 @@ class TripHomeScreen extends StatelessWidget {
     if (result == null || !context.mounted) return;
     switch (result.action) {
       case TripEditAction.save:
-        tripStore.rename(trip.id, result.name!);
+        tripStore.update(
+          trip.id,
+          name: result.name,
+          start: result.range!.start,
+          end: result.range!.end,
+          budgetKrw: result.budgetKrw,
+        );
       case TripEditAction.delete:
         // 지운 여행 화면에 남아 있으면 안 되니 리스트로 먼저 돌아간다
         Navigator.of(context).pop();
@@ -62,6 +70,21 @@ class TripHomeScreen extends StatelessWidget {
             children: [
               ScreenTopBar(
                 title: '${trip.country.flag} ${trip.name}',
+                // Figma 07: 여행 이름 오른쪽에 환율 + ⓘ (누르면 갱신 시각 안내)
+                titleSuffix: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      trip.country.rateLabel,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    RateInfoButton(lastUpdated: lastRateUpdate(DateTime.now())),
+                  ],
+                ),
                 trailing: _CircleIconButton(
                   icon: Icons.menu_rounded,
                   tooltip: '더보기',
@@ -76,7 +99,15 @@ class TripHomeScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _SpendingCard(trip: trip, onEdit: () => _edit(context)),
+                      _SpendingCard(
+                        trip: trip,
+                        onEdit: () => _edit(context),
+                        onToday: () => showAppSheet<void>(
+                          context: context,
+                          builder: (_) => TodayBudgetSheet(
+                              trip: trip, now: DateTime.now()),
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       QuickConverter(country: trip.country),
                     ],
@@ -116,10 +147,15 @@ String _md(DateTime d) =>
 
 /// 메인 카드: 사용한 금액이 가장 크게, 그 아래 예산 대비 진행 바와 남은 금액.
 class _SpendingCard extends StatelessWidget {
-  const _SpendingCard({required this.trip, required this.onEdit});
+  const _SpendingCard({
+    required this.trip,
+    required this.onEdit,
+    required this.onToday,
+  });
 
   final Trip trip;
   final VoidCallback onEdit;
+  final VoidCallback onToday;
 
   @override
   Widget build(BuildContext context) {
@@ -170,22 +206,16 @@ class _SpendingCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Tooltip(
-                message: '여행 편집',
-                child: InkResponse(
-                  onTap: onEdit,
-                  radius: 22,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.white.withValues(alpha: 0.18),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.edit_outlined,
-                        size: 16, color: AppColors.white),
-                  ),
-                ),
+              _CardIcon(
+                icon: Icons.today_rounded,
+                tooltip: '오늘 예산',
+                onTap: onToday,
+              ),
+              const SizedBox(width: 6),
+              _CardIcon(
+                icon: Icons.edit_outlined,
+                tooltip: '여행 편집',
+                onTap: onEdit,
               ),
             ],
           ),
@@ -287,6 +317,39 @@ class _SpendingCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 파란 카드 위의 작은 원형 아이콘 버튼 (오늘 예산, 편집)
+class _CardIcon extends StatelessWidget {
+  const _CardIcon({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 22,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.white.withValues(alpha: 0.18),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 16, color: AppColors.white),
+        ),
       ),
     );
   }

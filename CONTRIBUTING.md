@@ -6,8 +6,8 @@
 
 | 담당 | 화면 (Figma) | 파일 |
 |---|---|---|
-| **이 저장소 (완료)** | 00 첫 화면, 01 여행 리스트, 02 여행 추가, 04 국가 더보기, 05 기간 선택, 06 여행 편집, **여행 홈** (예산·사용 금액 요약, 빠른 환산) | `empty_home`, `trip_list`, `add_trip`, `trip_home` + `widgets/sheets.dart`, `widgets/quick_converter.dart` |
-| 장부 | 03 메인 페이지, 07 환율 툴팁, 지출 기록 | 새로 `lib/screens/ledger_screen.dart` → 연결은 `ledger_entry.dart` |
+| **이 저장소 (완료)** | 00 첫 화면, 01 여행 리스트, 02 여행 추가, 04 국가 더보기, 05 기간 선택, 06 여행 편집(이름·기간·예산), 07 환율 툴팁, **여행 홈** (예산·사용 금액 요약, 오늘 예산, 빠른 환산) | `empty_home`, `trip_list`, `add_trip`, `trip_home` + `widgets/sheets.dart`, `quick_converter.dart`, `today_budget_sheet.dart`, `rate_info_tooltip.dart` |
+| 장부 | 지출 목록, 지출 기록 입력 | 새로 `lib/screens/ledger_screen.dart` → 연결은 `ledger_entry.dart` |
 | 로그인 | 로그인 / 회원가입 | 새로 `lib/screens/login_screen.dart` → 연결은 `main.dart` 의 `HomeRouter` |
 | 더보기 | 더보기 메뉴 | `lib/screens/more_screen.dart` |
 
@@ -16,20 +16,25 @@
 01 에서 여행을 누르면 들어온다.
 
 ```
-← 🇯🇵 일본 여행                              ≡      ≡ -> 더보기
-┌ D-11 · 10.04 – 10.08 · 4박 5일        ✎ ┐      ✎ -> 06 여행 편집
+← 🇯🇵 일본 여행  ¥100 = ₩950 ⓘ               ≡      ⓘ -> 07 환율 갱신 툴팁, ≡ -> 더보기
+┌ D-11 · 10.04 – 10.08 · 4박 5일     📅 ✎ ┐      📅 -> 오늘 예산 시트, ✎ -> 06 여행 편집
 │ 사용한 금액  456,950원          ¥48,100 │
 │ ▓▓▓▓▓▓▓░░░░░░░░░░░░░░             38% │      예산 넘으면 "초과" 로 바뀜
 │ 예산 1,200,000원          남은 743,050원 │
 └─────────────────────────────────────────┘
 ┌ 빠른 환산  JPY → KRW                  ⇅ ┐      기록 안 남는 계산기
-│ ¥ 1,500                    = 14,250원   │
-│ [¥1,000] [¥5,000] [¥10,000]             │
+│ [¥ 1,500      ]  =          14,250원    │
 └─────────────────────────────────────────┘
+(여기 아래로 기능 카드를 더 붙일 자리)
 [ + 지출 기록 ]  [ 장부 보기 ]                       -> 장부 (입력부터 / 목록)
 ```
 
-사용한 금액 요약은 `trip.expenses` 를 **읽기만** 한다. 지출 목록·기록 입력·환율 툴팁은 장부 몫.
+- **오늘 예산**: 남은 예산 ÷ 오늘 포함 남은 날. 여행 중이면 "오늘 아침 기준" 으로 나누고
+  오늘 쓴 만큼 뺀 "오늘 남은 금액" 도 보여준다 (지금 남은 돈으로 나누면 쓸수록 오늘 몫이 줄어든다).
+  출발 전이면 전체 일수로 나눈 하루 예산. 계산은 `todayBudget()` 에 있고 테스트가 있다
+- **07 툴팁**: 매일 06:00 갱신 기준으로 최근 갱신 시각을 보여준다 (`lastRateUpdate()`).
+  환율 API 를 붙이면 실제 마지막 호출 시각으로 바꾸면 된다
+- 사용한 금액 요약은 `trip.expenses` 를 **읽기만** 한다. 지출 목록·기록 입력은 장부 몫
 
 ### 장부 담당
 
@@ -38,12 +43,11 @@
 
 - `openLedger(context, trip, start: LedgerStart.overview | addExpense)` 로 불린다.
   `addExpense` 면 입력 폼부터 열어 주면 된다
-- 사용한 금액·진행 바·남은 금액은 여행 홈에 이미 있으니 **장부는 목록과 입력에 집중**하면 된다
-- 03/07 은 예전에 이 저장소에 구현해 둔 게 있다. 필요한 부분만 가져다 써도 된다:
+- 사용한 금액·남은 금액·오늘 예산·07 환율 툴팁은 여행 홈에 이미 있으니 **장부는 목록과 입력에 집중**하면 된다.
+  장부 화면에도 환율 표시가 필요하면 `RateInfoButton` 을 그대로 쓴다
+- 지출 목록 한 줄 위젯은 예전 구현을 참고해도 된다:
   ```bash
-  git show 6fe2ac6:lib/screens/trip_main_screen.dart
-  git show 6fe2ac6:lib/widgets/budget_card.dart        # 예산 카드, ExpenseTile
-  git show 6fe2ac6:lib/widgets/rate_info_tooltip.dart  # 07 툴팁
+  git show 6fe2ac6:lib/widgets/budget_card.dart        # ExpenseTile
   ```
 - 저장은 `tripStore.addExpense(trip.id, Expense(...))` — Firebase 모드면 Firestore 까지 간다
 
