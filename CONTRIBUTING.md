@@ -4,35 +4,65 @@
 
 파일을 사람별로 갈라 뒀다. **자기 파일만 고치면 충돌이 안 난다.**
 
-| 담당 | 건드리는 파일 | 하는 일 |
+| 담당 | 화면 (Figma) | 파일 |
 |---|---|---|
-| 로그인 페이지 | `lib/screens/login_screen.dart` | 로그인·회원가입 화면 (비밀번호 찾기 등) |
-| 더보기 페이지 | `lib/screens/more_screen.dart` | 여행 정보 수정, 통화 설정, 여행 삭제, 로그아웃 |
-| 팀장 | 공용 파일 | Firebase 설정, 리뷰, 합치기 |
+| **이 저장소 (완료)** | 00 첫 화면, 01 여행 리스트, 02 여행 추가, 04 국가 더보기, 05 기간 선택, 06 여행 편집, **여행 홈** | `empty_home`, `trip_list`, `add_trip`, `trip_home` + `widgets/sheets.dart` |
+| 장부 | 03 메인 페이지, 07 환율 툴팁, 지출 기록 | 새로 `lib/screens/ledger_screen.dart` → 연결은 `ledger_entry.dart` |
+| 로그인 | 로그인 / 회원가입 | 새로 `lib/screens/login_screen.dart` → 연결은 `main.dart` 의 `HomeRouter` |
+| 더보기 | 더보기 메뉴 | `lib/screens/more_screen.dart` |
 
-두 화면 모두 이미 연결돼 있다 (로그인은 앱 시작, 더보기는 03 메인 ≡ 버튼).
-각자 파일을 열면 맨 위 주석에 쓸 수 있는 함수·데이터와 이미 만들어진 것들이
-정리돼 있다.
+### 여행 홈
 
-### 장부 페이지 (이 팀 범위 밖)
+01 에서 여행을 누르면 들어온다. 여행 자체의 정보(D-day, 기간, 예산, 국가·통화)만
+보여주고, 하단에 버튼이 있다:
 
-03 메인에 **"여행 장부" 메뉴는 있고**, 지금은 누르면 "준비 중" 안내만 뜬다.
-나중에 누가 만들든 `lib/screens/ledger_entry.dart` **한 파일만** 고치면 연결된다
-(공용인 `trip_main_screen.dart` 는 건드릴 필요 없다). 방법은 그 파일 맨 위 주석에 있다.
+```
+[ 📒 여행 장부   지출 4건 · 남은 예산 보기   (준비 중) › ]   -> 장부
+[ ＋ 지출 기록 ]  [ ⋯ 더보기 ]                               -> 장부(입력부터) / 더보기
+```
 
-### Firebase 없이 작업하기
+오른쪽 위 ✎ 는 06 여행 편집 시트(이름 변경·삭제)를 연다.
+
+### 장부 담당
+
+여행 홈의 두 버튼("여행 장부", "지출 기록")이 이미 있고, 지금은 누르면 "준비 중" 안내만 뜬다.
+**`lib/screens/ledger_entry.dart` 한 파일만** 고치면 연결된다 — 여행 홈은 건드릴 필요 없다.
+
+- `openLedger(context, trip, start: LedgerStart.overview | addExpense)` 로 불린다.
+  `addExpense` 면 입력 폼부터 열어 주면 된다
+- 03/07 은 예전에 이 저장소에 구현해 둔 게 있다. 그대로 가져다 써도 된다:
+  ```bash
+  git show 6fe2ac6:lib/screens/trip_main_screen.dart
+  git show 6fe2ac6:lib/widgets/budget_card.dart        # 예산 카드, ExpenseTile
+  git show 6fe2ac6:lib/widgets/rate_info_tooltip.dart  # 07 툴팁
+  ```
+- 저장은 `tripStore.addExpense(trip.id, Expense(...))` — Firebase 모드면 Firestore 까지 간다
+
+### 로그인 담당
+
+로그인 **기능**은 이미 있다 (`lib/services/auth_service.dart`). 화면만 만들면 된다.
+
+```dart
+await authService.signIn(email, password);   // 실패 시 AuthException(message) — 한국어 문구
+await authService.signUp(email, password);
+await authService.signOut();
+authService.isSignedIn / authService.currentUser
+```
+
+- 로그인 화면을 앱 앞에 세우려면 `main.dart` 의 `HomeRouter` 를
+  "`authService.isSignedIn` 이면 여행 화면, 아니면 로그인 화면" 으로 감싼다.
+  `authService` 는 ChangeNotifier 라 `AnimatedBuilder` 로 감싸면 로그인 즉시 넘어간다
+- Firebase 모드에서는 로그인하는 순간 그 사람의 Firestore(`users/{uid}/...`)에
+  자동으로 붙는다 (`services/session.dart`). 로그인 전 데이터는 메모리에만 있다
+- 로컬 모드의 가짜 로그인도 Firebase 와 같은 규칙·문구라 로컬에서 되면 Firebase 에서도 된다
+
+### Firebase 없이 작업하기 (로컬 모드)
 
 `lib/firebase_options.dart` 가 비어 있으면 앱이 **로컬 임시 모드**로 뜬다
-(참고한 naite-reservation 과 같은 방식). 로그인 화면에 파란 안내 박스가 보이면 그 상태다.
+(참고한 naite-reservation 의 임시 저장 모드와 같다). 데이터는 메모리에만 있고
+새로고침하면 목업 3건으로 돌아간다. **조원은 Firebase 키 없이 이 모드로 작업하면 된다.**
 
-- 로그인: 아무 이메일 + 6자 이상 비밀번호면 통과
-- 데이터: 메모리에만. 새로고침하면 목업 3건으로 돌아간다
-
-**조원은 Firebase 키 없이 이 모드로 작업하면 된다.** 로그인 화면은 로컬과 Firebase 가
-같은 함수(`authService.signIn/signUp`)와 같은 에러 문구를 쓰게 맞춰 놨으니, 로컬에서
-되면 Firebase 에서도 된다.
-
-키를 채운 뒤에도 콘솔 설정이 덜 됐거나 오프라인일 때는 강제로 로컬 모드로 띄울 수 있다:
+키를 채운 뒤에도 강제로 로컬 모드로 띄울 수 있다:
 
 ```bash
 flutter run -d chrome --dart-define=LOCAL_MODE=true
@@ -43,14 +73,14 @@ flutter run -d chrome --dart-define=LOCAL_MODE=true
 여러 명이 같이 쓰는 파일이라 **말없이 고치면 충돌 난다.** 바꿔야 하면 먼저 얘기할 것:
 
 ```
-lib/firebase_options.dart   Firebase 키           ← 팀장만. flutterfire configure 가 덮어씀
+lib/main.dart               HomeRouter (로그인 담당이 여기에 로그인 화면을 끼운다)
+lib/firebase_options.dart   Firebase 키           ← flutterfire configure 가 덮어씀
 lib/services/               authService, Backend  ← 로그인 기능 추가 시 여기 인터페이스부터 합의
 lib/models/                 Trip, Expense, Country ← 필드 추가는 Firestore 저장 구조도 같이 바뀜
 lib/data/                   tripStore, Firestore 저장
 lib/theme/                  색·폰트·숫자 포맷
 lib/widgets/                ScreenTopBar, AppSheet, CountryChip ...
-lib/main.dart               AuthGate (로그인 여부로 화면 전환)
-lib/screens/trip_main_screen.dart                  ← 더보기·장부 메뉴가 있는 곳
+lib/screens/trip_home_screen.dart   여행 홈 (장부·더보기로 가는 버튼)
 firestore.rules
 ```
 
@@ -64,7 +94,7 @@ firestore.rules
 ```bash
 git switch main
 git pull                       # 남이 합친 걸 먼저 받는다
-git switch -c feat/login       # feat/more, fix/xxx ...
+git switch -c feat/ledger      # feat/login, feat/more, fix/xxx ...
 
 # ... 작업 ...
 
@@ -72,8 +102,8 @@ flutter analyze                # 0건이어야 한다
 flutter test                   # 전부 통과해야 한다
 
 git add .
-git commit -m "로그인 페이지: 비밀번호 찾기 추가"
-git push -u origin feat/login
+git commit -m "장부: 지출 기록 입력 폼"
+git push -u origin feat/ledger
 ```
 
 GitHub 에서 PR 을 열면 CI 가 자동으로 `analyze` + `test` + `웹 빌드` 를 돌린다.
@@ -84,7 +114,7 @@ GitHub 에서 PR 을 열면 CI 가 자동으로 `analyze` + `test` + `웹 빌드
 ```bash
 git switch main
 git pull
-git switch feat/login
+git switch feat/ledger
 git merge main                 # 여기서 충돌 표시가 뜬다
 # 파일 열어서 <<<<<<< ======= >>>>>>> 구간 정리
 git add .
@@ -103,19 +133,24 @@ flutter run -d chrome
 
 Flutter 버전은 CI 와 같은 **3.47.5** 를 권장한다 (`flutter --version`).
 
+지원 플랫폼은 **Android · iOS · 웹**이다. Windows 데스크톱은 뺐다 — 켜 두면 Windows 에서
+"개발자 모드"를 켜지 않은 사람은 `flutter pub get` 이 플러그인 symlink 단계에서 실패한다.
+필요해지면 `flutter create --platforms=windows .` 로 다시 만든다.
+
 ## 테스트
 
 | 파일 | 보는 것 |
 |---|---|
 | `test/smoke_test.dart` | 화면들을 실제 사용 경로로 한 번씩. 폰 사이즈라 레이아웃이 넘치면 깨진다 |
-| `test/auth_test.dart` | 로그인 -> 여행 목록 -> 로그아웃 -> 로그인 흐름 |
-| `test/firebase_test.dart` | Firestore 저장 구조, 로그인 에러 문구. 가짜 Firebase 로 돌아서 키 필요 없음 |
+| `test/firebase_test.dart` | Firestore 저장 구조, 로그인 기능·에러 문구. 가짜 Firebase 로 돌아서 키 필요 없음 |
 
 지켜야 할 연결:
 
-- **로그인 담당**: `auth_test.dart` 가 계속 통과해야 한다. 화면을 갈아엎으면서 버튼 문구
-  (`로그인`, `처음이에요 · 회원가입`)가 바뀌면 테스트의 문구도 같이 바꿀 것
-- **더보기 담당**: 03 에서 들어가고 뒤로 나오기, `로그아웃` 버튼으로 로그인 화면 복귀
+- **장부 담당**: 연결하면 `smoke_test.dart` 의 "하단에 장부로 가는 버튼들" 테스트를
+  "장부로 들어가고 나온다" 로 바꿀 것 (지금은 "준비 중" 안내를 기대한다)
+- **로그인 담당**: 로그인 화면을 앞에 세우면 기존 화면 테스트들이 로그인 뒤에서 시작하도록
+  `setUp` 에서 `authService.signIn(...)` 을 불러 줄 것. 로그인 흐름 테스트도 새로 추가
+- **더보기 담당**: 여행 홈에서 들어가고 뒤로 나오기
 
 페이지 내용은 마음대로 바꿔도 된다. 기능을 추가하면 테스트도 같이 늘린다.
 
@@ -124,7 +159,7 @@ Flutter 버전은 CI 와 같은 **3.47.5** 를 권장한다 (`flutter --version`
 한 줄 요약 + (필요하면) 왜 그렇게 했는지. 한국어로 써도 된다.
 
 ```
-장부 페이지: 지출을 날짜별로 묶어서 표시
+장부: 지출을 날짜별로 묶어서 표시
 
 같은 날 여러 건을 기록하면 순서가 섞여서 date 를 타임스탬프로 비교하도록 했다.
 ```

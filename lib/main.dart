@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'data/trip_store.dart';
 import 'screens/empty_home_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/trip_list_screen.dart';
 import 'services/auth_service.dart';
 import 'services/backend.dart';
@@ -15,6 +14,10 @@ Future<void> main() async {
 
   // firebase_options.dart 가 채워져 있으면 Firebase, 아니면 로컬 임시 모드.
   if (await Backend.init() == BackendMode.firebase) {
+    // 로그인 화면은 이 저장소 범위 밖이다 (로그인 담당). 로그인 기능 자체
+    // (authService)와 "로그인하면 그 사람의 Firestore 에 붙는" 연결은 미리 해
+    // 뒀으니, 로그인 화면에서 authService.signIn 을 부르기만 하면 된다.
+    // 로그인 전에는 데이터가 메모리에만 있다.
     authService = FirebaseAuthService();
     bindTripStoreToAuth(authService, tripStore);
   } else {
@@ -37,7 +40,7 @@ class TripApp extends StatelessWidget {
       theme: buildAppTheme(),
       // 폰 기준으로 짠 레이아웃이라 데스크톱/태블릿 폭에서 그냥 늘리면
       // 그리드 칸이 거대한 정사각형으로 벌어진다. 폰 폭으로 묶어서 가운데 세운다.
-      // 시트·스낵바·툴팁 오버레이도 builder 안쪽이라 같이 묶인다.
+      // 시트·스낵바 오버레이도 builder 안쪽이라 같이 묶인다.
       builder: (context, child) => ColoredBox(
         color: AppColors.frame,
         child: Center(
@@ -47,7 +50,7 @@ class TripApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const AuthGate(),
+      home: const HomeRouter(),
     );
   }
 }
@@ -55,50 +58,11 @@ class TripApp extends StatelessWidget {
 /// 이 폭을 넘어가면 더 늘리지 않는다. 일반적인 폰 가로폭(≤430) 기준.
 const kPhoneWidth = 440.0;
 
-/// 로그인 안 했으면 로그인 화면, 했으면 여행 화면.
-///
-/// 로그인 화면에서 성공한 뒤 직접 화면을 넘길 필요 없다 — authService 가
-/// 바뀌면 여기서 알아서 바꾼다. 로그아웃하면 쌓여 있던 화면(03, 더보기 등)을
-/// 전부 걷어내고 로그인으로 돌아온다.
-class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
-
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  late bool _wasSignedIn = authService.isSignedIn;
-
-  @override
-  void initState() {
-    super.initState();
-    authService.addListener(_onAuthChanged);
-  }
-
-  @override
-  void dispose() {
-    authService.removeListener(_onAuthChanged);
-    super.dispose();
-  }
-
-  void _onAuthChanged() {
-    final signedIn = authService.isSignedIn;
-    if (_wasSignedIn && !signedIn) {
-      Navigator.of(context).popUntil((r) => r.isFirst);
-    }
-    _wasSignedIn = signedIn;
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!authService.isReady) return const _Loading();
-    return authService.isSignedIn ? const HomeRouter() : const LoginScreen();
-  }
-}
-
 /// 여행이 없으면 00 첫 화면, 있으면 01 여행 리스트.
+///
+/// 로그인 담당: 로그인 화면을 앞에 세우려면 여기(또는 TripApp.home)를
+/// "authService.isSignedIn 이면 HomeRouter, 아니면 로그인 화면" 으로 감싸면 된다.
+/// authService 는 ChangeNotifier 라 AnimatedBuilder 로 감싸면 로그인 즉시 넘어간다.
 class HomeRouter extends StatelessWidget {
   const HomeRouter({super.key});
 

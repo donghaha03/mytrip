@@ -1,7 +1,7 @@
 # 여행 장부앱 (Flutter + Firebase)
 
-Figma `환율 여행 장부앱 - PBL1` 을 옮긴 Flutter 앱.
-로그인은 Firebase Auth, 데이터는 Firestore, 배포는 GitHub Pages.
+Figma `환율 여행 장부앱 - PBL1` 을 옮긴 Flutter 앱. 데이터는 Firestore, 배포는 GitHub Pages.
+장부(03·07)와 로그인 화면은 다른 담당이 만든다 — 연결 지점만 준비돼 있다.
 
 - **배포 주소**: https://donghaha03.github.io/mytrip/ — `main` 에 합쳐지면 1~2분 뒤 자동 반영
 - **저장소**: https://github.com/donghaha03/mytrip
@@ -16,9 +16,8 @@ Figma `환율 여행 장부앱 - PBL1` 을 옮긴 Flutter 앱.
 | | 로컬 임시 모드 | Firebase 모드 |
 |---|---|---|
 | 언제 | `firebase_options.dart` 가 비어 있을 때 (**지금 상태**) | 키가 채워져 있을 때 |
-| 로그인 | 아무 이메일 + 6자 이상 비밀번호 | Firebase Auth 이메일/비밀번호 |
-| 데이터 | 메모리. 새로고침하면 목업 3건으로 초기화 | Firestore. 기기 간 실시간 동기화 |
-| 표시 | 로그인 화면에 파란 "로컬 임시 모드" 안내 | 안내 없음 |
+| 데이터 | 메모리. 새로고침하면 목업 3건으로 초기화 | 로그인한 사용자의 Firestore. 기기 간 실시간 동기화 |
+| 로그인 기능 | 아무 이메일 + 6자 이상 비밀번호 (가짜) | Firebase Auth 이메일/비밀번호 |
 
 조원은 Firebase 키 없이 로컬 모드로 바로 작업하면 된다.
 키를 채운 뒤에도 `--dart-define=LOCAL_MODE=true` 를 주면 강제로 로컬 모드로 뜬다.
@@ -51,8 +50,8 @@ dart pub global activate flutterfire_cli
 flutterfire configure --project=<firebase 프로젝트 id> --platforms=web,android,ios
 ```
 
-`lib/firebase_options.dart` 가 덮어써진다. 다시 `flutter run` 하면 로그인 화면의
-파란 안내가 사라지고 Firebase 모드로 뜬다.
+`lib/firebase_options.dart` 가 덮어써진다. 다시 `flutter run` 하면 Firebase 모드로 뜬다
+(목업 3건 대신 빈 화면에서 시작). 로그인 화면이 붙기 전까지는 데이터가 메모리에만 있다.
 
 > CLI 가 번거로우면: 콘솔 **프로젝트 설정 → 내 앱 → 웹 앱 추가** 에서 나오는
 > `firebaseConfig` 값을 `firebase_options.dart` 의 `web:` 칸에 직접 옮겨 적어도 된다.
@@ -88,23 +87,24 @@ Actions 탭에서 "Deploy to GitHub Pages" 가 초록불이 되면
 
 ## 화면 구성
 
-| 파일 | 번호 | 설명 | 담당 |
+| 파일 | Figma | 설명 | 담당 |
 |---|---|---|---|
-| `screens/login_screen.dart` | 10 | 로그인 / 회원가입 | **로그인 담당** |
-| `screens/empty_home_screen.dart` | 00 | 여행이 없을 때의 첫 화면 | |
-| `screens/trip_list_screen.dart` | 01 | 내 여행 목록 (길게 눌러 편집) | |
-| `screens/add_trip_screen.dart` | 02 | 새 여행 추가 | |
-| `screens/trip_main_screen.dart` | 03 | 여행 메인 (예산 요약) | |
-| `widgets/sheets.dart` | 04~06 | 국가 더보기 / 기간 선택 / 이름 편집 시트 | |
-| `widgets/rate_info_tooltip.dart` | 07 | 환율 갱신 안내 툴팁 | |
-| `screens/more_screen.dart` | 09 | 더보기 — **구현 전** | **더보기 담당** |
-| `screens/ledger_entry.dart` | 08 | 장부 연결 지점 (메뉴만, 페이지는 범위 밖) | — |
+| `screens/empty_home_screen.dart` | 00 | 여행이 없을 때의 첫 화면 | ✅ |
+| `screens/trip_list_screen.dart` | 01 | 내 여행 목록 (길게 눌러 편집) | ✅ |
+| `screens/add_trip_screen.dart` | 02 | 새 여행 추가 | ✅ |
+| `widgets/sheets.dart` | 04~06 | 국가 더보기 / 기간 선택 / 여행 편집 시트 | ✅ |
+| `screens/trip_home_screen.dart` | — | **여행 홈**: D-day·기간·예산 + 하단 장부 버튼 | ✅ |
+| `screens/ledger_entry.dart` | 03·07 | 장부 연결 지점 (버튼만, 페이지는 장부 담당) | 장부 담당 |
+| `screens/more_screen.dart` | — | 더보기 — **구현 전** | 더보기 담당 |
+| (없음) | — | 로그인 화면 — `services/auth_service.dart` 에 기능은 있음 | 로그인 담당 |
+
+흐름: 00/01 → 여행 누르면 **여행 홈** → 하단 "여행 장부" / "지출 기록" → 장부 (준비 중), "더보기" → 더보기
 
 ## 구조
 
 ```
 lib/
-  main.dart                  AuthGate: 로그인 여부로 화면 전환
+  main.dart                  HomeRouter: 00 빈 화면 / 01 리스트 (로그인 화면은 여기에 끼운다)
   firebase_options.dart      Firebase 키 (비어 있으면 로컬 모드)
   services/
     backend.dart             로컬 / Firebase 모드 판정
@@ -139,11 +139,11 @@ Firebase 경로 테스트(`test/firebase_test.dart`)는 가짜 Firestore/Auth �
 
 ## 다음 단계
 
-1. **환율** — `models/country.dart` 의 `krwPerUnit` 이 하드코딩. 환율 API 를 붙이고
-   마지막 호출 날짜를 저장해 두었다가 날짜가 바뀐 경우에만 다시 호출한다
-   (트래픽 절감). `rate_info_tooltip.dart` 의 `lastUpdated` 에 그 시각을 넘기면 된다.
-2. **장부 페이지** — 03 의 "여행 장부" 메뉴는 있고 지금은 "준비 중". 저장 쪽
-   (`tripStore.addExpense`)은 Firestore 까지 연결돼 있어서 화면만 만들면 된다.
-   `screens/ledger_entry.dart` 한 파일에서 연결.
-3. **폰트** — Figma 는 Inter. `google_fonts` 추가 후 `theme/app_theme.dart` 에서
+1. **장부 (장부 담당)** — 여행 홈의 "여행 장부"/"지출 기록" 버튼은 있고 지금은 "준비 중".
+   `screens/ledger_entry.dart` 한 파일에서 연결. 예전 03/07 구현은
+   `git show 6fe2ac6:lib/screens/trip_main_screen.dart` 로 꺼내 쓸 수 있다.
+2. **로그인 (로그인 담당)** — `authService` 로 화면만 만들어 `main.dart` 의 `HomeRouter` 앞에 세운다.
+3. **환율 API** — `models/country.dart` 의 `krwPerUnit` 이 하드코딩. 마지막 호출 날짜를
+   저장해 두었다가 날짜가 바뀐 경우에만 다시 호출한다 (트래픽 절감).
+4. **폰트** — Figma 는 Inter. `google_fonts` 추가 후 `theme/app_theme.dart` 에서
    `GoogleFonts.interTextTheme()`.

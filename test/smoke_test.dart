@@ -6,9 +6,9 @@ import 'package:tripapp/main.dart';
 import 'package:tripapp/screens/add_trip_screen.dart';
 import 'package:tripapp/screens/more_screen.dart';
 import 'package:tripapp/screens/trip_list_screen.dart';
-import 'package:tripapp/screens/trip_main_screen.dart';
-import 'package:tripapp/services/auth_service.dart';
+import 'package:tripapp/screens/trip_home_screen.dart';
 import 'package:tripapp/models/country.dart';
+import 'package:tripapp/models/trip.dart';
 import 'package:tripapp/theme/app_theme.dart';
 import 'package:tripapp/widgets/country_chip.dart';
 import 'package:tripapp/widgets/sheets.dart';
@@ -19,15 +19,10 @@ Widget _wrap(Widget child) =>
 
 void main() {
   // 목업 스크린샷과 같은 폰 사이즈로 맞춘다 (iPhone 14 기준).
-  setUp(() async {
+  setUp(() {
     final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     view.physicalSize = const Size(1170, 2532);
     view.devicePixelRatio = 3.0;
-
-    // 앱이 로그인 뒤에 있어서, 화면 테스트는 로그인된 상태에서 시작한다.
-    // 로그인 화면 자체는 auth_test.dart 에서 따로 본다.
-    authService = LocalAuthService();
-    await authService.signIn('tester@trip.app', '123456');
   });
 
   tearDown(() {
@@ -59,16 +54,6 @@ void main() {
     expect(find.text('JPY'), findsOneWidget);
     expect(find.text('더보기'), findsOneWidget);
     expect(find.text('여행 만들기'), findsOneWidget);
-  });
-
-  testWidgets('03 메인 페이지 예산 카드 + 최근 지출', (tester) async {
-    final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
-    await tester.pumpWidget(_wrap(TripMainScreen(trip: japan)));
-    expect(find.text('남은 예산'), findsOneWidget);
-    expect(find.text('¥100 = ₩950'), findsOneWidget);
-    expect(find.text('여행 장부'), findsOneWidget);
-    expect(find.text('이치란 라멘'), findsOneWidget);
-    expect(find.text('11,400원'), findsOneWidget); // ¥1,200 환산
   });
 
   testWidgets('04 국가 더보기 시트', (tester) async {
@@ -119,82 +104,138 @@ void main() {
     expect(find.text('가족 여행'), findsNothing);
   });
 
-  testWidgets('03 뒤로가기로 01 리스트에 돌아온다', (tester) async {
+  // ── 여행 홈 (01 에서 여행을 누르면) ─────────────────────────────
+  // 03 메인(남은 예산·지출 목록)과 07 환율 툴팁은 장부 담당 몫이라 여기 없다.
+
+  testWidgets('여행 홈: 여행 정보만 있고 지출·남은 예산은 없다', (tester) async {
     await tester.pumpWidget(const TripApp());
     await tester.tap(find.text('일본 여행'));
     await tester.pumpAndSettle();
-    expect(find.text('남은 예산'), findsOneWidget);
+
+    expect(find.byType(TripHomeScreen), findsOneWidget);
+    expect(find.text('🇯🇵 일본 여행'), findsOneWidget); // 상단바
+    expect(find.text('D-11'), findsOneWidget); // 목업: 오늘 + 11일 출발
+    expect(find.text('4박 5일'), findsOneWidget);
+    expect(find.text('1,200,000원'), findsOneWidget);
+    expect(find.text('≈ ¥126,316'), findsOneWidget);
+    // 하루 예산 = 1,200,000 / 5일
+    expect(find.text('하루 예산 · 5일'), findsOneWidget);
+    expect(find.text('240,000원'), findsOneWidget);
+
+    // 장부 담당 영역은 안 보여야 한다
+    expect(find.text('남은 예산'), findsNothing);
+    expect(find.text('이치란 라멘'), findsNothing);
+    expect(find.text('¥100 = ₩950'), findsNothing);
+  });
+
+  testWidgets('여행 홈: 하단에 장부로 가는 버튼들', (tester) async {
+    await tester.pumpWidget(const TripApp());
+    await tester.tap(find.text('일본 여행'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('장부 보기'), findsOneWidget);
+    expect(find.text('지출 기록'), findsOneWidget);
+
+    // 장부가 아직 없으니 두 버튼 다 안내만 띄우고 화면은 그대로
+    await tester.tap(find.text('장부 보기'));
+    await tester.pump();
+    expect(find.text('장부 페이지는 준비 중이에요'), findsOneWidget);
+
+    await tester.tap(find.text('지출 기록'));
+    await tester.pump();
+    expect(find.text('지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'),
+        findsOneWidget);
+    expect(find.byType(TripHomeScreen), findsOneWidget);
+  });
+
+  testWidgets('여행 홈: 오른쪽 위 ≡ 로 더보기에 들어가고 나온다', (tester) async {
+    await tester.pumpWidget(const TripApp());
+    await tester.tap(find.text('일본 여행'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('더보기'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MoreScreen), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    expect(find.byType(TripHomeScreen), findsOneWidget);
+  });
+
+  testWidgets('여행 홈: 뒤로가기로 01 리스트에 돌아온다', (tester) async {
+    await tester.pumpWidget(const TripApp());
+    await tester.tap(find.text('일본 여행'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
     await tester.pumpAndSettle();
     expect(find.text('내 여행'), findsOneWidget);
   });
 
-  testWidgets('03 을 루트로 띄우면 뒤로가기가 없다', (tester) async {
-    final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
-    await tester.pumpWidget(_wrap(TripMainScreen(trip: japan)));
-    expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
+  testWidgets('여행 홈: 편집 버튼으로 06 시트를 열어 이름을 바꾼다', (tester) async {
+    final thai = tripStore.trips.firstWhere((t) => t.id == 't3');
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: thai)));
+
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('여행 편집'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '치앙마이 여행');
+    await tester.pump();
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+    expect(find.text('🇹🇭 치앙마이 여행'), findsOneWidget);
   });
 
-  testWidgets('03 이름이 최대 길이여도 상단바가 안 넘친다', (tester) async {
-    // 뒤로가기 + 국기 + 이름(20자) + 환율 + i + 햄버거가 한 줄에 들어가야 한다.
+  testWidgets('여행 홈: 이름이 최대 길이여도 안 넘친다', (tester) async {
     // 넘치면 RenderFlex overflow 로 이 테스트가 깨진다.
-    final trip = tripStore.trips.firstWhere((t) => t.id == 't1'); // $1 = ₩1,350
-    tripStore.rename(trip.id, '가' * 20);
+    tripStore.rename('t1', '가' * 20);
     await tester.pumpWidget(const TripApp());
     await tester.tap(find.text('가' * 20));
     await tester.pumpAndSettle();
-
-    expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
-    expect(find.text('\$1 = ₩1,350'), findsOneWidget);
+    expect(find.byType(TripHomeScreen), findsOneWidget);
+    expect(find.text('여행 완료'), findsOneWidget); // 미국 여행은 이미 끝났다
   });
 
-  // 장부 페이지는 이 저장소 범위 밖이라 메뉴만 있다. ledger_entry.dart 에서
-  // kLedgerReady 를 켜고 화면을 연결하면 이 테스트를 "들어가고 나온다" 로 바꿀 것.
-  testWidgets('08 장부 메뉴: 건수를 보여주고, 누르면 준비 중 안내', (tester) async {
+  testWidgets('여행 홈: 편집 시트에서 삭제하면 리스트로 돌아가고 사라진다', (tester) async {
     await tester.pumpWidget(const TripApp());
-    await tester.tap(find.text('일본 여행'));
+    await tester.tap(find.text('가' * 20)); // 위 테스트에서 이름을 바꾼 미국 여행
     await tester.pumpAndSettle();
 
-    expect(find.text('여행 장부'), findsOneWidget);
-    expect(find.text('지출 4건 · 전체 내역 보기'), findsOneWidget);
-    expect(find.text('준비 중'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('여행 삭제'));
+    await tester.pumpAndSettle();
 
-    await tester.tap(find.text('여행 장부'));
-    await tester.pump();
-    expect(find.text('장부 페이지는 준비 중이에요'), findsOneWidget);
-    expect(find.text('남은 예산'), findsOneWidget); // 화면은 그대로
+    expect(find.byType(TripHomeScreen), findsNothing);
+    expect(find.text('내 여행'), findsOneWidget);
+    expect(find.text('가' * 20), findsNothing);
+    expect(tripStore.byId('t1'), isNull);
   });
 
-  testWidgets('08 장부 메뉴: 지출이 없으면 없다고 말한다', (tester) async {
-    final thai = tripStore.trips.firstWhere((t) => t.id == 't3');
-    await tester.pumpWidget(_wrap(TripMainScreen(trip: thai)));
-    expect(find.text('아직 기록이 없어요'), findsOneWidget);
-  });
+  group('tripStatusLabel', () {
+    final trip = Trip(
+      id: 'x',
+      name: 'x',
+      country: kPrimaryCountries.first,
+      start: DateTime(2026, 10, 1, 9, 30),
+      end: DateTime(2026, 10, 5),
+      budgetKrw: 0,
+    );
 
-  testWidgets('09 더보기 페이지로 들어가고 나온다', (tester) async {
-    await tester.pumpWidget(const TripApp());
-    await tester.tap(find.text('일본 여행'));
-    await tester.pumpAndSettle();
+    test('출발 전은 D-day', () {
+      expect(tripStatusLabel(trip, DateTime(2026, 9, 20, 23, 59)), 'D-11');
+      expect(tripStatusLabel(trip, DateTime(2026, 9, 30)), 'D-1');
+    });
 
-    await tester.tap(find.byIcon(Icons.menu_rounded));
-    await tester.pumpAndSettle();
-    expect(find.byType(MoreScreen), findsOneWidget);
-    expect(find.text('더보기'), findsOneWidget);
+    test('여행 중은 며칠째인지 (시각은 무시)', () {
+      expect(tripStatusLabel(trip, DateTime(2026, 10, 1, 0, 1)), '여행 중 · 1일차');
+      expect(tripStatusLabel(trip, DateTime(2026, 10, 5, 23, 0)), '여행 중 · 5일차');
+    });
 
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
-    await tester.pumpAndSettle();
-    expect(find.text('남은 예산'), findsOneWidget);
-  });
-
-  testWidgets('07 환율 정보 툴팁', (tester) async {
-    final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
-    await tester.pumpWidget(_wrap(TripMainScreen(trip: japan)));
-
-    await tester.tap(find.text('i'));
-    await tester.pumpAndSettle();
-    expect(find.text('환율 갱신 정보'), findsOneWidget);
-    expect(find.text('환율은 24시간마다 한 번 갱신돼요'), findsOneWidget);
+    test('끝난 뒤는 여행 완료', () {
+      expect(tripStatusLabel(trip, DateTime(2026, 10, 6)), '여행 완료');
+    });
   });
 
   testWidgets('데스크톱 폭에서도 폰 폭으로 묶인다', (tester) async {

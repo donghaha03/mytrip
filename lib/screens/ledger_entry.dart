@@ -2,40 +2,68 @@ import 'package:flutter/material.dart';
 
 import '../models/trip.dart';
 
-/// 03 메인의 "여행 장부" 메뉴 -> 장부 페이지 연결 지점.
+/// 장부 페이지를 어떤 상태로 열지. 여행 홈 하단 버튼마다 다르게 부른다.
+enum LedgerStart {
+  /// "여행 장부" — 남은 예산, 지출 목록
+  overview,
+
+  /// "지출 기록" — 바로 입력 폼부터
+  addExpense,
+}
+
+/// 여행 홈 -> 장부 페이지 연결 지점.
 ///
-/// 장부 페이지는 아직 없다 (이 저장소의 담당 범위 밖). 메뉴는 먼저 보이게 두고,
+/// 장부 페이지는 이 저장소 담당 범위 밖이다. 버튼은 먼저 보이게 두고,
 /// 누르면 "준비 중" 안내만 뜬다.
 ///
 /// ───────────────────────────────────────────────────────────────
-///  장부 페이지를 만드는 사람은 이 파일만 고치면 된다.
-///  trip_main_screen.dart(공용)는 건드릴 필요 없다.
+///  장부 담당이 만들 것 (Figma 03_메인_페이지 + 07_환율_정보_툴팁):
+///   - 남은 예산 카드 (원화 + 현지 통화, 어제 대비 증감, 진행 바)
+///   - 최근 지출 목록 (최근 결제가 위로)
+///   - 상단 "¥100 = ₩950 ⓘ" + 환율 갱신 안내 툴팁
+///   - 지출 기록 입력 (카테고리, 사용처, 금액 / 날짜는 시스템 시각)
 ///
-///   1. lib/screens/ledger_screen.dart 에 LedgerScreen(trip: trip) 을 만든다
-///   2. 아래 [kLedgerReady] 를 true 로 바꾼다 -> 메뉴의 "준비 중" 표시가 사라진다
-///   3. [openLedger] 안의 주석 처리된 push 두 줄을 살리고 import 를 추가한다
+///  예전에 이 저장소에 있던 03/07 구현을 그대로 가져다 써도 된다:
+///   git show 6fe2ac6:lib/screens/trip_main_screen.dart
+///   git show 6fe2ac6:lib/widgets/budget_card.dart         (예산 카드, ExpenseTile)
+///   git show 6fe2ac6:lib/widgets/rate_info_tooltip.dart   (07 툴팁)
+///
+///  연결은 이 파일만 고치면 된다. 여행 홈 화면은 건드릴 필요 없다.
+///   1. lib/screens/ledger_screen.dart 에 LedgerScreen(trip:, start:) 을 만든다
+///   2. 아래 [kLedgerReady] 를 true 로 -> 버튼의 "준비 중" 표시가 사라진다
+///   3. [openLedger] 안의 주석 처리된 push 를 살리고 import 를 추가한다
 ///
 ///  쓸 수 있는 것:
 ///   trip.expensesNewestFirst               최신순 지출 목록
+///   trip.spentKrw / remainKrw / spentRatio 합계·남은 예산·비율
 ///   trip.country.formatForeign(e.amount)   "¥1,200"
 ///   trip.country.toKrw(e.amount)           원화 환산
+///   trip.country.rateLabel                 "¥100 = ₩950"
 ///   tripStore.addExpense(trip.id, Expense(...))  저장 (Firebase 모드면 Firestore 까지)
 /// ───────────────────────────────────────────────────────────────
 const bool kLedgerReady = false;
 
-void openLedger(BuildContext context, Trip trip) {
+void openLedger(
+  BuildContext context,
+  Trip trip, {
+  LedgerStart start = LedgerStart.overview,
+}) {
   if (kLedgerReady) {
-    // Navigator.of(context).push(
-    //     MaterialPageRoute(builder: (_) => LedgerScreen(trip: trip)));
+    // Navigator.of(context).push(MaterialPageRoute(
+    //     builder: (_) => LedgerScreen(trip: trip, start: start)));
     return;
   }
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
-      const SnackBar(
-        content: Text('장부 페이지는 준비 중이에요'),
+      SnackBar(
+        content: Text(
+          start == LedgerStart.addExpense
+              ? '지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'
+              : '장부 페이지는 준비 중이에요',
+        ),
         behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
 }
