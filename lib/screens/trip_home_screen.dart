@@ -5,6 +5,7 @@ import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
+import '../widgets/quick_converter.dart';
 import '../widgets/screen_top_bar.dart';
 import '../widgets/sheets.dart';
 import 'ledger_entry.dart';
@@ -12,16 +13,22 @@ import 'more_screen.dart';
 
 /// 여행 홈. 01 리스트에서 여행을 누르면 들어온다.
 ///
-/// 여행 계획(언제·얼마나·예산)만 보여준다. 돈을 쓴 이야기 — 남은 예산,
-/// 지출 목록, 환율 툴팁(Figma 03/07) — 는 장부 페이지 몫이라 여기 두지 않고,
-/// 하단 버튼으로 장부에 넘긴다. 장부 연결은 ledger_entry.dart 에서 한다.
+/// 메인은 "예산 대비 얼마 썼나" 요약이다. 읽기만 한다 — 지출 목록·기록 입력·
+/// 환율 툴팁(Figma 03/07)은 장부 몫이라 여기 없고, 하단 버튼으로 장부에 넘긴다.
+/// 장부 연결은 ledger_entry.dart 에서 한다.
 ///
-///   ← 🇯🇵 일본 여행                    ≡     ≡ = 더보기 (Figma 03 과 같은 자리)
-///   ┌ 파란 카드: D-day · 기간 ──── ✎ ┐     ✎ = 06 여행 편집
-///   └───────────────────────────────┘
-///   ┌ 흰 카드: 예산 · 하루 예산 ──────┐
-///   └───────────────────────────────┘
-///   [ + 지출 기록 ]  [ 장부 보기 ]           -> 장부
+///   ← 🇯🇵 일본 여행                         ≡   ≡ = 더보기 (Figma 03 과 같은 자리)
+///   ┌ 파란 카드 ─────────────────────────┐
+///   │ D-11 · 10.04 – 10.08 · 4박 5일   ✎  │   ✎ = 06 여행 편집
+///   │ 사용한 금액                          │
+///   │ 456,950원              ¥48,100      │
+///   │ ▓▓▓▓▓▓░░░░░░░░░░░░░░░         38%   │
+///   │ 예산 1,200,000원     남은 743,050원  │
+///   │ 하루 240,000원                       │
+///   └────────────────────────────────────┘
+///   ┌ 빠른 환산 ─────────────────────────┐   기록 안 남는 계산기
+///   └────────────────────────────────────┘
+///   [ + 지출 기록 ]  [ 장부 보기 ]                -> 장부
 class TripHomeScreen extends StatelessWidget {
   const TripHomeScreen({super.key, required this.trip});
 
@@ -69,19 +76,9 @@ class TripHomeScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _HeroCard(trip: trip, onEdit: () => _edit(context)),
+                      _SpendingCard(trip: trip, onEdit: () => _edit(context)),
                       const SizedBox(height: 16),
-                      _BudgetCard(trip: trip),
-                      const SizedBox(height: 14),
-                      const Text(
-                        '남은 예산과 지출 내역은 장부에서 볼 수 있어요',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textTertiary,
-                        ),
-                      ),
+                      QuickConverter(country: trip.country),
                     ],
                   ),
                 ),
@@ -112,18 +109,29 @@ String tripStatusLabel(Trip t, DateTime now) {
 /// 여행 일수 (4박 5일 -> 5)
 int _tripDays(Trip t) => t.end.difference(t.start).inDays + 1;
 
+String _md(DateTime d) =>
+    '${d.month.toString().padLeft(2, '0')}.${d.day.toString().padLeft(2, '0')}';
+
 // ---------------------------------------------------------------------------
 
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.trip, required this.onEdit});
+/// 메인 카드: 사용한 금액이 가장 크게, 그 아래 예산 대비 진행 바와 남은 금액.
+class _SpendingCard extends StatelessWidget {
+  const _SpendingCard({required this.trip, required this.onEdit});
 
   final Trip trip;
   final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
+    final c = trip.country;
+    final remain = trip.remainKrw;
+    final over = remain < 0;
+    final percent = trip.budgetKrw == 0
+        ? 0
+        : (trip.spentKrw / trip.budgetKrw * 100).round();
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 14, 22),
+      padding: const EdgeInsets.fromLTRB(20, 16, 14, 20),
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
@@ -131,61 +139,151 @@ class _HeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 상태 · 기간 · 편집
           Row(
             children: [
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   tripStatusLabel(trip, DateTime.now()),
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppColors.white,
                   ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${_md(trip.start)} – ${_md(trip.end)} · ${trip.durationLabel}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onPrimaryMuted,
+                  ),
+                ),
+              ),
               Tooltip(
                 message: '여행 편집',
                 child: InkResponse(
                   onTap: onEdit,
                   radius: 22,
                   child: Container(
-                    width: 34,
-                    height: 34,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: AppColors.white.withValues(alpha: 0.18),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.edit_outlined,
-                        size: 17, color: AppColors.white),
+                        size: 16, color: AppColors.white),
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          Text(
-            trip.durationLabel,
-            style: const TextStyle(
-              fontSize: 30,
-              height: 1.2,
-              fontWeight: FontWeight.w700,
-              color: AppColors.white,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            trip.dateRangeLabel,
-            style: const TextStyle(
-              fontSize: 15,
+
+          // 사용한 금액
+          const Text(
+            '사용한 금액',
+            style: TextStyle(
+              fontSize: 14,
               fontWeight: FontWeight.w500,
               color: AppColors.onPrimaryMuted,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Text(
+                    formatWon(trip.spentKrw),
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 32,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.white,
+                    ),
+                  ),
+                ),
+                Text(
+                  c.formatForeign(trip.spentForeign),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onPrimaryFaint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 예산 대비 진행
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: trip.spentRatio,
+                      minHeight: 8,
+                      backgroundColor: AppColors.white.withValues(alpha: 0.22),
+                      valueColor: AlwaysStoppedAnimation(
+                          over ? const Color(0xFFFFB4B4) : AppColors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '$percent%',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 예산 / 남은 금액
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _Figure(
+                    label: '예산',
+                    value: formatWon(trip.budgetKrw),
+                    sub: '하루 ${formatWon(trip.budgetKrw / _tripDays(trip))}',
+                  ),
+                ),
+                _Figure(
+                  label: over ? '초과' : '남은 금액',
+                  value: formatWon(remain.abs()),
+                  sub: c.formatForeign(trip.remainForeign.abs()),
+                  alignEnd: true,
+                  warn: over,
+                ),
+              ],
             ),
           ),
         ],
@@ -194,94 +292,54 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
-/// 예산 + 하루 예산. 둘 다 "계획" 숫자라 여기 둔다 (쓴 돈은 장부).
-class _BudgetCard extends StatelessWidget {
-  const _BudgetCard({required this.trip});
+class _Figure extends StatelessWidget {
+  const _Figure({
+    required this.label,
+    required this.value,
+    required this.sub,
+    this.alignEnd = false,
+    this.warn = false,
+  });
 
-  final Trip trip;
+  final String label;
+  final String value;
+  final String sub;
+  final bool alignEnd;
+  final bool warn;
 
   @override
   Widget build(BuildContext context) {
-    final days = _tripDays(trip);
-    final c = trip.country;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '예산',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
-            ),
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: warn ? const Color(0xFFFFCACA) : AppColors.onPrimaryMuted,
           ),
-          const SizedBox(height: 6),
-          Text(
-            formatWon(trip.budgetKrw),
-            style: const TextStyle(
-              fontSize: 26,
-              height: 1.25,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: warn ? const Color(0xFFFFCACA) : AppColors.white,
           ),
-          const SizedBox(height: 2),
-          Text(
-            '≈ ${c.formatForeign(trip.budgetForeign)}',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textTertiary,
-            ),
+        ),
+        const SizedBox(height: 1),
+        Text(
+          sub,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: AppColors.onPrimaryFaint,
           ),
-          const SizedBox(height: 16),
-          Container(height: 1, color: AppColors.border),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '하루 예산 · $days일',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const Spacer(),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    formatWon(trip.budgetKrw / days),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '≈ ${c.formatForeign(trip.budgetForeign / days)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

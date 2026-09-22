@@ -12,6 +12,7 @@ import 'package:tripapp/models/trip.dart';
 import 'package:tripapp/theme/app_theme.dart';
 import 'package:tripapp/widgets/country_chip.dart';
 import 'package:tripapp/widgets/sheets.dart';
+import 'package:tripapp/widgets/quick_converter.dart';
 import 'package:tripapp/widgets/won_input_formatter.dart';
 
 Widget _wrap(Widget child) =>
@@ -107,7 +108,7 @@ void main() {
   // ── 여행 홈 (01 에서 여행을 누르면) ─────────────────────────────
   // 03 메인(남은 예산·지출 목록)과 07 환율 툴팁은 장부 담당 몫이라 여기 없다.
 
-  testWidgets('여행 홈: 여행 정보만 있고 지출·남은 예산은 없다', (tester) async {
+  testWidgets('여행 홈: 사용한 금액과 예산이 메인', (tester) async {
     await tester.pumpWidget(const TripApp());
     await tester.tap(find.text('일본 여행'));
     await tester.pumpAndSettle();
@@ -115,17 +116,41 @@ void main() {
     expect(find.byType(TripHomeScreen), findsOneWidget);
     expect(find.text('🇯🇵 일본 여행'), findsOneWidget); // 상단바
     expect(find.text('D-11'), findsOneWidget); // 목업: 오늘 + 11일 출발
-    expect(find.text('4박 5일'), findsOneWidget);
-    expect(find.text('1,200,000원'), findsOneWidget);
-    expect(find.text('≈ ¥126,316'), findsOneWidget);
-    // 하루 예산 = 1,200,000 / 5일
-    expect(find.text('하루 예산 · 5일'), findsOneWidget);
-    expect(find.text('240,000원'), findsOneWidget);
+    expect(find.textContaining('4박 5일'), findsOneWidget);
 
-    // 장부 담당 영역은 안 보여야 한다
-    expect(find.text('남은 예산'), findsNothing);
+    // 목업 지출 ¥1,200 + ¥3,500 + ¥2,800 + ¥40,600 = ¥48,100 -> 456,950원
+    expect(find.text('사용한 금액'), findsOneWidget);
+    expect(find.text('456,950원'), findsOneWidget);
+    expect(find.text('¥48,100'), findsOneWidget);
+    expect(find.text('38%'), findsOneWidget);
+    expect(find.text('1,200,000원'), findsOneWidget);
+    expect(find.text('하루 240,000원'), findsOneWidget); // 1,200,000 / 5일
+    expect(find.text('남은 금액'), findsOneWidget);
+    expect(find.text('743,050원'), findsOneWidget);
+
+    // 지출 목록은 장부 몫이라 없다
     expect(find.text('이치란 라멘'), findsNothing);
-    expect(find.text('¥100 = ₩950'), findsNothing);
+  });
+
+  testWidgets('여행 홈: 예산을 넘기면 "초과" 로 바뀐다', (tester) async {
+    final trip = Trip(
+      id: 'over',
+      name: '과소비 여행',
+      country: countryByCode('JPY')!,
+      start: DateTime(2026, 10, 1),
+      end: DateTime(2026, 10, 2),
+      budgetKrw: 10000,
+      expenses: [
+        Expense(
+            id: 'x', icon: '🛍', place: '쇼핑', amount: 2000, date: DateTime(2026, 10, 1)),
+      ],
+    );
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: trip)));
+    // ¥2,000 = 19,000원, 예산 10,000원 -> 9,000원 초과
+    expect(find.text('초과'), findsOneWidget);
+    expect(find.text('9,000원'), findsOneWidget);
+    expect(find.text('190%'), findsOneWidget);
+    expect(find.text('남은 금액'), findsNothing);
   });
 
   testWidgets('여행 홈: 하단에 장부로 가는 버튼들', (tester) async {
@@ -180,7 +205,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('여행 편집'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), '치앙마이 여행');
+    // 화면에 계산기 입력칸도 있어서 시트 안의 입력칸으로 좁힌다
+    await tester.enterText(
+      find.descendant(
+          of: find.byType(TripEditSheet), matching: find.byType(TextField)),
+      '치앙마이 여행',
+    );
     await tester.pump();
     await tester.tap(find.text('저장'));
     await tester.pumpAndSettle();
@@ -211,6 +241,89 @@ void main() {
     expect(find.text('내 여행'), findsOneWidget);
     expect(find.text('가' * 20), findsNothing);
     expect(tripStore.byId('t1'), isNull);
+  });
+
+  group('빠른 환산', () {
+    Widget converter(String code) =>
+        _wrap(Scaffold(body: QuickConverter(country: countryByCode(code)!)));
+
+    testWidgets('엔 -> 원, 빠른 금액 칩', (tester) async {
+      await tester.pumpWidget(converter('JPY'));
+      expect(find.text('¥100 = ₩950 기준'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '1500');
+      await tester.pump();
+      expect(find.text('1,500'), findsOneWidget); // 입력칸도 콤마
+      expect(find.text('14,250원'), findsOneWidget);
+
+      await tester.tap(find.text('¥1,000'));
+      await tester.pump();
+      expect(find.text('9,500원'), findsOneWidget);
+    });
+
+    testWidgets('방향을 바꾸면 지금 결과가 새 입력이 된다', (tester) async {
+      await tester.pumpWidget(converter('JPY'));
+      await tester.enterText(find.byType(TextField), '1000');
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('방향 바꾸기'));
+      await tester.pump();
+      expect(find.text('KRW → JPY'), findsOneWidget);
+      expect(find.text('9,500'), findsOneWidget); // 입력칸
+      expect(find.text('¥1,000'), findsOneWidget); // 결과
+    });
+
+    testWidgets('달러는 센트까지', (tester) async {
+      await tester.pumpWidget(converter('USD'));
+      await tester.enterText(find.byType(TextField), '12.5');
+      await tester.pump();
+      expect(find.text('16,875원'), findsOneWidget); // 12.5 * 1,350
+
+      await tester.tap(find.byTooltip('방향 바꾸기'));
+      await tester.pump();
+      expect(find.text('\$12.50'), findsOneWidget);
+    });
+
+    test('원 -> 현지 통화 변환', () {
+      expect(krwToForeign(countryByCode('JPY')!, 9500), closeTo(1000, 1e-9));
+      expect(formatForeignAmount(countryByCode('USD')!, 7.4074), '\$7.41');
+      expect(formatForeignAmount(countryByCode('VND')!, 12345.6), '₫12,346');
+    });
+  });
+
+  group('AmountInputFormatter (소수점)', () {
+    const f = AmountInputFormatter(decimals: 2);
+    String type(String t) => f
+        .formatEditUpdate(TextEditingValue.empty,
+            TextEditingValue(text: t, selection: TextSelection.collapsed(offset: t.length)))
+        .text;
+
+    test('정수부만 콤마, 소수부는 그대로', () {
+      expect(type('1234.56'), '1,234.56');
+      expect(type('1234.'), '1,234.');
+    });
+
+    test('소수점부터 치면 0 을 붙인다', () {
+      expect(type('.5'), '0.5');
+    });
+
+    test('소수점은 하나만, 자릿수는 decimals 까지', () {
+      expect(type('1.2.3'), '1.23');
+      final v = f.formatEditUpdate(
+        const TextEditingValue(text: '1.23'),
+        const TextEditingValue(text: '1.234'),
+      );
+      expect(v.text, '1.23');
+    });
+
+    test('decimals 0 이면 소수점을 버린다 (원화 예산)', () {
+      const won = WonInputFormatter();
+      expect(
+        won.formatEditUpdate(TextEditingValue.empty,
+            const TextEditingValue(text: '12.5')).text,
+        '125',
+      );
+    });
   });
 
   group('tripStatusLabel', () {

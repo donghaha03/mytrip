@@ -93,7 +93,8 @@ Actions 탭에서 "Deploy to GitHub Pages" 가 초록불이 되면
 | `screens/trip_list_screen.dart` | 01 | 내 여행 목록 (길게 눌러 편집) | ✅ |
 | `screens/add_trip_screen.dart` | 02 | 새 여행 추가 | ✅ |
 | `widgets/sheets.dart` | 04~06 | 국가 더보기 / 기간 선택 / 여행 편집 시트 | ✅ |
-| `screens/trip_home_screen.dart` | — | **여행 홈**: D-day·기간·예산 + 하단 장부 버튼 | ✅ |
+| `screens/trip_home_screen.dart` | — | **여행 홈**: 사용한 금액·예산·남은 금액 + 하단 장부 버튼 | ✅ |
+| `widgets/quick_converter.dart` | — | 빠른 환산 계산기 (현지 ↔ 원화, 기록 안 남김) | ✅ |
 | `screens/ledger_entry.dart` | 03·07 | 장부 연결 지점 (버튼만, 페이지는 장부 담당) | 장부 담당 |
 | `screens/more_screen.dart` | — | 더보기 — **구현 전** | 더보기 담당 |
 | (없음) | — | 로그인 화면 — `services/auth_service.dart` 에 기능은 있음 | 로그인 담당 |
