@@ -1,65 +1,125 @@
-# 여행 장부앱 (Flutter)
+# 여행 장부앱 (Flutter + Firebase)
 
-Figma `환율 여행 장부앱 - PBL1` 의 화면 8개를 옮긴 프로토타입.
-외부 패키지 의존성 없이 Flutter SDK 만으로 돌아간다.
+Figma `환율 여행 장부앱 - PBL1` 을 옮긴 Flutter 앱.
+로그인은 Firebase Auth, 데이터는 Firestore, 배포는 GitHub Pages.
+
+- **배포 주소**: `https://<계정>.github.io/<repo>/` — `main` 에 합쳐지면 1~2분 뒤 자동 반영
+- **팀 작업 규칙**: [CONTRIBUTING.md](CONTRIBUTING.md) — 누가 어떤 파일을 맡는지
+
+## 두 가지 모드
+
+`lib/firebase_options.dart` 가 채워져 있는지에 따라 알아서 바뀐다.
+(참고한 [naite-reservation](https://github.com/gnu-naite/naite-reservation) 의
+`store.js` 가 Firestore ↔ 임시 저장을 자동 전환하는 것과 같은 방식)
+
+| | 로컬 임시 모드 | Firebase 모드 |
+|---|---|---|
+| 언제 | `firebase_options.dart` 가 비어 있을 때 (**지금 상태**) | 키가 채워져 있을 때 |
+| 로그인 | 아무 이메일 + 6자 이상 비밀번호 | Firebase Auth 이메일/비밀번호 |
+| 데이터 | 메모리. 새로고침하면 목업 3건으로 초기화 | Firestore. 기기 간 실시간 동기화 |
+| 표시 | 로그인 화면에 파란 "로컬 임시 모드" 안내 | 안내 없음 |
+
+조원은 Firebase 키 없이 로컬 모드로 바로 작업하면 된다.
 
 ## 실행
 
-이 PC 에는 Flutter 가 PATH 에 등록되어 있지 않고 `C:\Users\dongb\dev\flutter` 에만 풀려 있다.
-터미널을 새로 열 때마다 먼저 환경을 잡아준다:
-
 ```powershell
-. C:\Users\dongb\dev\flutter-env.ps1
-```
-
-그 다음:
-
-```powershell
+. C:\Users\dongb\dev\flutter-env.ps1   # 이 PC 기준. flutter 가 PATH 에 있으면 생략
 flutter pub get
-flutter run            # 연결된 기기/에뮬레이터 선택
-flutter run -d chrome  # 크롬으로 바로 보기
+flutter run -d chrome
 ```
 
-웹 빌드 결과만 훑어보려면:
+## 처음 한 번: Firebase 연결 (팀장)
+
+### 1. Firebase 프로젝트
+
+1. [Firebase 콘솔](https://console.firebase.google.com) → **프로젝트 추가** (이름 예: `tripapp`)
+2. 왼쪽 **빌드 → Authentication → 시작하기 → 로그인 방법 → 이메일/비밀번호 → 사용 설정**
+3. **빌드 → Firestore Database → 데이터베이스 만들기**
+   - 위치: `asia-northeast3 (서울)`
+   - **프로덕션 모드**로 시작
+4. Firestore **규칙** 탭에 repo 의 [`firestore.rules`](firestore.rules) 내용을 붙여 넣고 **게시**
+
+### 2. 앱에 키 넣기
 
 ```powershell
-flutter build web
-node tool/serve.js     # http://localhost:8099
+npm install -g firebase-tools        # 없으면
+firebase login
+dart pub global activate flutterfire_cli
+flutterfire configure --project=<firebase 프로젝트 id> --platforms=web,android,ios
 ```
+
+`lib/firebase_options.dart` 가 덮어써진다. 다시 `flutter run` 하면 로그인 화면의
+파란 안내가 사라지고 Firebase 모드로 뜬다.
+
+> CLI 가 번거로우면: 콘솔 **프로젝트 설정 → 내 앱 → 웹 앱 추가** 에서 나오는
+> `firebaseConfig` 값을 `firebase_options.dart` 의 `web:` 칸에 직접 옮겨 적어도 된다.
+
+웹 API 키는 비밀번호가 아니라서 공개 repo 에 커밋해도 된다 (Firebase 공식 입장).
+**대신 1-4 의 보안 규칙은 반드시** — 테스트 모드로 두면 누구나 전체 DB 를 읽고 쓴다.
+
+### 3. GitHub Pages 도메인 허용 (안 하면 배포 사이트에서 로그인이 막힌다)
+
+**Authentication → 설정 → 승인된 도메인 → 도메인 추가** → `<계정>.github.io`
+
+## 처음 한 번: GitHub 에 올리기 (팀장)
+
+1. github.com 에서 새 repo — **README·.gitignore·license 모두 체크 해제**
+2. 올리기:
+
+   ```powershell
+   git remote add origin https://github.com/<계정>/<repo>.git
+   git push -u origin main feat/login feat/more
+   ```
+
+   `feat/login`, `feat/more` 는 조원 작업용으로 미리 만들어 둔 브랜치다.
+3. repo **Settings → Pages → Source: GitHub Actions**
+4. repo **Settings → Collaborators** 에서 조원 초대
+5. (권장) **Settings → Branches → main 보호 규칙**: PR 필수 + `CI` 통과 필수
+
+Actions 탭에서 "Deploy to GitHub Pages" 가 초록불이 되면
+`https://<계정>.github.io/<repo>/` 에서 열린다.
 
 ## 화면 구성
 
-| 파일 | Figma | 설명 |
-|---|---|---|
-| `screens/empty_home_screen.dart` | 00 | 여행이 없을 때의 첫 화면 |
-| `screens/trip_list_screen.dart` | 01 | 내 여행 목록 (길게 눌러 편집) |
-| `screens/add_trip_screen.dart` | 02 | 새 여행 추가 |
-| `screens/trip_main_screen.dart` | 03 | 여행 메인 (예산 요약) |
-| `widgets/sheets.dart` → `MoreCountrySheet` | 04 | 국가 더보기 |
-| `widgets/sheets.dart` → `DateRangeSheet` | 05 | 기간 선택 (드래그) |
-| `widgets/sheets.dart` → `TripEditSheet` | 06 | 이름 인라인 수정 + 삭제 |
-| `widgets/rate_info_tooltip.dart` | 07 | 환율 갱신 안내 툴팁 |
-| `screens/ledger_screen.dart` | 08 | 여행 장부 상세 — **구현 전** |
-| `screens/more_screen.dart` | 09 | 더보기 — **구현 전** |
+| 파일 | 번호 | 설명 | 담당 |
+|---|---|---|---|
+| `screens/login_screen.dart` | 10 | 로그인 / 회원가입 | **로그인 담당** |
+| `screens/empty_home_screen.dart` | 00 | 여행이 없을 때의 첫 화면 | |
+| `screens/trip_list_screen.dart` | 01 | 내 여행 목록 (길게 눌러 편집) | |
+| `screens/add_trip_screen.dart` | 02 | 새 여행 추가 | |
+| `screens/trip_main_screen.dart` | 03 | 여행 메인 (예산 요약) | |
+| `widgets/sheets.dart` | 04~06 | 국가 더보기 / 기간 선택 / 이름 편집 시트 | |
+| `widgets/rate_info_tooltip.dart` | 07 | 환율 갱신 안내 툴팁 | |
+| `screens/more_screen.dart` | 09 | 더보기 — **구현 전** | **더보기 담당** |
+| `screens/ledger_entry.dart` | 08 | 장부 연결 지점 (메뉴만, 페이지는 범위 밖) | — |
 
-## 팀 작업
+## 구조
 
-08·09 는 각자 담당이 나뉘어 있다. 누가 어떤 파일을 건드리고, 어떤 파일이
-공용이라 미리 얘기해야 하는지는 **[CONTRIBUTING.md](CONTRIBUTING.md)** 참고.
+```
+lib/
+  main.dart                  AuthGate: 로그인 여부로 화면 전환
+  firebase_options.dart      Firebase 키 (비어 있으면 로컬 모드)
+  services/
+    backend.dart             로컬 / Firebase 모드 판정
+    auth_service.dart        로그인 (로컬·Firebase 구현이 같은 인터페이스)
+    session.dart             로그인 사용자 -> 그 사람의 Firestore 경로 연결
+  data/
+    trip_store.dart          화면이 보는 여행 목록 (ChangeNotifier)
+    trip_repository.dart     Firestore 읽기/쓰기
+  models/ screens/ widgets/ theme/
+firestore.rules              Firestore 보안 규칙
+.github/workflows/
+  ci.yml                     PR 마다 analyze + test + 웹 빌드
+  pages.yml                  main 에 합쳐지면 GitHub Pages 배포
+```
 
-요약하면:
+Firestore 저장 구조:
 
-- 자기 화면 파일만 고치면 충돌 안 난다
-- `lib/models`, `lib/data`, `lib/theme`, `lib/widgets`, `trip_main_screen.dart` 는 공용
-- `main` 직접 push 금지, 브랜치 → PR → CI 초록불 → merge
-
-## 확인해볼 것
-
-- **빈 화면(00) 보기**: `main.dart` 의 `tripStore.seedMockTrips();` 를 주석 처리
-- **여행완료 도장**: 목업의 미국 여행은 종료일이 지나 있어서 도장이 찍힌다
-- **드래그 기간 선택**: 02 → 출발일 박스 탭 → 달력에서 손가락으로 쭉 드래그
-- **이름 편집**: 01 에서 여행 카드를 길게 누르면 커서가 올라온 입력창이 뜬다
-- **환율 툴팁**: 03 상단 `100엔 = 950원` 옆 `i` 아이콘 탭
+```
+users/{uid}/trips/{tripId}                  이름, 통화코드, 기간, 예산
+users/{uid}/trips/{tripId}/records/{id}     지출 한 건 (date 는 시분초 포함 Timestamp)
+```
 
 ## 테스트
 
@@ -68,31 +128,16 @@ flutter analyze
 flutter test
 ```
 
-`test/smoke_test.dart` 가 8개 화면을 실제 사용 경로(칩 탭 → 시트 열림, 카드 롱프레스 →
-편집 시트, 달력 드래그)로 한 번씩 돌려본다. 폰 사이즈(375×812)로 렌더링하기 때문에
-레이아웃 overflow 도 여기서 잡힌다.
+Firebase 경로 테스트(`test/firebase_test.dart`)는 가짜 Firestore/Auth 로 돌아서
+키도 네트워크도 필요 없다.
 
-## 지금은 목업인 부분 (다음 단계)
+## 다음 단계
 
-1. **환율** — `models/country.dart` 의 `krwPerUnit` 이 하드코딩. 실제로는
-   환율 API 를 호출하고, 마지막 호출 날짜를 저장해 두었다가 날짜가 바뀐 경우에만
-   다시 호출하는 구조로 바꿔야 한다 (요구사항의 트래픽 절감 방식).
-   `widgets/rate_info_tooltip.dart` 의 `lastUpdated` 에 그 시각을 넘기면 된다.
-
-2. **저장소** — `data/trip_store.dart` 가 메모리에만 들고 있어서 앱을 끄면 날아간다.
-   Firestore 를 붙일 때는 이 클래스의 메서드 본문만 바꾸면 화면 코드는 그대로 쓸 수 있게
-   인터페이스를 맞춰 뒀다. 추천 구조:
-
-   ```
-   users/{uid}/trips/{tripId}
-   users/{uid}/trips/{tripId}/records/{recordId}
-   ```
-
-   지출 기록은 `date` 를 날짜가 아니라 **타임스탬프(시분초 포함)** 로 저장해야
-   같은 날 여러 건을 기록해도 정렬이 깨지지 않는다.
-
-3. **장부 상세 페이지** — 03 의 "여행 장부 보기" 버튼은 아직 스낵바만 띄운다.
-
-4. **폰트** — Figma 는 Inter 로 작업했지만 여기서는 시스템 기본 폰트를 쓴다.
-   맞추려면 `google_fonts` 패키지를 추가하고 `theme/app_theme.dart` 에서
-   `GoogleFonts.interTextTheme()` 을 적용하면 된다.
+1. **환율** — `models/country.dart` 의 `krwPerUnit` 이 하드코딩. 환율 API 를 붙이고
+   마지막 호출 날짜를 저장해 두었다가 날짜가 바뀐 경우에만 다시 호출한다
+   (트래픽 절감). `rate_info_tooltip.dart` 의 `lastUpdated` 에 그 시각을 넘기면 된다.
+2. **장부 페이지** — 03 의 "여행 장부" 메뉴는 있고 지금은 "준비 중". 저장 쪽
+   (`tripStore.addExpense`)은 Firestore 까지 연결돼 있어서 화면만 만들면 된다.
+   `screens/ledger_entry.dart` 한 파일에서 연결.
+3. **폰트** — Figma 는 Inter. `google_fonts` 추가 후 `theme/app_theme.dart` 에서
+   `GoogleFonts.interTextTheme()`.

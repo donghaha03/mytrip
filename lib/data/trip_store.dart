@@ -1,39 +1,147 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/country.dart';
 import '../models/trip.dart';
+import 'trip_repository.dart';
 
-/// 프로토타입용 인메모리 저장소.
+/// 화면이 보는 여행 목록.
 ///
-/// 나중에 Firestore를 붙일 때는 이 클래스의 메서드 본문만
-/// `users/{uid}/trips/{tripId}` 컬렉션 연동으로 바꾸면 된다.
-/// 화면 쪽 코드는 손대지 않아도 되도록 인터페이스를 맞춰 뒀다.
+/// 화면 쪽은 모드를 몰라도 된다 — add/remove/rename/addExpense 를 부르고
+/// trips 를 읽기만 하면 된다.
+///
+///  - 로컬 임시 모드: 메모리에만 있다. 앱을 끄면 사라진다.
+///  - Firebase 모드: [connect] 로 Firestore 에 붙는다. 쓰기는 메모리에 먼저
+///    반영하고(화면이 바로 바뀌게) Firestore 로 보낸다. 다른 기기에서 바뀐
+///    내용은 스냅샷으로 들어와 합쳐진다.
 class TripStore extends ChangeNotifier {
   final List<Trip> _trips = [];
+
+  TripRepository? _repo;
+  StreamSubscription<List<Trip>>? _tripsSub;
+  final Map<String, StreamSubscription<List<Expense>>> _expenseSubs = {};
+  bool _loading = false;
 
   List<Trip> get trips => List.unmodifiable(_trips);
   bool get isEmpty => _trips.isEmpty;
 
+  /// Firestore 에서 첫 스냅샷을 기다리는 중. 이때 빈 화면(00)을 띄우면
+  /// 여행이 있는 사용자한테도 "아직 떠날 준비가..." 가 번쩍 보인다.
+  bool get isLoading => _loading;
+
+  Trip? byId(String id) {
+    for (final t in _trips) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
   void add(Trip trip) {
     _trips.add(trip);
     notifyListeners();
+    _push(_repo?.saveTrip(trip));
   }
 
   void remove(String id) {
     _trips.removeWhere((t) => t.id == id);
+    _expenseSubs.remove(id)?.cancel();
     notifyListeners();
+    _push(_repo?.deleteTrip(id));
   }
 
   void rename(String id, String newName) {
-    final trip = _trips.firstWhere((t) => t.id == id);
+    final trip = byId(id);
+    if (trip == null) return;
     trip.name = newName;
     notifyListeners();
+    _push(_repo?.renameTrip(id, newName));
   }
 
   void addExpense(String tripId, Expense expense) {
-    final trip = _trips.firstWhere((t) => t.id == tripId);
+    final trip = byId(tripId);
+    if (trip == null) return;
     trip.expenses.add(expense);
     notifyListeners();
+    _push(_repo?.saveExpense(tripId, expense));
+  }
+
+  // -------------------------------------------------------------------------
+  // 원격 저장소 연결
+  // -------------------------------------------------------------------------
+
+  /// 로그인한 사용자의 저장소에 붙는다. null 이면 떼고 목록을 비운다 (로그아웃).
+  void connect(TripRepository? repo) {
+    _tripsSub?.cancel();
+    _tripsSub = null;
+    for (final s in _expenseSubs.values) {
+      s.cancel();
+    }
+    _expenseSubs.clear();
+    _trips.clear();
+
+    _repo = repo;
+    _loading = repo != null;
+    notifyListeners();
+
+    _tripsSub = repo?.watchTrips().listen(
+      _mergeTrips,
+      onError: (Object e) {
+        debugPrint('[TripStore] 여행 목록 구독 실패: $e');
+        _loading = false;
+        notifyListeners();
+      },
+    );
+  }
+
+  /// 스냅샷을 기존 객체에 "덮어쓰지 않고 합친다".
+  ///
+  /// 03 메인 같은 화면은 Trip 객체를 들고 있어서, 새 객체로 갈아 끼우면
+  /// 열려 있는 화면이 옛날 값을 계속 보여준다. id 가 같으면 필드만 갱신한다.
+  void _mergeTrips(List<Trip> fresh) {
+    final freshIds = {for (final t in fresh) t.id};
+
+    _trips.removeWhere((t) => !freshIds.contains(t.id));
+    for (final id in _expenseSubs.keys.toList()) {
+      if (!freshIds.contains(id)) _expenseSubs.remove(id)?.cancel();
+    }
+
+    for (final f in fresh) {
+      final existing = byId(f.id);
+      if (existing == null) {
+        _trips.add(f);
+      } else {
+        existing
+          ..name = f.name
+          ..country = f.country
+          ..start = f.start
+          ..end = f.end
+          ..budgetKrw = f.budgetKrw;
+      }
+      _expenseSubs[f.id] ??= _repo!.watchExpenses(f.id).listen((list) {
+        final t = byId(f.id);
+        if (t == null) return;
+        t.expenses
+          ..clear()
+          ..addAll(list);
+        notifyListeners();
+      });
+    }
+
+    // 서버 정렬(시작일 순)을 따른다
+    final order = {for (var i = 0; i < fresh.length; i++) fresh[i].id: i};
+    _trips.sort((a, b) => (order[a.id] ?? 0).compareTo(order[b.id] ?? 0));
+
+    _loading = false;
+    notifyListeners();
+  }
+
+  /// 원격 쓰기. 실패해도 화면은 이미 바뀐 상태라 로그만 남긴다.
+  /// (권한 오류가 나면 firestore.rules 를 확인할 것)
+  void _push(Future<void>? write) {
+    write?.catchError((Object e) {
+      debugPrint('[TripStore] Firestore 쓰기 실패: $e');
+    });
   }
 
   /// 00 빈 화면 -> 01 리스트 화면 전환을 눈으로 확인하려면

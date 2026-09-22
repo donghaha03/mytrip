@@ -4,10 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tripapp/data/trip_store.dart';
 import 'package:tripapp/main.dart';
 import 'package:tripapp/screens/add_trip_screen.dart';
-import 'package:tripapp/screens/ledger_screen.dart';
 import 'package:tripapp/screens/more_screen.dart';
 import 'package:tripapp/screens/trip_list_screen.dart';
 import 'package:tripapp/screens/trip_main_screen.dart';
+import 'package:tripapp/services/auth_service.dart';
 import 'package:tripapp/models/country.dart';
 import 'package:tripapp/theme/app_theme.dart';
 import 'package:tripapp/widgets/country_chip.dart';
@@ -19,10 +19,15 @@ Widget _wrap(Widget child) =>
 
 void main() {
   // 목업 스크린샷과 같은 폰 사이즈로 맞춘다 (iPhone 14 기준).
-  setUp(() {
+  setUp(() async {
     final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     view.physicalSize = const Size(1170, 2532);
     view.devicePixelRatio = 3.0;
+
+    // 앱이 로그인 뒤에 있어서, 화면 테스트는 로그인된 상태에서 시작한다.
+    // 로그인 화면 자체는 auth_test.dart 에서 따로 본다.
+    authService = LocalAuthService();
+    await authService.signIn('tester@trip.app', '123456');
   });
 
   tearDown(() {
@@ -61,7 +66,7 @@ void main() {
     await tester.pumpWidget(_wrap(TripMainScreen(trip: japan)));
     expect(find.text('남은 예산'), findsOneWidget);
     expect(find.text('¥100 = ₩950'), findsOneWidget);
-    expect(find.text('📒  여행 장부 보기'), findsOneWidget);
+    expect(find.text('여행 장부'), findsOneWidget);
     expect(find.text('이치란 라멘'), findsOneWidget);
     expect(find.text('11,400원'), findsOneWidget); // ¥1,200 환산
   });
@@ -144,20 +149,27 @@ void main() {
     expect(find.text('\$1 = ₩1,350'), findsOneWidget);
   });
 
-  // 08/09 는 각자 담당자가 채운다. 아래 두 테스트는 "03 에서 진입할 수 있고
-  // 뒤로 돌아온다" 는 연결만 확인한다 — 페이지 내용은 자유롭게 바꿔도 된다.
-  testWidgets('08 장부 페이지로 들어가고 나온다', (tester) async {
+  // 장부 페이지는 이 저장소 범위 밖이라 메뉴만 있다. ledger_entry.dart 에서
+  // kLedgerReady 를 켜고 화면을 연결하면 이 테스트를 "들어가고 나온다" 로 바꿀 것.
+  testWidgets('08 장부 메뉴: 건수를 보여주고, 누르면 준비 중 안내', (tester) async {
     await tester.pumpWidget(const TripApp());
     await tester.tap(find.text('일본 여행'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('📒  여행 장부 보기'));
-    await tester.pumpAndSettle();
-    expect(find.byType(LedgerScreen), findsOneWidget);
+    expect(find.text('여행 장부'), findsOneWidget);
+    expect(find.text('지출 4건 · 전체 내역 보기'), findsOneWidget);
+    expect(find.text('준비 중'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
-    await tester.pumpAndSettle();
-    expect(find.text('남은 예산'), findsOneWidget);
+    await tester.tap(find.text('여행 장부'));
+    await tester.pump();
+    expect(find.text('장부 페이지는 준비 중이에요'), findsOneWidget);
+    expect(find.text('남은 예산'), findsOneWidget); // 화면은 그대로
+  });
+
+  testWidgets('08 장부 메뉴: 지출이 없으면 없다고 말한다', (tester) async {
+    final thai = tripStore.trips.firstWhere((t) => t.id == 't3');
+    await tester.pumpWidget(_wrap(TripMainScreen(trip: thai)));
+    expect(find.text('아직 기록이 없어요'), findsOneWidget);
   });
 
   testWidgets('09 더보기 페이지로 들어가고 나온다', (tester) async {

@@ -40,6 +40,17 @@ class Country {
       '${formatForeign(unitAmount)} = $kWonSymbol${formatNumber(krwPerUnit)}';
 }
 
+/// 통화 코드("JPY") -> Country. Firestore 에는 코드만 저장한다.
+Country? countryByCode(String code) {
+  for (final c in kPrimaryCountries) {
+    if (c.currency == code) return c;
+  }
+  for (final c in kMoreCountries) {
+    if (c.currency == code) return c;
+  }
+  return null;
+}
+
 /// 02 화면에 기본 노출되는 7개국 (마지막 칸은 "더보기")
 const kPrimaryCountries = <Country>[
   Country(

@@ -5,7 +5,7 @@ import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../widgets/budget_card.dart';
 import '../widgets/rate_info_tooltip.dart';
-import 'ledger_screen.dart';
+import 'ledger_entry.dart';
 import 'more_screen.dart';
 
 /// 03. 여행 하나를 선택했을 때의 메인 페이지.
@@ -33,11 +33,8 @@ class TripMainScreen extends StatelessWidget {
                   BudgetCard(trip: trip),
                   const SizedBox(height: 20),
                   _LedgerButton(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => LedgerScreen(trip: trip),
-                      ),
-                    ),
+                    trip: trip,
+                    onTap: () => openLedger(context, trip),
                   ),
                   const SizedBox(height: 20),
                   const Text(
@@ -169,13 +166,18 @@ class _MenuButton extends StatelessWidget {
   }
 }
 
+/// "여행 장부" 메뉴. 무엇이 들어있는지(지출 건수)와 어디로 가는지(전체 내역)를
+/// 한눈에 보이게 두 줄로 쓴다. 장부 페이지가 아직 없으면 "준비 중" 을 붙인다 —
+/// 연결은 ledger_entry.dart 에서.
 class _LedgerButton extends StatelessWidget {
-  const _LedgerButton({required this.onTap});
+  const _LedgerButton({required this.trip, required this.onTap});
 
+  final Trip trip;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final count = trip.expenses.length;
     return Material(
       color: AppColors.white,
       borderRadius: BorderRadius.circular(14),
@@ -183,26 +185,84 @@ class _LedgerButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                '📒  여행 장부 보기',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.receipt_long_rounded,
+                    size: 22, color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          '여행 장부',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        if (!kLedgerReady) ...[
+                          const SizedBox(width: 6),
+                          const _SoonChip(),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      count == 0 ? '아직 기록이 없어요' : '지출 $count건 · 전체 내역 보기',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Icon(Icons.arrow_forward_rounded,
-                  size: 20, color: AppColors.textSecondary),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 24, color: AppColors.textTertiary),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SoonChip extends StatelessWidget {
+  const _SoonChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.closeBg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Text(
+        '준비 중',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
         ),
       ),
     );

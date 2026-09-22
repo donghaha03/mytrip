@@ -7,6 +7,10 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..', 'build', 'web');
 const PORT = 8099;
+// GitHub Pages 처럼 하위 경로에 올린 상태를 흉내 낼 때:
+//   flutter build web --base-href /tripapp/
+//   $env:BASE='/tripapp/'; node tool/serve.js   ->  http://localhost:8099/tripapp/
+const BASE = process.env.BASE || '/';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -28,7 +32,15 @@ const TYPES = {
 
 http
   .createServer((req, res) => {
-    const urlPath = decodeURIComponent(req.url.split('?')[0]);
+    let urlPath = decodeURIComponent(req.url.split('?')[0]);
+    if (BASE !== '/') {
+      // Pages 와 똑같이, base 밖 경로는 404
+      if (!urlPath.startsWith(BASE)) {
+        res.writeHead(404).end('not found (outside BASE)');
+        return;
+      }
+      urlPath = '/' + urlPath.slice(BASE.length);
+    }
     let filePath = path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath);
 
     // 디렉터리 밖으로 나가는 경로 차단
