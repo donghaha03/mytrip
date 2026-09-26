@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
+/// 앱 전역 글꼴. 굵기 400/500/600/700 을 pubspec 에 등록해 뒀다.
+/// 이모지(국기 등)는 Pretendard 에 없어서 시스템 글꼴로 대체된다.
+const kFontFamily = 'Pretendard';
+
 ThemeData buildAppTheme() {
   return ThemeData(
     useMaterial3: true,
+    fontFamily: kFontFamily,
     scaffoldBackgroundColor: AppColors.bg,
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primary,

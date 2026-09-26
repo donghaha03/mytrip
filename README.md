@@ -149,5 +149,14 @@ Firebase 경로 테스트(`test/firebase_test.dart`)는 가짜 Firestore/Auth �
 2. **로그인 (로그인 담당)** — `authService` 로 화면만 만들어 `main.dart` 의 `HomeRouter` 앞에 세운다.
 3. **환율 API** — `models/country.dart` 의 `krwPerUnit` 이 하드코딩. 마지막 호출 날짜를
    저장해 두었다가 날짜가 바뀐 경우에만 다시 호출한다 (트래픽 절감).
-4. **폰트** — Figma 는 Inter. `google_fonts` 추가 후 `theme/app_theme.dart` 에서
-   `GoogleFonts.interTextTheme()`.
+4. **웹 첫 로딩** — Pretendard 4개 굵기(6MB)를 통째로 넣어서 웹 빌드가 46MB 다.
+   느리면 쓰는 글자만 남기는 서브셋으로 줄이거나 굵기를 400/700 둘로 줄이면 된다.
+
+## 글꼴
+
+**Pretendard** (`assets/fonts/`, 400/500/600/700). `theme/app_theme.dart` 의
+`ThemeData.fontFamily` 로 앱 전체에 적용된다. 국기 같은 이모지는 Pretendard 에
+없어서 시스템 글꼴로 대체된다.
+
+[SIL Open Font License 1.1](assets/fonts/OFL.txt) — 재배포·상업적 사용 모두 가능하고,
+라이선스 파일을 같이 두는 것이 조건이라 `assets/fonts/OFL.txt` 로 포함했다.
