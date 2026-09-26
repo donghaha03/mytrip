@@ -14,6 +14,7 @@ import 'package:tripapp/widgets/country_chip.dart';
 import 'package:tripapp/widgets/sheets.dart';
 import 'package:tripapp/widgets/quick_converter.dart';
 import 'package:tripapp/widgets/rate_info_tooltip.dart';
+import 'package:tripapp/widgets/recent_expenses_card.dart';
 import 'package:tripapp/widgets/today_budget_sheet.dart';
 import 'package:tripapp/widgets/won_input_formatter.dart';
 
@@ -130,8 +131,10 @@ void main() {
     expect(find.text('남은 금액'), findsOneWidget);
     expect(find.text('743,050원'), findsOneWidget);
 
-    // 지출 목록은 장부 몫이라 없다
-    expect(find.text('이치란 라멘'), findsNothing);
+    // 최근 3건 요약은 여기 있고(아래 최근 지출 카드 테스트 참고),
+    // 전체 목록과 기록 입력은 장부 몫이다
+    expect(find.text('이치란 라멘'), findsOneWidget);
+    expect(find.text('신주쿠 호텔'), findsNothing); // 4번째라 요약에는 없다
   });
 
   testWidgets('여행 홈: 예산을 넘기면 "초과" 로 바뀐다', (tester) async {
@@ -368,6 +371,67 @@ void main() {
     expect(find.text('내 여행'), findsOneWidget);
     expect(find.text('가' * 20), findsNothing);
     expect(tripStore.byId('t1'), isNull);
+  });
+
+  testWidgets('여행 홈: 최근 지출 카드 (7일 막대 + 마지막 3건)', (tester) async {
+    final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: japan)));
+
+    expect(find.text('최근 지출'), findsOneWidget);
+    expect(find.text('4건'), findsOneWidget);
+    expect(find.text('전체 보기'), findsOneWidget);
+
+    // 최신 3건만 (신주쿠 호텔은 4번째라 안 보인다)
+    expect(find.text('이치란 라멘'), findsOneWidget);
+    expect(find.text('JR 패스'), findsOneWidget);
+    expect(find.text('돈키호테'), findsOneWidget);
+    expect(find.text('신주쿠 호텔'), findsNothing);
+    expect(find.text('11,400원'), findsWidgets); // ¥1,200
+    expect(find.text('¥1,200'), findsOneWidget);
+
+    await tester.tap(find.text('전체 보기'));
+    await tester.pump();
+    expect(find.text('장부 페이지는 준비 중이에요'), findsOneWidget);
+  });
+
+  testWidgets('여행 홈: 지출이 없으면 첫 기록을 권한다', (tester) async {
+    final thai = tripStore.trips.firstWhere((t) => t.id == 't3');
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: thai)));
+
+    expect(find.text('아직 기록한 지출이 없어요'), findsOneWidget);
+    await tester.tap(find.text('첫 지출 기록하기'));
+    await tester.pump();
+    expect(find.text('지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'),
+        findsOneWidget);
+  });
+
+  test('dailySpending: 오늘까지 7일치로 묶는다', () {
+    final now = DateTime(2026, 10, 10, 15);
+    final t = Trip(
+      id: 'd',
+      name: 'd',
+      country: countryByCode('JPY')!, // ¥100 = ₩950
+      start: DateTime(2026, 10, 5),
+      end: DateTime(2026, 10, 12),
+      budgetKrw: 100000,
+      expenses: [
+        // 오늘 두 건 -> 합쳐진다
+        Expense(id: '1', icon: '·', place: 'a', amount: 1000, date: DateTime(2026, 10, 10, 9)),
+        Expense(id: '2', icon: '·', place: 'b', amount: 2000, date: DateTime(2026, 10, 10, 20)),
+        // 6일 전 (구간 맨 앞)
+        Expense(id: '3', icon: '·', place: 'c', amount: 500, date: DateTime(2026, 10, 4, 12)),
+        // 7일 전 -> 구간 밖이라 빠진다
+        Expense(id: '4', icon: '·', place: 'd', amount: 9999, date: DateTime(2026, 10, 3)),
+      ],
+    );
+
+    final days = dailySpending(t, now);
+    expect(days.length, 7);
+    expect(days.first.day, DateTime(2026, 10, 4));
+    expect(days.last.day, DateTime(2026, 10, 10));
+    expect(days.first.krw, 4750); // ¥500
+    expect(days.last.krw, 28500); // ¥3,000
+    expect(days[3].krw, 0); // 아무것도 안 쓴 날
   });
 
   group('빠른 환산', () {

@@ -24,6 +24,9 @@ enum LedgerStart {
 ///
 ///  ⚠ 여행 홈에 이미 있는 것 — 장부에서 또 만들 필요 없다:
 ///    - 사용한 금액 · 예산 대비 진행 바 · 남은 금액 (trip_home_screen.dart)
+///    - 최근 7일 막대 + 마지막 지출 3건 요약 (widgets/recent_expenses_card.dart)
+///      "전체 보기" 를 누르면 openLedger 로 넘어온다. 장부는 **전체 목록**과
+///      **기록 입력**을 맡는다 (요약 3건은 홈, 전부는 장부).
 ///    - 오늘 예산 (widgets/today_budget_sheet.dart)
 ///    - "¥100 = ₩950 ⓘ" + 07 환율 갱신 툴팁 (widgets/rate_info_tooltip.dart)
 ///      장부 화면 상단에도 필요하면 RateInfoButton 을 그대로 가져다 쓰면 된다.

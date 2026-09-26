@@ -42,7 +42,28 @@ class TripListScreen extends StatelessWidget {
         child: AnimatedBuilder(
           animation: tripStore,
           builder: (context, _) {
-            final trips = tripStore.trips;
+            final now = DateTime.now();
+            final today = DateTime.utc(now.year, now.month, now.day);
+            DateTime day(DateTime date) =>
+                DateTime.utc(date.year, date.month, date.day);
+            int group(Trip trip) {
+              if (day(trip.end).isBefore(today)) return 2;
+              if (day(trip.start).isAfter(today)) return 1;
+              return 0;
+            }
+
+            // 진행 중인 여행을 먼저, 예정은 가까운 순, 완료는 최근 순으로 보여준다.
+            final trips = [...tripStore.trips]
+              ..sort((a, b) {
+                final order = group(a).compareTo(group(b));
+                if (order != 0) return order;
+                return group(a) == 2
+                    ? b.end.compareTo(a.end)
+                    : a.start.compareTo(b.start);
+              });
+            final featured = trips.isNotEmpty && group(trips.first) < 2
+                ? trips.first
+                : null;
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               child: Column(
@@ -56,12 +77,37 @@ class TripListScreen extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text(
+                        '${trips.length}개${featured == null ? ' · 모든 여행 완료' : ' · '}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      if (featured != null)
+                        Flexible(
+                          child: Text(
+                            '${featured.name} ${tripStatusLabel(featured, now)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
                   AddTripCta(
                     label: '여행 선택하기',
                     onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const AddTripScreen()),
+                      MaterialPageRoute(builder: (_) => const AddTripScreen()),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -79,7 +125,7 @@ class TripListScreen extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   const Text(
-                    '여행을 길게 누르면 이름 편집 · 삭제할 수 있어요',
+                    '여행을 길게 누르면 이름 · 기간 · 예산을 고치거나 삭제할 수 있어요',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

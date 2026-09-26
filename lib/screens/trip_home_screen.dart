@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
 import '../widgets/quick_converter.dart';
 import '../widgets/rate_info_tooltip.dart';
+import '../widgets/recent_expenses_card.dart';
 import '../widgets/screen_top_bar.dart';
 import '../widgets/sheets.dart';
 import '../widgets/today_budget_sheet.dart';
@@ -27,6 +28,8 @@ import 'more_screen.dart';
 ///   │ ▓▓▓▓▓▓░░░░░░░░░░░░░░░         38%   │
 ///   │ 예산 1,200,000원     남은 743,050원  │
 ///   │ 하루 240,000원                       │
+///   └────────────────────────────────────┘
+///   ┌ 최근 지출 ─────────────── 전체 보기 ›┐   7일 막대 + 마지막 3건 (요약)
 ///   └────────────────────────────────────┘
 ///   ┌ 빠른 환산 ─────────────────────────┐   기록 안 남는 계산기
 ///   └────────────────────────────────────┘
@@ -107,6 +110,14 @@ class TripHomeScreen extends StatelessWidget {
                           builder: (_) => TodayBudgetSheet(
                               trip: trip, now: DateTime.now()),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      RecentExpensesCard(
+                        trip: trip,
+                        now: DateTime.now(),
+                        onOpenLedger: () => openLedger(context, trip),
+                        onAddExpense: () => openLedger(context, trip,
+                            start: LedgerStart.addExpense),
                       ),
                       const SizedBox(height: 16),
                       QuickConverter(country: trip.country),

@@ -90,12 +90,13 @@ Actions 탭에서 "Deploy to GitHub Pages" 가 초록불이 되면
 | 파일 | Figma | 설명 | 담당 |
 |---|---|---|---|
 | `screens/empty_home_screen.dart` | 00 | 여행이 없을 때의 첫 화면 | ✅ |
-| `screens/trip_list_screen.dart` | 01 | 내 여행 목록 (길게 눌러 편집) | ✅ |
+| `screens/trip_list_screen.dart` | 01 | 내 여행 목록: 요약 줄, D-day 배지, 예산·사용률 (길게 눌러 편집) | ✅ |
 | `screens/add_trip_screen.dart` | 02 | 새 여행 추가 | ✅ |
 | `widgets/sheets.dart` | 04~06 | 국가 더보기 / 기간 선택 / 여행 편집(이름·기간·예산) 시트 | ✅ |
 | `screens/trip_home_screen.dart` | — | **여행 홈**: 사용한 금액·예산·남은 금액 + 하단 장부 버튼 | ✅ |
 | `widgets/quick_converter.dart` | — | 빠른 환산 계산기 (현지 ↔ 원화, 기록 안 남김) | ✅ |
 | `widgets/today_budget_sheet.dart` | — | 오늘 예산: 남은 예산 ÷ 남은 날 | ✅ |
+| `widgets/recent_expenses_card.dart` | — | 최근 지출 요약: 7일 막대 + 마지막 3건 | ✅ |
 | `widgets/rate_info_tooltip.dart` | 07 | 여행 이름 옆 환율 + 갱신 시각 툴팁 (매일 06:00) | ✅ |
 | `screens/ledger_entry.dart` | 03 | 장부 연결 지점 (버튼만, 지출 목록·입력은 장부 담당) | 장부 담당 |
 | `screens/more_screen.dart` | — | 더보기 — **구현 전** | 더보기 담당 |
