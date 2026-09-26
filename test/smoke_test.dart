@@ -513,6 +513,72 @@ void main() {
     });
   });
 
+  group('여행 중이면 메인 페이지부터', () {
+    Trip ongoing(String id, {required DateTime start, required DateTime end}) =>
+        Trip(
+          id: id,
+          name: '진행중 $id',
+          country: countryByCode('JPY')!,
+          start: start,
+          end: end,
+          budgetKrw: 500000,
+        );
+
+    test('오늘이 기간 안이면 그 여행 (시작·종료일 포함)', () {
+      final now = DateTime(2026, 10, 3, 14);
+      final t = ongoing('a', start: DateTime(2026, 10, 1), end: DateTime(2026, 10, 5));
+      expect(ongoingTrip([t], now)?.id, 'a');
+      // 시작일 당일 / 종료일 당일도 "여행 중"
+      expect(ongoingTrip([t], DateTime(2026, 10, 1, 0, 5))?.id, 'a');
+      expect(ongoingTrip([t], DateTime(2026, 10, 5, 23, 55))?.id, 'a');
+    });
+
+    test('기간 밖이면 null', () {
+      final t = ongoing('a', start: DateTime(2026, 10, 1), end: DateTime(2026, 10, 5));
+      expect(ongoingTrip([t], DateTime(2026, 9, 30, 23)), isNull);
+      expect(ongoingTrip([t], DateTime(2026, 10, 6)), isNull);
+      expect(ongoingTrip([], DateTime(2026, 10, 3)), isNull);
+    });
+
+    test('겹치면 먼저 시작한 여행', () {
+      final a = ongoing('a', start: DateTime(2026, 10, 1), end: DateTime(2026, 10, 9));
+      final b = ongoing('b', start: DateTime(2026, 10, 2), end: DateTime(2026, 10, 4));
+      expect(ongoingTrip([b, a], DateTime(2026, 10, 3))?.id, 'a');
+    });
+
+    testWidgets('앱을 켜면 여행 목록 대신 메인 페이지, 뒤로가기로 목록', (tester) async {
+      final now = DateTime.now();
+      tripStore.add(ongoing(
+        'now',
+        start: now.subtract(const Duration(days: 1)),
+        end: now.add(const Duration(days: 1)),
+      ));
+      addTearDown(() => tripStore.remove('now'));
+
+      await tester.pumpWidget(const TripApp());
+      await tester.pumpAndSettle();
+
+      // 목록을 건너뛰고 그 여행 화면이 바로 떠 있다
+      expect(find.byType(TripHomeScreen), findsOneWidget);
+      expect(find.text('🇯🇵 진행중 now'), findsOneWidget);
+      expect(find.text('내 여행'), findsNothing);
+
+      // 좌측 상단 뒤로가기 -> 여행 선택(목록)
+      await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('내 여행'), findsOneWidget);
+      expect(find.byType(TripHomeScreen), findsNothing);
+    });
+
+    testWidgets('여행 중이 아니면 평소대로 목록부터', (tester) async {
+      // 목업 3건은 모두 오늘이 기간 밖이다
+      await tester.pumpWidget(const TripApp());
+      await tester.pumpAndSettle();
+      expect(find.text('내 여행'), findsOneWidget);
+      expect(find.byType(TripHomeScreen), findsNothing);
+    });
+  });
+
   group('tripStatusLabel', () {
     final trip = Trip(
       id: 'x',

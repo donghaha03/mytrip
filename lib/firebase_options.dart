@@ -33,14 +33,18 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: '',
-    appId: '',
-    messagingSenderId: '',
-    projectId: '',
-    authDomain: '',
-    storageBucket: '',
+    apiKey: 'AIzaSyDjEP2qqKagyRRRG0KHmtYLf-ytW_1PqbI',
+    appId: '1:930702318741:web:939f8c0ced41df31784f9c',
+    messagingSenderId: '930702318741',
+    projectId: 'mytrip-fddfb',
+    authDomain: 'mytrip-fddfb.firebaseapp.com',
+    storageBucket: 'mytrip-fddfb.firebasestorage.app',
   );
 
+  // 아직 Firebase 콘솔에 Android/iOS 앱을 등록하지 않았다. 비어 있으면
+  // services/backend.dart 가 로컬 임시 모드로 띄운다 (앱은 정상 동작하고
+  // 데이터만 메모리에 남는다). 모바일에서도 Firestore 를 쓰려면 콘솔에서
+  // 앱을 추가하고(패키지 이름 com.example.tripapp) 여기에 값을 채우면 된다.
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: '',
     appId: '',

@@ -77,11 +77,12 @@ authService.isSignedIn / authService.currentUser
 
 ### Firebase 없이 작업하기 (로컬 모드)
 
-`lib/firebase_options.dart` 가 비어 있으면 앱이 **로컬 임시 모드**로 뜬다
-(참고한 naite-reservation 의 임시 저장 모드와 같다). 데이터는 메모리에만 있고
-새로고침하면 목업 3건으로 돌아간다. **조원은 Firebase 키 없이 이 모드로 작업하면 된다.**
+웹 키는 이제 `lib/firebase_options.dart` 에 들어 있어서 웹은 기본이 **Firebase 모드**다
+(프로젝트 `mytrip-fddfb`). Android/iOS 는 아직 등록 전이라 키가 비어 있고, 그 경우
+앱이 **로컬 임시 모드**로 뜬다 (참고한 naite-reservation 의 임시 저장 모드와 같다).
+로컬 모드에서는 데이터가 메모리에만 있고 새로고침하면 목업 3건으로 돌아간다.
 
-키를 채운 뒤에도 강제로 로컬 모드로 띄울 수 있다:
+Firebase 를 건드리고 싶지 않거나 오프라인일 때는 강제로 로컬 모드로 띄운다:
 
 ```bash
 flutter run -d chrome --dart-define=LOCAL_MODE=true
@@ -127,6 +128,23 @@ git push -u origin feat/ledger
 
 GitHub 에서 PR 을 열면 CI 가 자동으로 `analyze` + `test` + `웹 빌드` 를 돌린다.
 **초록불일 때만 merge 한다.** merge 되면 1~2분 뒤 GitHub Pages 에 자동 배포된다.
+
+### 나중에 팀 저장소(wannabb/tripledger)에 합치는 방법
+
+팀 저장소의 `main` 에서 브랜치를 만든 뒤 이 저장소의 변경을 합쳐 PR 을 연다.
+두 저장소는 공통 커밋이 없으므로 합칠 때 충돌한 파일을 확인해야 한다.
+
+```bash
+git remote add team https://github.com/wannabb/tripledger.git
+git fetch team
+git switch -c feat/tripapp-integration team/main
+git merge origin/main --allow-unrelated-histories
+# 충돌이 나면 파일을 정리하고 git add, git commit
+git push -u team feat/tripapp-integration
+```
+
+GitHub 의 `wannabb/tripledger` 에서 `feat/tripapp-integration` → `main` PR 을 연다.
+이 저장소에는 `windows/` 가 없고, 팀 저장소에는 `linux/`·`macos/`·`windows/` 가 있다.
 
 ### 충돌이 났을 때
 

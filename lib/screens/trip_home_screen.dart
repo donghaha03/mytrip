@@ -148,6 +148,21 @@ String tripStatusLabel(Trip t, DateTime now) {
   return '여행 중 · ${today.difference(start).inDays + 1}일차';
 }
 
+/// 오늘이 여행 기간(시작·종료일 포함) 안에 드는 여행. 없으면 null.
+///
+/// 앱을 켰을 때 여행 중이면 목록 대신 그 여행 화면부터 보여주려고 쓴다.
+/// 기간이 겹치는 여행이 여러 개면 먼저 시작한 쪽을 고른다.
+Trip? ongoingTrip(Iterable<Trip> trips, DateTime now) {
+  DateTime day(DateTime d) => DateTime.utc(d.year, d.month, d.day);
+  final today = day(now);
+  Trip? found;
+  for (final t in trips) {
+    if (day(t.start).isAfter(today) || day(t.end).isBefore(today)) continue;
+    if (found == null || t.start.isBefore(found.start)) found = t;
+  }
+  return found;
+}
+
 /// 여행 일수 (4박 5일 -> 5)
 int _tripDays(Trip t) => t.end.difference(t.start).inDays + 1;
 

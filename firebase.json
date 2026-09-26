@@ -1,0 +1,14 @@
+{
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "mytrip-fddfb",
+          "configurations": {
+            "web": "1:930702318741:web:939f8c0ced41df31784f9c"
+          }
+        }
+      }
+    }
+  }
+}
