@@ -1,10 +1,11 @@
 name: CI
 
-# main 으로 보내는 PR 과 main 자체를 검사한다.
+# push 한 모든 브랜치 + main 으로 보내는 PR 을 검사한다.
 # 두 사람이 각자 만든 걸 합칠 때 깨진 채로 들어가는 걸 막는 용도.
+# 브랜치 push 에서도 도는 이유: PR 을 열기 전에, 그리고 Windows 에서 로컬
+# flutter 가 막혀 있을 때도 analyze·test 결과를 볼 수 있어야 한다.
 on:
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 
