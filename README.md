@@ -41,6 +41,7 @@ Figma `환율 여행 장부앱 - PBL1` 을 옮긴 Flutter 앱. 데이터는 Fire
 - **배포 주소**: https://donghaha03.github.io/mytrip/ — `main` 에 합쳐지면 1~2분 뒤 자동 반영
 - **저장소**: https://github.com/donghaha03/mytrip
 - **팀 작업 규칙**: [CONTRIBUTING.md](CONTRIBUTING.md) — 누가 어떤 파일을 맡는지
+- **폴더 규칙**: 이 파트의 코드는 전부 `lib/trip_home/` 안에 있다 (팀 저장소의 "브랜치별 폴더" 규칙)
 
 ## 두 가지 모드
 
@@ -91,44 +92,64 @@ flutter run -d chrome --dart-define=LOCAL_MODE=true   # 키가 있어도 로컬�
 웹 API 키는 비밀번호가 아니라서 공개 repo 에 있어도 된다 (Firebase 공식 입장).
 보안은 위의 **보안 규칙**과 **승인된 도메인**이 담당한다.
 
-## 처음 한 번: GitHub 에 올리기
+## 팀 저장소에 합치기 전에 필요한 것
 
-1. github.com 에서 새 repo — **README·.gitignore·license 모두 체크 해제**
-2. 올리기:
+팀 저장소 [`wannabb/tripledger`](https://github.com/wannabb/tripledger) 규칙에 맞춰
+`lib/trip_home/` 한 폴더로 모아 뒀다. 합치기 전에 팀과 맞춰야 할 것은 세 가지뿐이다.
 
-   ```powershell
-   git remote add origin https://github.com/<계정>/<repo>.git
-   git push -u origin main
-   ```
+| 필요한 것 | 왜 | 누가 |
+|---|---|---|
+| `pubspec.yaml` 수정 승인 | 아래 표 참고. 팀 규칙상 미리 알려야 함 | 팀 |
+| Firebase 프로젝트(`tripledger-ebc18`) 멤버 추가 | 이 파트가 Firestore 에 여행·지출을 씀 | 팀 |
+| [`firestore.rules`](firestore.rules) 를 팀 프로젝트에 게시 | 안 하면 `users/{uid}/trips` 읽기·쓰기가 전부 막힘 | 팀 |
 
-3. repo **Settings → Pages → Source: GitHub Actions**
+`pubspec.yaml` 에 추가해야 하는 것:
 
-Actions 탭에서 "Deploy to GitHub Pages" 가 초록불이 되면
-`https://<계정>.github.io/<repo>/` 에서 열린다.
+| 항목 | 용도 |
+|---|---|
+| `cloud_firestore`, `firebase_auth` | 여행·지출 저장, 로그인 |
+| `fake_cloud_firestore`, `firebase_auth_mocks`, `mock_exceptions` (dev) | 테스트 전용. 앱 빌드에는 안 들어감 |
+| Pretendard `.otf` 4개 + `fonts:` 섹션 | 글꼴 |
 
-## 나중에 조원과 공유할 때
+`firebase_core` 와 `environment.sdk` 는 **건드릴 필요 없다** — 팀의 `^4.14.0` 이
+이 앱이 쓰는 4.15 를 이미 포함한다.
+
+합칠 때 버리는 것: 이 저장소의 `lib/firebase_options.dart` (팀 프로젝트 키를 쓴다.
+팀 쪽은 web·android·ios·macos·windows 가 전부 등록돼 있어서 이쪽보다 낫다).
+
+실제 합치는 명령은 [CONTRIBUTING.md](CONTRIBUTING.md) 에 있다.
+
+### 아직 제안 단계
+
+폴더별로 나누면 화면은 안 부딪히는데, 이 폴더에는 화면 말고 **공용 뼈대**도 있다 —
+`models/`(Trip·Expense), `theme/`, `data/`(저장소·Firestore). 다른 담당이 자기 폴더에
+`Trip` 을 또 만들면 두 쪽이 나중에 붙지 않는다. **모델·테마·저장소는 공용 폴더 하나로
+쓰자**고 팀에 제안해야 한다. 합의되면 `lib/trip_home/{models,theme,data}` 를
+`lib/common/` 으로 옮기면 된다 (import 가 전부 상대 경로라 옮기는 값은 싸다).
+
+## 조원과 공유할 때
 
 1. repo **Settings → Collaborators** 에서 조원 초대
 2. (권장) **Settings → Branches → main 보호 규칙**: PR 필수 + `CI` 통과 필수
 3. 조원은 clone 후 각자 브랜치에서 작업 (`feat/login`, `feat/more` — [CONTRIBUTING.md](CONTRIBUTING.md))
-4. Firebase 를 붙였다면 조원도 콘솔에서 보게 하려면: Firebase **프로젝트 설정 → 사용자 및 권한** 에서 추가
+4. Firebase 콘솔도 같이 보려면 **프로젝트 설정 → 사용자 및 권한** 에서 추가
 
 ## 화면 구성
 
 | 파일 | Figma | 설명 | 담당 |
 |---|---|---|---|
-| `screens/empty_home_screen.dart` | 00 | 여행이 없을 때의 첫 화면 | ✅ |
-| `screens/trip_list_screen.dart` | 01 | 내 여행 목록: 요약 줄, D-day 배지, 예산·사용률 (길게 눌러 편집) | ✅ |
-| `screens/add_trip_screen.dart` | 02 | 새 여행 추가 | ✅ |
-| `widgets/sheets.dart` | 04~06 | 국가 더보기 / 기간 선택 / 여행 편집(이름·기간·예산) 시트 | ✅ |
-| `screens/trip_home_screen.dart` | — | **여행 홈**: 사용한 금액·예산·남은 금액 + 하단 장부 버튼 | ✅ |
-| `widgets/quick_converter.dart` | — | 빠른 환산 계산기 (현지 ↔ 원화, 기록 안 남김) | ✅ |
-| `widgets/today_budget_sheet.dart` | — | 오늘 예산: 남은 예산 ÷ 남은 날 | ✅ |
-| `widgets/recent_expenses_card.dart` | — | 최근 지출 요약: 7일 막대 + 마지막 3건 | ✅ |
-| `widgets/rate_info_tooltip.dart` | 07 | 여행 이름 옆 환율 + 갱신 시각 툴팁 (매일 06:00) | ✅ |
-| `screens/ledger_entry.dart` | 03 | 장부 연결 지점 (버튼만, 지출 목록·입력은 장부 담당) | 장부 담당 |
-| `screens/more_screen.dart` | — | 더보기 — **구현 전** | 더보기 담당 |
-| (없음) | — | 로그인 화면 — `services/auth_service.dart` 에 기능은 있음 | 로그인 담당 |
+| `trip_home/screens/empty_home_screen.dart` | 00 | 여행이 없을 때의 첫 화면 | ✅ |
+| `trip_home/screens/trip_list_screen.dart` | 01 | 내 여행 목록: 요약 줄, D-day 배지, 예산·사용률 (길게 눌러 편집) | ✅ |
+| `trip_home/screens/add_trip_screen.dart` | 02 | 새 여행 추가 | ✅ |
+| `trip_home/widgets/sheets.dart` | 04~06 | 국가 더보기 / 기간 선택 / 여행 편집(이름·기간·예산) 시트 | ✅ |
+| `trip_home/screens/trip_home_screen.dart` | — | **여행 홈**: 사용한 금액·예산·남은 금액 + 하단 장부 버튼 | ✅ |
+| `trip_home/widgets/quick_converter.dart` | — | 빠른 환산 계산기 (현지 ↔ 원화, 기록 안 남김) | ✅ |
+| `trip_home/widgets/today_budget_sheet.dart` | — | 오늘 예산: 남은 예산 ÷ 남은 날 | ✅ |
+| `trip_home/widgets/recent_expenses_card.dart` | — | 최근 지출 요약: 7일 막대 + 마지막 3건 | ✅ |
+| `trip_home/widgets/rate_info_tooltip.dart` | 07 | 여행 이름 옆 환율 + 갱신 시각 툴팁 (매일 06:00) | ✅ |
+| `trip_home/screens/ledger_entry.dart` | 03 | 장부 연결 지점 (버튼만, 지출 목록·입력은 장부 담당) | 장부 담당 |
+| `trip_home/screens/more_screen.dart` | — | 더보기 — **구현 전** | 더보기 담당 |
+| (없음) | — | 로그인 화면 — `trip_home/services/auth_service.dart` 에 기능은 있음 | 로그인 담당 |
 
 흐름: 00/01 → 여행 누르면 **여행 홈** → 하단 "여행 장부" / "지출 기록" → 장부 (준비 중), "더보기" → 더보기
 
@@ -136,16 +157,19 @@ Actions 탭에서 "Deploy to GitHub Pages" 가 초록불이 되면
 
 ```
 lib/
-  main.dart                  HomeRouter: 00 빈 화면 / 01 리스트 (로그인 화면은 여기에 끼운다)
-  firebase_options.dart      Firebase 키 (비어 있으면 로컬 모드)
-  services/
-    backend.dart             로컬 / Firebase 모드 판정
-    auth_service.dart        로그인 (로컬·Firebase 구현이 같은 인터페이스)
-    session.dart             로그인 사용자 -> 그 사람의 Firestore 경로 연결
-  data/
-    trip_store.dart          화면이 보는 여행 목록 (ChangeNotifier)
-    trip_repository.dart     Firestore 읽기/쓰기
-  models/ screens/ widgets/ theme/
+  main.dart                  공용 진입점 — trip_home/app.dart 를 띄우기만 한다 (3줄)
+  firebase_options.dart      공용 Firebase 키 (비어 있으면 로컬 모드)
+  trip_home/                 ← 이 파트 전부. 팀 저장소의 "브랜치별 폴더" 규칙
+    app.dart                 TripApp + HomeRouter: 00 빈 화면 / 01 리스트,
+                             여행 기간 안이면 그 여행 홈부터
+    services/
+      backend.dart           로컬 / Firebase 모드 판정
+      auth_service.dart      로그인 (로컬·Firebase 구현이 같은 인터페이스)
+      session.dart           로그인 사용자 -> 그 사람의 Firestore 경로 연결
+    data/
+      trip_store.dart        화면이 보는 여행 목록 (ChangeNotifier)
+      trip_repository.dart   Firestore 읽기/쓰기
+    models/ screens/ widgets/ theme/
 firestore.rules              Firestore 보안 규칙
 .github/workflows/
   ci.yml                     PR 마다 analyze + test + 웹 빌드
@@ -169,20 +193,25 @@ flutter test
 Firebase 경로 테스트(`test/firebase_test.dart`)는 가짜 Firestore/Auth 로 돌아서
 키도 네트워크도 필요 없다.
 
+Windows 11 에서 `flutter` 명령이 전부 `애플리케이션 제어 정책에서 이 파일을 차단했습니다`
+로 죽으면 **스마트 앱 제어**(Windows 보안 → 앱 및 브라우저 컨트롤) 가 Flutter 의
+`dartvm.exe` 를 막는 것이다. 프로젝트 문제가 아니다. `dart analyze` 는 그래도 돌아가고,
+`test` 와 웹 빌드는 PR 을 올려서 CI(Ubuntu) 로 확인하면 된다.
+
 ## 다음 단계
 
 1. **장부 (장부 담당)** — 여행 홈의 "여행 장부"/"지출 기록" 버튼은 있고 지금은 "준비 중".
-   `screens/ledger_entry.dart` 한 파일에서 연결. 예전 03/07 구현은
+   `trip_home/screens/ledger_entry.dart` 한 파일에서 연결. 예전 03/07 구현은
    `git show 6fe2ac6:lib/screens/trip_main_screen.dart` 로 꺼내 쓸 수 있다.
-2. **로그인 (로그인 담당)** — `authService` 로 화면만 만들어 `main.dart` 의 `HomeRouter` 앞에 세운다.
-3. **환율 API** — `models/country.dart` 의 `krwPerUnit` 이 하드코딩. 마지막 호출 날짜를
+2. **로그인 (로그인 담당)** — `authService` 로 화면만 만들어 `lib/main.dart` 에서 `trip_home/app.dart` 앞에 세운다.
+3. **환율 API** — `trip_home/models/country.dart` 의 `krwPerUnit` 이 하드코딩. 마지막 호출 날짜를
    저장해 두었다가 날짜가 바뀐 경우에만 다시 호출한다 (트래픽 절감).
 4. **웹 첫 로딩** — Pretendard 4개 굵기(6MB)를 통째로 넣어서 웹 빌드가 46MB 다.
    느리면 쓰는 글자만 남기는 서브셋으로 줄이거나 굵기를 400/700 둘로 줄이면 된다.
 
 ## 글꼴
 
-**Pretendard** (`assets/fonts/`, 400/500/600/700). `theme/app_theme.dart` 의
+**Pretendard** (`assets/fonts/`, 400/500/600/700). `trip_home/theme/app_theme.dart` 의
 `ThemeData.fontFamily` 로 앱 전체에 적용된다. 국기 같은 이모지는 Pretendard 에
 없어서 시스템 글꼴로 대체된다.
 

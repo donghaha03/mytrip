@@ -9,12 +9,12 @@ import 'package:firebase_auth_mocks/firebase_auth_mocks.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mock_exceptions/mock_exceptions.dart';
 
-import 'package:tripapp/data/trip_repository.dart';
-import 'package:tripapp/data/trip_store.dart';
-import 'package:tripapp/models/country.dart';
-import 'package:tripapp/models/trip.dart';
-import 'package:tripapp/services/auth_service.dart';
-import 'package:tripapp/services/session.dart';
+import 'package:tripapp/trip_home/data/trip_repository.dart';
+import 'package:tripapp/trip_home/data/trip_store.dart';
+import 'package:tripapp/trip_home/models/country.dart';
+import 'package:tripapp/trip_home/models/trip.dart';
+import 'package:tripapp/trip_home/services/auth_service.dart';
+import 'package:tripapp/trip_home/services/session.dart';
 
 /// 스냅샷 스트림이 한 바퀴 돌 시간을 준다.
 Future<void> settle() => Future<void>.delayed(const Duration(milliseconds: 20));

@@ -4,12 +4,15 @@
 
 파일을 사람별로 갈라 뒀다. **자기 파일만 고치면 충돌이 안 난다.**
 
+팀 저장소 규칙대로 **자기 파트는 `lib/<파트>/` 폴더 하나**에 넣는다. `lib/` 루트에는
+공용 파일만 둔다 (`main.dart`, `firebase_options.dart`). 이 파트는 `lib/trip_home/` 이다.
+
 | 담당 | 화면 (Figma) | 파일 |
 |---|---|---|
-| **이 저장소 (완료)** | 00 첫 화면, 01 여행 리스트, 02 여행 추가, 04 국가 더보기, 05 기간 선택, 06 여행 편집(이름·기간·예산), 07 환율 툴팁, **여행 홈** (예산·사용 금액 요약, 오늘 예산, 빠른 환산) | `empty_home`, `trip_list`, `add_trip`, `trip_home` + `widgets/sheets.dart`, `quick_converter.dart`, `today_budget_sheet.dart`, `rate_info_tooltip.dart` |
-| 장부 | 지출 목록, 지출 기록 입력 | 새로 `lib/screens/ledger_screen.dart` → 연결은 `ledger_entry.dart` |
-| 로그인 | 로그인 / 회원가입 | 새로 `lib/screens/login_screen.dart` → 연결은 `main.dart` 의 `HomeRouter` |
-| 더보기 | 더보기 메뉴 | `lib/screens/more_screen.dart` |
+| **이 저장소 (완료)** | 00 첫 화면, 01 여행 리스트, 02 여행 추가, 04 국가 더보기, 05 기간 선택, 06 여행 편집(이름·기간·예산), 07 환율 툴팁, **여행 홈** (예산·사용 금액 요약, 오늘 예산, 빠른 환산) | `lib/trip_home/` 전체 |
+| 장부 | 지출 목록, 지출 기록 입력 | 새로 `lib/ledger/` → 연결은 `trip_home/screens/ledger_entry.dart` 한 줄 |
+| 로그인 | 로그인 / 회원가입 | 새로 `lib/login/` → 연결은 `lib/main.dart` |
+| 더보기 | 더보기 메뉴 | `lib/trip_home/screens/more_screen.dart` (또는 새로 `lib/more/`) |
 
 ### 여행 홈
 
@@ -45,7 +48,7 @@
 ### 장부 담당
 
 여행 홈의 두 버튼("여행 장부", "지출 기록")이 이미 있고, 지금은 누르면 "준비 중" 안내만 뜬다.
-**`lib/screens/ledger_entry.dart` 한 파일만** 고치면 연결된다 — 여행 홈은 건드릴 필요 없다.
+**`lib/trip_home/screens/ledger_entry.dart` 한 파일만** 고치면 연결된다 — 여행 홈은 건드릴 필요 없다.
 
 - `openLedger(context, trip, start: LedgerStart.overview | addExpense)` 로 불린다.
   `addExpense` 면 입력 폼부터 열어 주면 된다
@@ -59,7 +62,7 @@
 
 ### 로그인 담당
 
-로그인 **기능**은 이미 있다 (`lib/services/auth_service.dart`). 화면만 만들면 된다.
+로그인 **기능**은 이미 있다 (`lib/trip_home/services/auth_service.dart`). 화면만 만들면 된다.
 
 ```dart
 await authService.signIn(email, password);   // 실패 시 AuthException(message) — 한국어 문구
@@ -68,11 +71,11 @@ await authService.signOut();
 authService.isSignedIn / authService.currentUser
 ```
 
-- 로그인 화면을 앱 앞에 세우려면 `main.dart` 의 `HomeRouter` 를
+- 로그인 화면을 앱 앞에 세우려면 `lib/trip_home/app.dart` 의 `HomeRouter` 를
   "`authService.isSignedIn` 이면 여행 화면, 아니면 로그인 화면" 으로 감싼다.
   `authService` 는 ChangeNotifier 라 `AnimatedBuilder` 로 감싸면 로그인 즉시 넘어간다
 - Firebase 모드에서는 로그인하는 순간 그 사람의 Firestore(`users/{uid}/...`)에
-  자동으로 붙는다 (`services/session.dart`). 로그인 전 데이터는 메모리에만 있다
+  자동으로 붙는다 (`trip_home/services/session.dart`). 로그인 전 데이터는 메모리에만 있다
 - 로컬 모드의 가짜 로그인도 Firebase 와 같은 규칙·문구라 로컬에서 되면 Firebase 에서도 된다
 
 ### Firebase 없이 작업하기 (로컬 모드)
@@ -93,18 +96,26 @@ flutter run -d chrome --dart-define=LOCAL_MODE=true
 여러 명이 같이 쓰는 파일이라 **말없이 고치면 충돌 난다.** 바꿔야 하면 먼저 얘기할 것:
 
 ```
-lib/main.dart               HomeRouter (로그인 담당이 여기에 로그인 화면을 끼운다)
+lib/main.dart               진입점 (로그인 담당이 여기에 로그인 화면을 끼운다)
 lib/firebase_options.dart   Firebase 키           ← flutterfire configure 가 덮어씀
-lib/services/               authService, Backend  ← 로그인 기능 추가 시 여기 인터페이스부터 합의
-lib/models/                 Trip, Expense, Country ← 필드 추가는 Firestore 저장 구조도 같이 바뀜
-lib/data/                   tripStore, Firestore 저장
-lib/theme/                  색·폰트·숫자 포맷
-lib/widgets/                ScreenTopBar, AppSheet, CountryChip ...
-lib/screens/trip_home_screen.dart   여행 홈 (장부·더보기로 가는 버튼)
+pubspec.yaml                팀 규칙: 고치기 전에 카톡에 미리 알린다
 firestore.rules
 ```
 
-새 위젯이 필요하면 `lib/widgets/` 에 **새 파일**로 만든다. 기존 파일에 끼워
+아래는 지금 `lib/trip_home/` 안에 있지만 사실 공용 뼈대다. **모델·테마·저장소를
+`lib/common/` 으로 뺄지는 팀과 합의해야 한다** (각자 폴더에 `Trip` 을 따로 만들면
+나중에 합쳐지지 않는다):
+
+```
+trip_home/services/         authService, Backend  ← 로그인 기능 추가 시 여기 인터페이스부터 합의
+trip_home/models/           Trip, Expense, Country ← 필드 추가는 Firestore 저장 구조도 같이 바뀜
+trip_home/data/             tripStore, Firestore 저장
+trip_home/theme/            색·폰트·숫자 포맷
+trip_home/widgets/          ScreenTopBar, AppSheet, CountryChip ...
+trip_home/screens/trip_home_screen.dart   여행 홈 (장부·더보기로 가는 버튼)
+```
+
+새 위젯이 필요하면 `lib/trip_home/widgets/` 에 **새 파일**로 만든다. 기존 파일에 끼워
 넣지 않는다. 그래야 서로 안 부딪힌다.
 
 ## 브랜치 / PR
@@ -144,7 +155,26 @@ git push -u team feat/tripapp-integration
 ```
 
 GitHub 의 `wannabb/tripledger` 에서 `feat/tripapp-integration` → `main` PR 을 연다.
-이 저장소에는 `windows/` 가 없고, 팀 저장소에는 `linux/`·`macos/`·`windows/` 가 있다.
+
+**미리 해 둘 것** (안 하면 합쳐도 안 돌아간다):
+
+1. **`pubspec.yaml` 수정을 팀에 알린다** — 팀 규칙이다. 추가할 것:
+   `cloud_firestore`, `firebase_auth` / dev 에 `fake_cloud_firestore`,
+   `firebase_auth_mocks`, `mock_exceptions` / Pretendard `.otf` 4개 + `fonts:` 섹션.
+   `firebase_core` 와 `environment.sdk` 는 팀 것 그대로 둬도 된다
+2. **Firebase 프로젝트(`tripledger-ebc18`) 멤버로 추가** 를 요청한다
+3. **`firestore.rules` 를 팀 프로젝트에 게시** 한다. 안 하면 `users/{uid}/trips` 가 전부 막힌다
+4. GitHub Pages 로 배포한다면 Auth **승인된 도메인** 에 그 주소를 추가한다
+
+**합칠 때 정리할 파일**:
+
+| 파일 | 어떻게 |
+|---|---|
+| `lib/firebase_options.dart` | **팀 것을 쓴다.** 팀 프로젝트는 web·android·ios·macos·windows 전부 등록돼 있다 |
+| `lib/main.dart` | 팀 것은 `flutter create` 기본 카운터 앱이다. 이쪽 3줄짜리로 바꾸거나, 로그인 화면이 있으면 그걸 앞에 세운다 |
+| `analysis_options.yaml` | 팀 것과 같게 맞춰 뒀다 (`macos/**`·`linux/**` 제외 포함) |
+| `linux/`·`macos/`·`windows/` | 팀에만 있다. **지우지 말 것** |
+| `README.md` | 팀 기획서를 맨 위에 그대로 두었다. 아래쪽 개발 가이드만 합친다 |
 
 ### 충돌이 났을 때
 

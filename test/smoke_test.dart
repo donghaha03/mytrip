@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:tripapp/data/trip_store.dart';
-import 'package:tripapp/main.dart';
-import 'package:tripapp/screens/add_trip_screen.dart';
-import 'package:tripapp/screens/more_screen.dart';
-import 'package:tripapp/screens/trip_list_screen.dart';
-import 'package:tripapp/screens/trip_home_screen.dart';
-import 'package:tripapp/models/country.dart';
-import 'package:tripapp/models/trip.dart';
-import 'package:tripapp/theme/app_theme.dart';
-import 'package:tripapp/widgets/country_chip.dart';
-import 'package:tripapp/widgets/sheets.dart';
-import 'package:tripapp/widgets/quick_converter.dart';
-import 'package:tripapp/widgets/rate_info_tooltip.dart';
-import 'package:tripapp/widgets/recent_expenses_card.dart';
-import 'package:tripapp/widgets/today_budget_sheet.dart';
-import 'package:tripapp/widgets/won_input_formatter.dart';
+import 'package:tripapp/trip_home/data/trip_store.dart';
+import 'package:tripapp/trip_home/app.dart';
+import 'package:tripapp/trip_home/screens/add_trip_screen.dart';
+import 'package:tripapp/trip_home/screens/more_screen.dart';
+import 'package:tripapp/trip_home/screens/trip_list_screen.dart';
+import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
+import 'package:tripapp/trip_home/models/country.dart';
+import 'package:tripapp/trip_home/models/trip.dart';
+import 'package:tripapp/trip_home/theme/app_theme.dart';
+import 'package:tripapp/trip_home/widgets/country_chip.dart';
+import 'package:tripapp/trip_home/widgets/sheets.dart';
+import 'package:tripapp/trip_home/widgets/quick_converter.dart';
+import 'package:tripapp/trip_home/widgets/rate_info_tooltip.dart';
+import 'package:tripapp/trip_home/widgets/recent_expenses_card.dart';
+import 'package:tripapp/trip_home/widgets/today_budget_sheet.dart';
+import 'package:tripapp/trip_home/widgets/won_input_formatter.dart';
 
 Widget _wrap(Widget child) =>
     MaterialApp(theme: buildAppTheme(), home: child);

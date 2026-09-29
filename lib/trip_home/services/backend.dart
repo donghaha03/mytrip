@@ -1,7 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
-import '../firebase_options.dart';
+import '../../firebase_options.dart';
 
 enum BackendMode {
   /// Firebase 설정이 없다. 데이터는 메모리에만, 로그인은 가짜.
