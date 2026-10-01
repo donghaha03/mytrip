@@ -7,7 +7,7 @@
 ## 팀 작업 규칙
 
 - 각자 별도 Git 브랜치에서 작업하고, `lib/` 아래 담당 작업 폴더를 사용합니다. 이 저장소의 폴더는 `lib/trip_home/`입니다.
-- `pubspec.yaml` 등 YAML을 수정해야 한다면 변경 목적과 내용을 미리 팀에 알립니다. 이번 환율 연결에는 `http`, `shared_preferences`, `url_launcher`를 추가했습니다.
+- `pubspec.yaml` 등 YAML을 수정해야 한다면 변경 목적과 내용을 미리 팀에 알립니다. 환율 연결에 `http`, `shared_preferences`를 사용하며, 출처 링크 제거 후 사용하지 않는 `url_launcher`는 제거했습니다.
 - DB 작업이 필요해지면 팀 담당자에게 프로젝트 멤버 추가를 요청합니다. 지금은 DB 권한 없이 작업할 수 있습니다.
 - 우선 이전 데이터가 있다고 가정해 화면을 완성합니다. 기본 실행의 샘플 여행·지출은 실제 사용자 데이터가 아닙니다.
 
@@ -52,7 +52,7 @@ flutter build web --release --no-wasm-dry-run
 `test/smoke_test.dart`는 화면 이동·입력·예산 계산을,
 `test/firebase_test.dart`는 모의 Firebase로 인증과 저장 구조를 확인합니다.
 `test/rate_api_test.dart`는 실제 네트워크 호출 없이 환율 방향·06시 경계·캐시·오류 복구를 확인합니다.
-`tool/update_rates.mjs --check`는 서버 응답 변환과 잘못된 날짜·누락·0 환율 차단을 확인합니다.
+`tool/update_rates.mjs --check`는 서버 응답 변환, 잘못된 날짜·누락·0 환율 차단, 일반 배포의 기존 값 보존과 예약 수집을 확인합니다.
 화면 동작을 변경했다면 해당 테스트의 기대값도 함께 갱신합니다.
 
 ## 이후 tripledger로 옮기는 절차
@@ -83,7 +83,7 @@ git restore --source=mytrip/main -- lib/trip_home
 
 - **공용 API:** 화면에서 Firebase를 직접 호출하지 않고 팀의 `AuthApi`, `TripApi`, `ExpenseApi`, `RateApi`, `LedgerCalc`를 사용합니다. 현재 `services/`와 `data/`는 개인 프로토타입용이므로 팀 저장 계층과 함께 중복 실행하지 않습니다.
 - **모델:** 예산은 `Trip.budget`에 원화 정수로, 지출은 현지 금액과 기록 당시 `currency`·`rate`로 처리합니다. `records` 경로와 `budgetKrw` 필드를 그대로 사용하지 않습니다. 현재 샘플 지출의 고정 환율은 팀의 `Expense.rate`로 대체하며, 과거 지출을 새 환율로 재계산하지 않습니다.
-- **환율:** mytrip에서 `RateApi.load`, `ready`, `krwPer`, `toKrw`, `fromKrw`, `lastFetched`의 정적 호출과 환율 없음=0을 팀 형식에 맞췄습니다. 팀에 가져갈 화면에서는 팀의 `api.dart`를 import하고 기존 `RateApi`를 재사용합니다. 개인 `lib/api`를 팀 공용 API에 덮어쓰지 않습니다. `changes` 구독과 06시 서버 스냅샷은 mytrip 확장이므로 팀 API 담당자와 조율합니다. `http`·`shared_preferences`는 팀에 이미 있으며 `url_launcher` 추가가 필요하면 먼저 알립니다.
+- **환율:** mytrip에서 `RateApi.load`, `ready`, `krwPer`, `toKrw`, `fromKrw`, `lastFetched`의 정적 호출과 환율 없음=0을 팀 형식에 맞췄습니다. 팀에 가져갈 화면에서는 팀의 `api.dart`를 import하고 기존 `RateApi`를 재사용합니다. 개인 `lib/api`를 팀 공용 API에 덮어쓰지 않습니다. `changes` 구독과 06시 서버 스냅샷은 mytrip 확장이므로 팀 API 담당자와 조율합니다. `http`·`shared_preferences`는 팀에 이미 있으며 출처 링크용 패키지는 필요하지 않습니다.
 - **앱 진입점:** 팀의 `lib/main.dart`에 화면을 연결하고, 이 저장소의 앱 초기화 코드를 통째로 대체하지 않습니다. Firebase와 소셜 로그인·환율 초기화는 앱 시작 시 한 번만 수행합니다.
 - **Firebase:** 팀의 `lib/firebase_options.dart`와 `tripledger-ebc18` 설정을 사용합니다. 개인 프로젝트 설정이나 `firestore.rules`를 팀 프로젝트에 덮어쓰지 않습니다.
 - **글꼴·패키지:** 팀에 Pretendard와 Firebase 패키지가 이미 있으므로 먼저 기존 설정을 확인합니다. 테스트 의존성이나 추가 글꼴이 필요하면 실제 사용하는 항목만 반영합니다.
@@ -93,7 +93,8 @@ git restore --source=mytrip/main -- lib/trip_home
 
 ## mytrip의 06시 예약 갱신
 
-- 변경은 mytrip의 `.github/workflows/pages.yml`(06:00 KST 예약·환율 파일 생성)과 `ci.yml`(서버 스크립트 검증)에만 적용합니다. `pubspec.yaml`·DB·팀 저장소 설정은 그대로 둡니다.
+- mytrip의 `.github/workflows/pages.yml`이 06:00 KST 예약·환율 파일 배포를, `ci.yml`이 서버 스크립트 검증을 담당합니다. DB·팀 저장소 설정은 변경하지 않습니다.
 - `tool/update_rates.mjs`는 CC0 공개 API를 KRW 기준 `rates`·`rate_date`·`fetched_at`으로 정리합니다. 제공 기준일과 수집 시각을 혼동하지 않습니다.
+- 예약 실행만 새 환율을 수집합니다. 코드 변경·수동 배포는 기존 파일과 수집 시각을 보존하며, 공개 파일이 없는 최초 배포만 즉시 수집합니다. 앱에는 수동 재조회 버튼을 두지 않습니다.
 - 예약 실행·배포 지연 시 이전 환율을 유지합니다. GitHub 무료 예약의 지연·60일 무활동 중지 제한은 README에 안내합니다.
 - 기존 샘플 지출은 현재 환율로 다시 계산하지 않습니다. 로그인·여행·지출 API 전체 연결과 DB 모델 변경은 이번 작업에 포함하지 않습니다.

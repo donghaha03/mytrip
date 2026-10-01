@@ -314,9 +314,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('환율 정보'), findsOneWidget);
     expect(find.textContaining('환율 기준일: '), findsOneWidget);
-    expect(find.textContaining('서버 갱신: '), findsOneWidget);
-    expect(find.text('매일 오전 6시(한국 시간) 자동 갱신'), findsOneWidget);
-    expect(find.text('다시 불러오기'), findsOneWidget);
+    expect(find.textContaining('마지막 수집: '), findsOneWidget);
+    expect(find.text('자동 갱신: 매일 오전 6시(한국 시간)'), findsOneWidget);
+    expect(find.text('다시 불러오기'), findsNothing);
     expect(find.textContaining('최근 갱신: '), findsNothing);
 
     // 바깥을 누르면 닫힌다
@@ -847,6 +847,6 @@ void main() {
     await tester.enterText(input, '1000');
     await tester.pump();
     expect(find.text('9,000원'), findsOneWidget);
-    expect(find.text('환율 제공: Currency API · 매일 06:00 KST'), findsOneWidget);
+    expect(find.textContaining('환율 제공:'), findsNothing);
   });
 }

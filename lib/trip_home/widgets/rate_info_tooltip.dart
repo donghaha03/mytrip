@@ -4,7 +4,7 @@ import '../../api/api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
-/// API 기준 시각·조회 상태와 다시 불러오기 버튼.
+/// 정기 갱신 일정과 실제 마지막 수집 시각을 구분해 안내한다.
 class RateInfoButton extends StatefulWidget {
   const RateInfoButton({super.key, required this.currency});
 
@@ -156,9 +156,14 @@ class _TooltipBody extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
+            const Text(
+              '자동 갱신: 매일 오전 6시(한국 시간)',
+              style: TextStyle(fontSize: 12, color: AppColors.white),
+            ),
+            const SizedBox(height: 4),
             Text(
               available
-                  ? '서버 갱신: $stamp'
+                  ? '마지막 수집: $stamp'
                   : RateApi.isLoading
                   ? '환율을 불러오는 중이에요'
                   : '환율을 불러오지 못했어요',
@@ -169,20 +174,19 @@ class _TooltipBody extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              RateApi.hasError
-                  ? available
-                        ? '연결 실패 · 저장된 환율을 사용하고 있어요'
-                        : '네트워크를 확인하고 다시 시도해주세요'
-                  : RateApi.isStale
-                  ? '오늘 갱신 대기 · 저장된 환율 사용 중'
-                  : '매일 오전 6시(한국 시간) 자동 갱신',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.white.withValues(alpha: 0.6),
+            if (RateApi.hasError || RateApi.isStale)
+              Text(
+                RateApi.hasError
+                    ? available
+                          ? '연결 실패 · 저장된 환율을 사용하고 있어요'
+                          : '네트워크를 확인하고 다시 시도해주세요'
+                    : '자동 갱신 대기 · 저장된 환율 사용 중',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.white.withValues(alpha: 0.6),
+                ),
               ),
-            ),
             if (RateApi.updatedAt != null)
               Text(
                 '환율 기준일: ${formatDate(RateApi.updatedAt!)}',
@@ -191,13 +195,6 @@ class _TooltipBody extends StatelessWidget {
                   color: AppColors.white.withValues(alpha: 0.6),
                 ),
               ),
-            TextButton(
-              onPressed: RateApi.isLoading
-                  ? null
-                  : () => RateApi.load(force: true),
-              style: TextButton.styleFrom(foregroundColor: AppColors.white),
-              child: Text(RateApi.isLoading ? '불러오는 중…' : '다시 불러오기'),
-            ),
           ],
         ),
       ),
