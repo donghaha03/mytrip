@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../data/trip_store.dart';
 import '../models/country.dart' show kWonSymbol;
@@ -114,25 +113,6 @@ class TripHomeScreen extends StatelessWidget {
                       QuickConverter(
                         country: trip.country,
                         rate: RateApi.krwPer(trip.country.currency),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          try {
-                            if (!await launchUrl(
-                              Uri.parse(
-                                'https://github.com/fawazahmed0/exchange-api',
-                              ),
-                            )) {
-                              throw StateError('출처 링크 열기 실패');
-                            }
-                          } catch (_) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('출처 페이지를 열 수 없어요')),
-                            );
-                          }
-                        },
-                        child: const Text('환율 제공: Currency API · 매일 06:00 KST'),
                       ),
                     ],
                   ),
