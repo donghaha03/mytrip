@@ -106,7 +106,7 @@ class TripListScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   AddTripCta(
-                    label: '여행 선택하기',
+                    label: '여행 추가하기',
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const AddTripScreen()),
                     ),
@@ -126,7 +126,7 @@ class TripListScreen extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   const Text(
-                    '여행을 길게 누르면 이름 · 기간 · 예산을 고치거나 삭제할 수 있어요',
+                    '여행을 길게 눌러 편집하세요',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

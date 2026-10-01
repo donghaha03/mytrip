@@ -276,11 +276,6 @@ class _SpendingCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          const Text(
-            '상단 정수 환율 기준 · 소수점 버림',
-            style: TextStyle(fontSize: 11, color: AppColors.onPrimaryMuted),
-          ),
           const SizedBox(height: 16),
 
           // 예산 대비 진행
