@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'data/trip_store.dart';
@@ -6,6 +8,7 @@ import 'screens/trip_home_screen.dart';
 import 'screens/trip_list_screen.dart';
 import 'services/auth_service.dart';
 import 'services/backend.dart';
+import 'services/rate_api.dart';
 import 'services/session.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
@@ -24,6 +27,7 @@ Future<void> main() async {
   }
 
   runApp(const TripApp());
+  unawaited(rateApi.load());
 }
 
 class TripApp extends StatelessWidget {

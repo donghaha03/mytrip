@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/trip_store.dart';
+import '../models/country.dart' show kWonSymbol;
 import '../models/trip.dart';
+import '../services/rate_api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
@@ -46,7 +49,7 @@ class TripHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: tripStore,
+      animation: Listenable.merge([tripStore, rateApi]),
       builder: (context, _) => Scaffold(
         body: SafeArea(
           bottom: false,
@@ -55,19 +58,22 @@ class TripHomeScreen extends StatelessWidget {
             children: [
               ScreenTopBar(
                 title: '${trip.country.flag} ${trip.name}',
-                // 여행 이름 오른쪽에 예시 환율과 안내를 표시한다.
+                // 지출 합계와 별도로 현재 API 환율을 표시한다.
                 titleSuffix: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      trip.country.rateLabel,
+                      rateApi.krwPer(trip.country.currency) == null
+                          ? (rateApi.isLoading ? '환율 확인 중' : '환율 없음')
+                          : '${trip.country.formatForeign(trip.country.unitAmount)} = '
+                                '$kWonSymbol${formatNumber(rateApi.krwPer(trip.country.currency)! * trip.country.unitAmount)}',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const RateInfoButton(),
+                    RateInfoButton(currency: trip.country.currency),
                   ],
                 ),
                 trailing: _CircleIconButton(
@@ -105,7 +111,27 @@ class TripHomeScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      QuickConverter(country: trip.country),
+                      QuickConverter(
+                        country: trip.country,
+                        rate: rateApi.krwPer(trip.country.currency),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          try {
+                            if (!await launchUrl(
+                              Uri.parse('https://www.exchangerate-api.com'),
+                            )) {
+                              throw StateError('출처 링크 열기 실패');
+                            }
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('출처 페이지를 열 수 없어요')),
+                            );
+                          }
+                        },
+                        child: const Text('환율 제공: ExchangeRate-API'),
+                      ),
                     ],
                   ),
                 ),
@@ -320,7 +346,9 @@ class _SpendingCard extends StatelessWidget {
                 _Figure(
                   label: over ? '초과' : '남은 금액',
                   value: formatWon(remain.abs()),
-                  sub: c.formatForeign(trip.remainForeign.abs()),
+                  sub: rateApi.krwPer(c.currency) == null
+                      ? '환율 없음'
+                      : '≈ ${c.formatForeign(remain.abs() / rateApi.krwPer(c.currency)!)}',
                   alignEnd: true,
                   warn: over,
                 ),

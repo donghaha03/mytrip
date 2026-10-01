@@ -14,12 +14,26 @@
 | 여행 홈 | 사용액·남은 예산·진행률·D-day 표시 |
 | 오늘 예산 | 여행 기간과 지출을 기준으로 계산 |
 | 최근 지출 | 최근 7일 요약과 최신 3건 표시 |
-| 빠른 환산·환율 안내 | 고정된 예시 환율 사용, 실시간 API 미연결 |
+| 빠른 환산·환율 안내 | 실제 환율 API 연결, 기준 시각·재조회·24시간 캐시 |
 | 로그인·회원가입 | 인증 서비스만 있음, 화면 미구현 |
 | 장부·지출 입력 | 버튼과 연결 지점만 있음, 화면 미구현 |
 | 내 계정·설정 | 준비 중 안내만 표시 |
 
-환율과 금액 계산은 화면 확인용입니다. 실제 지출 관리에 사용하기 전에 팀의 환율·지출 API 연결이 필요합니다.
+빠른 환산과 현재 예산의 현지 통화 표시는 API 환율을 사용합니다.
+기존 샘플 지출의 원화 금액은 고정 예시 환율을 유지하며, 실제 지출 저장은 아직 팀 API에 연결되지 않았습니다.
+
+## 환율
+
+팀과 같은 [ExchangeRate-API 공개 API](https://www.exchangerate-api.com/docs/free)의 KRW 기준 환율을 사용합니다.
+API 키와 DB 권한은 필요 없습니다. 제공 데이터는 하루 한 번 갱신되며 초 단위 실시간 시세가 아닙니다.
+
+- 앱 시작 시 조회하고, 조회 후 24시간 동안 기기에 저장된 값을 재사용합니다.
+- 여행 홈의 `ⓘ`에서 제공 기준 시각을 확인하거나 다시 불러올 수 있습니다.
+- 조회 실패 시 이전 캐시를 유지하고 연결 실패를 안내합니다. 환율이 전혀 없으면 환산을 비활성화합니다.
+- 출처 링크를 화면에 표시합니다. 카드사 수수료·실제 결제 환율은 반영하지 않습니다.
+
+이번 환율 연결에는 `pubspec.yaml`에 `http`, `shared_preferences`, `url_launcher`를 추가했습니다.
+DB 구조와 Firebase 설정은 변경하지 않았습니다.
 
 ## 실행
 
@@ -58,7 +72,7 @@ lib/
     ├── widgets/              달력·편집 시트·계산기·요약 카드
     ├── models/               현재 프로토타입의 여행·지출 모델
     ├── data/                 메모리 상태·Firestore 저장
-    ├── services/             인증·실행 모드·사용자 연결
+    ├── services/             인증·실행 모드·사용자 연결·환율 API
     └── theme/                색상·글꼴·표시 형식
 test/                         화면·계산·Firebase 모의 테스트
 assets/fonts/                 Pretendard와 글꼴 라이선스
@@ -76,7 +90,7 @@ YAML 변경이 필요하면 먼저 팀에 알리고, DB 권한은 연결 작업�
 | 예산 | `Trip.budgetKrw` | `Trip.budget` — 원화 정수 |
 | 통화 | `Trip.country.currency` | `Trip.currency` |
 | 지출 컬렉션 | `trips/{tripId}/records` | `trips/{tripId}/expenses` |
-| 지출 원화 환산 | 국가별 고정 예시 환율 | 지출에 저장된 `currency`·`rate`, `amountKrw` |
+| 지출 원화 환산 | 샘플은 고정 환율, 현재 환산은 API | 지출에 저장된 `currency`·`rate`, `amountKrw` |
 | 데이터 호출 | `tripStore`·`authService` | `lib/api/api.dart`의 공용 API |
 | Firebase 프로젝트 | `mytrip-fddfb` | `tripledger-ebc18` |
 
