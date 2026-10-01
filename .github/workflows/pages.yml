@@ -1,15 +1,14 @@
 name: Deploy to GitHub Pages
 
 # main 에 합쳐지면 자동으로 빌드해서 https://<계정>.github.io/<repo>/ 에 올린다.
-#
-# naite-reservation 은 순수 HTML 이라 main 브랜치 루트를 그대로 서빙하지만,
-# Flutter 는 빌드 결과물(build/web)을 올려야 해서 Actions 로 배포한다.
-#
 # 처음 한 번: repo Settings -> Pages -> Source 를 "GitHub Actions" 로 바꿀 것.
 on:
   push:
     branches: [main]
   workflow_dispatch: # Actions 탭에서 수동 실행
+  # ponytail: 무료 예약은 지연·60일 무활동 중지 가능; 정각/상시 운영 필요 시 전용 스케줄러.
+  schedule:
+    - cron: '0 21 * * *' # UTC 21:00 = 한국 시간 다음 날 06:00. 실행·배포 지연 가능.
 
 permissions:
   contents: read
@@ -38,6 +37,7 @@ jobs:
       # 깨진 채로 배포되지 않게 여기서도 한 번 더 막는다
       - run: flutter analyze --fatal-infos --fatal-warnings
       - run: flutter test
+      - run: node tool/update_rates.mjs --check
 
       # <계정>.github.io/<repo>/ 처럼 하위 경로에 뜨므로 base-href 를 repo 이름으로.
       # repo 이름이 <계정>.github.io 이면 루트(/)에 뜬다.
@@ -47,6 +47,10 @@ jobs:
           if [[ "$REPO" == *.github.io ]]; then BASE="/"; else BASE="/$REPO/"; fi
           echo "base-href: $BASE"
           flutter build web --release --no-wasm-dry-run --base-href "$BASE"
+
+      # 실패하면 배포를 중단하므로 마지막 정상 환율과 앱이 그대로 남는다.
+      - name: Update daily rates
+        run: node tool/update_rates.mjs
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/trip.dart';
-import '../services/rate_api.dart';
+import '../../api/api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'app_sheet.dart';
@@ -114,14 +114,14 @@ class TodayBudgetSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: rateApi,
+    animation: RateApi.changes,
     builder: (context, _) => _buildSheet(context),
   );
 
   Widget _buildSheet(BuildContext context) {
     final b = todayBudget(trip, now);
     final c = trip.country;
-    final rate = rateApi.krwPer(c.currency);
+    final rate = RateApi.krwPer(c.currency);
 
     final (String caption, String headline) = switch (b.phase) {
       TodayPhase.beforeTrip => (
@@ -169,9 +169,9 @@ class TodayBudgetSheet extends StatelessWidget {
               if (b.allowanceKrw > 0) ...[
                 const SizedBox(height: 2),
                 Text(
-                  rate == null
+                  rate <= 0
                       ? '환율 없음'
-                      : '≈ ${c.formatForeign(b.allowanceKrw / rate)}',
+                      : '≈ ${c.formatForeign(RateApi.fromKrw(b.allowanceKrw, c.currency))}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

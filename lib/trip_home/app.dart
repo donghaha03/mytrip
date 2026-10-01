@@ -8,7 +8,7 @@ import 'screens/trip_home_screen.dart';
 import 'screens/trip_list_screen.dart';
 import 'services/auth_service.dart';
 import 'services/backend.dart';
-import 'services/rate_api.dart';
+import '../api/api.dart';
 import 'services/session.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
@@ -27,7 +27,11 @@ Future<void> main() async {
   }
 
   runApp(const TripApp());
-  unawaited(rateApi.load());
+  unawaited(RateApi.load());
+  // 서버가 06시에 갱신한다. 열려 있는 앱은 배포 지연도 포함해 최신 파일을 확인한다.
+  // 같은 06시 구간의 캐시가 있으면 load()는 네트워크를 호출하지 않는다.
+  Timer.periodic(const Duration(minutes: 5), (_) => unawaited(RateApi.load()));
+  AppLifecycleListener(onResume: () => unawaited(RateApi.load()));
 }
 
 class TripApp extends StatelessWidget {
