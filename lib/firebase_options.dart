@@ -1,17 +1,6 @@
-// Firebase 연결 설정. (참고한 naite-reservation 의 config.js 에 해당)
-//
-// 지금은 비어 있어서 앱이 "로컬 임시 모드" 로 뜬다 — 데이터는 메모리에만
-// 있고, 로그인은 아무 이메일 + 6자 이상 비밀번호면 통과한다.
-// 조원들은 이 상태 그대로 작업하면 된다.
-//
-// 실제 Firebase 에 붙이려면 (팀장이 한 번만):
-//   dart pub global activate flutterfire_cli
-//   flutterfire configure --project=<firebase 프로젝트 id>
-// 이 파일이 같은 모양으로 덮어써지고, 다음 실행부터 자동으로 Firebase 모드가 된다.
-// 콘솔의 "웹 앱 설정" 값을 아래 web: 에 직접 붙여 넣어도 된다.
-//
-// 웹 API 키는 비밀번호가 아니다 (공개 repo 에 올라가도 된다).
-// 대신 firestore.rules 와 Auth 의 "승인된 도메인" 을 반드시 설정할 것.
+// 개인 Firebase 프로젝트 설정. 기본 실행은 DB 연결 없는 화면 미리보기다.
+// LOCAL_MODE=false일 때만 사용하며, 팀 통합 시 팀의 설정 파일을 유지한다.
+// 웹 API 키와 별개로 Firestore 보안 규칙과 Auth 승인 도메인은 확인해야 한다.
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
@@ -42,7 +31,7 @@ class DefaultFirebaseOptions {
   );
 
   // 아직 Firebase 콘솔에 Android/iOS 앱을 등록하지 않았다. 비어 있으면
-  // services/backend.dart 가 로컬 임시 모드로 띄운다 (앱은 정상 동작하고
+  // trip_home/services/backend.dart 가 로컬 임시 모드로 띄운다 (앱은 정상 동작하고
   // 데이터만 메모리에 남는다). 모바일에서도 Firestore 를 쓰려면 콘솔에서
   // 앱을 추가하고(패키지 이름 com.example.tripapp) 여기에 값을 채우면 된다.
   static const FirebaseOptions android = FirebaseOptions(

@@ -1,28 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
 
-/// 환율이 하루에 한 번 갱신되는 시각 (Figma 07: "최근 갱신: 06:00").
-const kRateUpdateHour = 6;
-
-/// 지금 기준 가장 최근 갱신 시각. 06:00 전이면 어제 06:00, 이후면 오늘 06:00.
-///
-/// 환율 API 를 붙이면 "마지막으로 API 를 부른 시각" 을 저장해 두고 그걸 넘기면 된다
-/// (기획서: 앱을 연 날짜가 마지막 호출 날짜와 다를 때만 다시 부른다).
-DateTime lastRateUpdate(DateTime now) {
-  final todayUpdate = DateTime(now.year, now.month, now.day, kRateUpdateHour);
-  return now.isBefore(todayUpdate)
-      ? todayUpdate.subtract(const Duration(days: 1))
-      : todayUpdate;
-}
-
-/// 07. i 아이콘을 누르면 바로 아래에 붙어서 뜨는 환율 갱신 안내 말풍선.
-/// 무료 환율 API 를 쓰는 구조라 하루 한 번만 갱신된다는 점을 알려준다.
+/// 현재 환율이 화면 확인용 예시 값임을 안내한다.
 class RateInfoButton extends StatefulWidget {
-  const RateInfoButton({super.key, required this.lastUpdated});
-
-  final DateTime lastUpdated;
+  const RateInfoButton({super.key});
 
   @override
   State<RateInfoButton> createState() => _RateInfoButtonState();
@@ -60,8 +42,10 @@ class _RateInfoButtonState extends State<RateInfoButton> {
     const tooltipWidth = 250.0;
     final tailCenterX = anchor.dx + box.size.width / 2;
     // 화면 밖으로 나가지 않도록 좌우 16px 여백 안에서 클램프
-    final left = (tailCenterX - tooltipWidth + 40)
-        .clamp(16.0, areaWidth - tooltipWidth - 16.0);
+    final left = (tailCenterX - tooltipWidth + 40).clamp(
+      16.0,
+      areaWidth - tooltipWidth - 16.0,
+    );
     final top = anchor.dy + box.size.height + 8;
 
     _entry = OverlayEntry(
@@ -87,7 +71,7 @@ class _RateInfoButtonState extends State<RateInfoButton> {
             left: left,
             top: top,
             width: tooltipWidth,
-            child: _TooltipBody(lastUpdated: widget.lastUpdated),
+            child: const _TooltipBody(),
           ),
         ],
       ),
@@ -129,16 +113,10 @@ class _RateInfoButtonState extends State<RateInfoButton> {
 }
 
 class _TooltipBody extends StatelessWidget {
-  const _TooltipBody({required this.lastUpdated});
-
-  final DateTime lastUpdated;
+  const _TooltipBody();
 
   @override
   Widget build(BuildContext context) {
-    final t = lastUpdated;
-    final time =
-        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
     return Material(
       color: Colors.transparent,
       child: Container(
@@ -152,7 +130,7 @@ class _TooltipBody extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              '환율 갱신 정보',
+              '예시 환율 정보',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -161,7 +139,7 @@ class _TooltipBody extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '최근 갱신: ${formatDate(t)} $time',
+              '화면 확인용 환율을 사용하고 있어요',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -170,7 +148,7 @@ class _TooltipBody extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '환율은 24시간마다 한 번 갱신돼요',
+              '실시간 환율 API는 아직 연결되지 않았어요',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
