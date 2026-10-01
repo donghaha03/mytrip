@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/trip_store.dart';
-import '../models/country.dart' show kWonSymbol;
 import '../models/trip.dart';
 import '../../api/api.dart';
 import '../theme/app_colors.dart';
@@ -62,10 +61,7 @@ class TripHomeScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      RateApi.krwPer(trip.country.currency) <= 0
-                          ? (RateApi.isLoading ? '환율 확인 중' : '환율 없음')
-                          : '${trip.country.formatForeign(trip.country.unitAmount)} = '
-                                '$kWonSymbol${formatNumber(RateApi.krwPer(trip.country.currency) * trip.country.unitAmount)}',
+                      currentRateLabel(trip.country),
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -110,10 +106,7 @@ class TripHomeScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      QuickConverter(
-                        country: trip.country,
-                        rate: RateApi.krwPer(trip.country.currency),
-                      ),
+                      QuickConverter(country: trip.country),
                     ],
                   ),
                 ),
@@ -277,6 +270,11 @@ class _SpendingCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '샘플 지출 · 고정 환율 기준',
+            style: TextStyle(fontSize: 11, color: AppColors.onPrimaryMuted),
           ),
           const SizedBox(height: 16),
 

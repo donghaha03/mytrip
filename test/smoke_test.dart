@@ -308,7 +308,7 @@ void main() {
   testWidgets('여행 홈: 여행 이름 옆 환율 + ⓘ 툴팁 (07)', (tester) async {
     final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: japan)));
-    expect(find.text('¥100 = ₩950'), findsOneWidget);
+    expect(find.text('¥100 ≈ ₩950.00'), findsOneWidget);
 
     await tester.tap(find.text('i'));
     await tester.pumpAndSettle();
@@ -511,24 +511,18 @@ void main() {
   });
 
   group('빠른 환산', () {
-    Widget converter(String code) => _wrap(
-      Scaffold(
-        body: QuickConverter(
-          country: countryByCode(code)!,
-          rate: RateApi.krwPer(code),
-        ),
-      ),
-    );
+    Widget converter(String code) =>
+        _wrap(Scaffold(body: QuickConverter(country: countryByCode(code)!)));
 
     testWidgets('환율이 없으면 계산을 비활성화한다', (tester) async {
+      RateApi.reset();
+      SharedPreferences.setMockInitialValues({});
+      addTearDown(() => _loadRates());
       await tester.pumpWidget(
-        _wrap(
-          Scaffold(
-            body: QuickConverter(country: countryByCode('JPY')!, rate: 0),
-          ),
-        ),
+        _wrap(Scaffold(body: QuickConverter(country: countryByCode('JPY')!))),
       );
       expect(find.text('환율 없음'), findsOneWidget);
+      expect(find.text('적용 환율: 환율 없음'), findsOneWidget);
       expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
     });
 
@@ -563,6 +557,28 @@ void main() {
       await tester.tap(find.byTooltip('방향 바꾸기'));
       await tester.pump();
       expect(find.text('\$12.50'), findsOneWidget);
+    });
+
+    testWidgets('API 소수 환율 갱신을 양방향 환산에 즉시 반영한다', (tester) async {
+      addTearDown(() => _loadRates());
+      await tester.pumpWidget(converter('JPY'));
+      await tester.enterText(find.byType(TextField), '1000');
+      await tester.pump();
+      expect(find.text('9,500원'), findsOneWidget);
+
+      await tester.runAsync(() => _loadRates(yenRate: 8.624175011418408));
+      await tester.pump();
+      expect(find.text('적용 환율: ¥100 ≈ ₩862.42'), findsOneWidget);
+      expect(find.text('8,624원'), findsOneWidget);
+      expect(find.text('1,000'), findsOneWidget); // 갱신해도 입력은 유지한다.
+      expect(find.text('9,500원'), findsNothing);
+
+      await tester.tap(find.byTooltip('방향 바꾸기'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), '456950');
+      await tester.pump();
+      expect(find.text('KRW → JPY'), findsOneWidget);
+      expect(find.text('¥52,985'), findsOneWidget);
     });
 
     test('원 -> 현지 통화 변환', () {
@@ -835,9 +851,11 @@ void main() {
     final spent = japan.spentKrw;
     addTearDown(() => _loadRates());
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: japan)));
-    await tester.runAsync(() => _loadRates(yenRate: 9));
+    await tester.runAsync(() => _loadRates(yenRate: 8.624175011418408));
     await tester.pump();
-    expect(find.text('¥100 = ₩900'), findsOneWidget);
+    expect(find.text('¥100 ≈ ₩862.42'), findsOneWidget);
+    expect(find.text('적용 환율: ¥100 ≈ ₩862.42'), findsOneWidget);
+    expect(find.text('샘플 지출 · 고정 환율 기준'), findsOneWidget);
     expect(japan.spentKrw, spent);
     final input = find.descendant(
       of: find.byType(QuickConverter),
@@ -846,7 +864,7 @@ void main() {
     await tester.ensureVisible(input);
     await tester.enterText(input, '1000');
     await tester.pump();
-    expect(find.text('9,000원'), findsOneWidget);
+    expect(find.text('8,624원'), findsOneWidget);
     expect(find.textContaining('환율 제공:'), findsNothing);
   });
 }
