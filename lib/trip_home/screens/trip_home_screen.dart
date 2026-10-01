@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/trip_store.dart';
 import '../models/country.dart' show kWonSymbol;
 import '../models/trip.dart';
-import '../services/rate_api.dart';
+import '../../api/api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
@@ -49,7 +49,7 @@ class TripHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([tripStore, rateApi]),
+      animation: Listenable.merge([tripStore, RateApi.changes]),
       builder: (context, _) => Scaffold(
         body: SafeArea(
           bottom: false,
@@ -63,10 +63,10 @@ class TripHomeScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      rateApi.krwPer(trip.country.currency) == null
-                          ? (rateApi.isLoading ? '환율 확인 중' : '환율 없음')
+                      RateApi.krwPer(trip.country.currency) <= 0
+                          ? (RateApi.isLoading ? '환율 확인 중' : '환율 없음')
                           : '${trip.country.formatForeign(trip.country.unitAmount)} = '
-                                '$kWonSymbol${formatNumber(rateApi.krwPer(trip.country.currency)! * trip.country.unitAmount)}',
+                                '$kWonSymbol${formatNumber(RateApi.krwPer(trip.country.currency) * trip.country.unitAmount)}',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -113,13 +113,15 @@ class TripHomeScreen extends StatelessWidget {
                       const SizedBox(height: 16),
                       QuickConverter(
                         country: trip.country,
-                        rate: rateApi.krwPer(trip.country.currency),
+                        rate: RateApi.krwPer(trip.country.currency),
                       ),
                       TextButton(
                         onPressed: () async {
                           try {
                             if (!await launchUrl(
-                              Uri.parse('https://www.exchangerate-api.com'),
+                              Uri.parse(
+                                'https://github.com/fawazahmed0/exchange-api',
+                              ),
                             )) {
                               throw StateError('출처 링크 열기 실패');
                             }
@@ -130,7 +132,7 @@ class TripHomeScreen extends StatelessWidget {
                             );
                           }
                         },
-                        child: const Text('환율 제공: ExchangeRate-API'),
+                        child: const Text('환율 제공: Currency API · 매일 06:00 KST'),
                       ),
                     ],
                   ),
@@ -346,9 +348,9 @@ class _SpendingCard extends StatelessWidget {
                 _Figure(
                   label: over ? '초과' : '남은 금액',
                   value: formatWon(remain.abs()),
-                  sub: rateApi.krwPer(c.currency) == null
+                  sub: RateApi.krwPer(c.currency) <= 0
                       ? '환율 없음'
-                      : '≈ ${c.formatForeign(remain.abs() / rateApi.krwPer(c.currency)!)}',
+                      : '≈ ${c.formatForeign(RateApi.fromKrw(remain.abs(), c.currency))}',
                   alignEnd: true,
                   warn: over,
                 ),

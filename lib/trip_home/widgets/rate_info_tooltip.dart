@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../services/rate_api.dart';
+import '../../api/api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
@@ -123,18 +123,18 @@ class _TooltipBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: rateApi,
+    animation: RateApi.changes,
     builder: (context, _) => _buildBody(),
   );
 
   Widget _buildBody() {
-    final updated = rateApi.updatedAt?.toLocal();
-    final available = rateApi.krwPer(currency) != null;
-    final stamp = updated == null
+    final fetched = RateApi.lastFetched?.toUtc().add(const Duration(hours: 9));
+    final available = RateApi.krwPer(currency) > 0;
+    final stamp = fetched == null
         ? null
-        : '${formatDate(updated)} '
-              '${updated.hour.toString().padLeft(2, '0')}:'
-              '${updated.minute.toString().padLeft(2, '0')}';
+        : '${formatDate(fetched)} '
+              '${fetched.hour.toString().padLeft(2, '0')}:'
+              '${fetched.minute.toString().padLeft(2, '0')} KST';
     return Material(
       color: Colors.transparent,
       child: Container(
@@ -158,8 +158,8 @@ class _TooltipBody extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               available
-                  ? '환율 기준: $stamp'
-                  : rateApi.isLoading
+                  ? '서버 갱신: $stamp'
+                  : RateApi.isLoading
                   ? '환율을 불러오는 중이에요'
                   : '환율을 불러오지 못했어요',
               style: TextStyle(
@@ -170,23 +170,33 @@ class _TooltipBody extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              rateApi.hasError
+              RateApi.hasError
                   ? available
                         ? '연결 실패 · 저장된 환율을 사용하고 있어요'
                         : '네트워크를 확인하고 다시 시도해주세요'
-                  : '하루 한 번 갱신되는 참고 환율이에요',
+                  : RateApi.isStale
+                  ? '오늘 갱신 대기 · 저장된 환율 사용 중'
+                  : '매일 오전 6시(한국 시간) 자동 갱신',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: AppColors.white.withValues(alpha: 0.6),
               ),
             ),
+            if (RateApi.updatedAt != null)
+              Text(
+                '환율 기준일: ${formatDate(RateApi.updatedAt!)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.white.withValues(alpha: 0.6),
+                ),
+              ),
             TextButton(
-              onPressed: rateApi.isLoading
+              onPressed: RateApi.isLoading
                   ? null
-                  : () => rateApi.load(force: true),
+                  : () => RateApi.load(force: true),
               style: TextButton.styleFrom(foregroundColor: AppColors.white),
-              child: Text(rateApi.isLoading ? '불러오는 중…' : '다시 불러오기'),
+              child: Text(RateApi.isLoading ? '불러오는 중…' : '다시 불러오기'),
             ),
           ],
         ),

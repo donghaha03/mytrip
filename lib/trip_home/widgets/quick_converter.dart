@@ -43,7 +43,7 @@ class _QuickConverterState extends State<QuickConverter> {
 
   void _swap() {
     final rate = widget.rate;
-    if (rate == null) return;
+    if (rate == null || rate <= 0) return;
     // 방향을 바꿀 때 지금 결과를 새 입력으로 넘겨서 흐름이 안 끊기게 한다
     final value = parseAmount(_input.text);
     setState(() => _fromForeign = !_fromForeign);
@@ -59,7 +59,7 @@ class _QuickConverterState extends State<QuickConverter> {
   @override
   Widget build(BuildContext context) {
     final value = parseAmount(_input.text);
-    final rate = widget.rate;
+    final rate = widget.rate != null && widget.rate! > 0 ? widget.rate : null;
     final result = rate == null
         ? '환율 없음'
         : _fromForeign

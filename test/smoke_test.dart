@@ -15,7 +15,7 @@ import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/models/country.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
 import 'package:tripapp/trip_home/services/backend.dart';
-import 'package:tripapp/trip_home/services/rate_api.dart';
+import 'package:tripapp/api/api.dart';
 import 'package:tripapp/trip_home/theme/app_theme.dart';
 import 'package:tripapp/trip_home/widgets/country_chip.dart';
 import 'package:tripapp/trip_home/widgets/sheets.dart';
@@ -27,12 +27,14 @@ import 'package:tripapp/trip_home/widgets/won_input_formatter.dart';
 Widget _wrap(Widget child) => MaterialApp(theme: buildAppTheme(), home: child);
 
 Future<void> _loadRates({double? yenRate}) async {
+  final fetched = DateTime.now().toUtc();
   final client = MockClient(
     (_) async => http.Response(
       jsonEncode({
         'result': 'success',
         'base_code': 'KRW',
-        'time_last_update_unix': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        'rate_date': fetched.toIso8601String().substring(0, 10),
+        'fetched_at': fetched.toIso8601String(),
         'rates': {
           for (final c in [...kPrimaryCountries, ...kMoreCountries])
             c.currency: c.currency == 'JPY' && yenRate != null
@@ -44,7 +46,7 @@ Future<void> _loadRates({double? yenRate}) async {
     ),
   );
   try {
-    await rateApi.load(force: true, client: client);
+    await RateApi.load(force: true, client: client);
   } finally {
     client.close();
   }
@@ -311,8 +313,9 @@ void main() {
     await tester.tap(find.text('i'));
     await tester.pumpAndSettle();
     expect(find.text('환율 정보'), findsOneWidget);
-    expect(find.textContaining('환율 기준: '), findsOneWidget);
-    expect(find.text('하루 한 번 갱신되는 참고 환율이에요'), findsOneWidget);
+    expect(find.textContaining('환율 기준일: '), findsOneWidget);
+    expect(find.textContaining('서버 갱신: '), findsOneWidget);
+    expect(find.text('매일 오전 6시(한국 시간) 자동 갱신'), findsOneWidget);
     expect(find.text('다시 불러오기'), findsOneWidget);
     expect(find.textContaining('최근 갱신: '), findsNothing);
 
@@ -512,7 +515,7 @@ void main() {
       Scaffold(
         body: QuickConverter(
           country: countryByCode(code)!,
-          rate: rateApi.krwPer(code),
+          rate: RateApi.krwPer(code),
         ),
       ),
     );
@@ -521,7 +524,7 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           Scaffold(
-            body: QuickConverter(country: countryByCode('JPY')!, rate: null),
+            body: QuickConverter(country: countryByCode('JPY')!, rate: 0),
           ),
         ),
       );
@@ -844,6 +847,6 @@ void main() {
     await tester.enterText(input, '1000');
     await tester.pump();
     expect(find.text('9,000원'), findsOneWidget);
-    expect(find.text('환율 제공: ExchangeRate-API'), findsOneWidget);
+    expect(find.text('환율 제공: Currency API · 매일 06:00 KST'), findsOneWidget);
   });
 }

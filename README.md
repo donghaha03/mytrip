@@ -14,7 +14,7 @@
 | 여행 홈 | 사용액·남은 예산·진행률·D-day 표시 |
 | 오늘 예산 | 여행 기간과 지출을 기준으로 계산 |
 | 최근 지출 | 최근 7일 요약과 최신 3건 표시 |
-| 빠른 환산·환율 안내 | 실제 환율 API 연결, 기준 시각·재조회·24시간 캐시 |
+| 빠른 환산·환율 안내 | 매일 06:00 KST 서버 갱신, 기준일·갱신 시각·기기 캐시 |
 | 로그인·회원가입 | 인증 서비스만 있음, 화면 미구현 |
 | 장부·지출 입력 | 버튼과 연결 지점만 있음, 화면 미구현 |
 | 내 계정·설정 | 준비 중 안내만 표시 |
@@ -24,16 +24,38 @@
 
 ## 환율
 
-팀과 같은 [ExchangeRate-API 공개 API](https://www.exchangerate-api.com/docs/free)의 KRW 기준 환율을 사용합니다.
-API 키와 DB 권한은 필요 없습니다. 제공 데이터는 하루 한 번 갱신되며 초 단위 실시간 시세가 아닙니다.
+공개 환율 파일을 제공할 수 있는 [Currency API](https://github.com/fawazahmed0/exchange-api)의
+KRW 기준 일별 참고 환율을 사용합니다([CC0](https://github.com/fawazahmed0/exchange-api/blob/main/LICENSE)).
+API 키·새 패키지·DB 권한 없이 기존 GitHub Pages 배포를 재사용합니다.
+팀 API 사용 가이드와 같은 `lib/api/api.dart` 진입점과 정적 `RateApi` 호출 형식을 사용합니다.
 
-- 앱 시작 시 조회하고, 조회 후 24시간 동안 기기에 저장된 값을 재사용합니다.
-- 여행 홈의 `ⓘ`에서 제공 기준 시각을 확인하거나 다시 불러올 수 있습니다.
+- **앱을 닫아도 매일 오전 6시(한국 시간)** mytrip의 GitHub Actions가 환율을 받아 `rates.json`을 배포합니다.
+- 첫 배포와 코드 변경·수동 배포 때도 환율 파일을 생성합니다. 브라우저의 재조회는 공개 파일만 읽습니다.
+- 앱 시작·다시 활성화할 때 읽고, 열려 있는 앱은 5분마다 확인합니다. 서버 갱신 시각이 최근 06시 이후면 기기 캐시를 재사용합니다.
+- 자정이 아니라 **06시 경계**를 넘으면 다시 조회합니다. 배포가 늦으면 이전 환율을 표시하며 재시도합니다.
+- 여행 홈의 `ⓘ`에서 API **환율 기준일**과 **실제 서버 갱신 시각(KST)**을 구분해 확인합니다.
 - 조회 실패 시 이전 캐시를 유지하고 연결 실패를 안내합니다. 환율이 전혀 없으면 환산을 비활성화합니다.
-- 출처 링크를 화면에 표시합니다. 카드사 수수료·실제 결제 환율은 반영하지 않습니다.
+- 서버는 jsDelivr 조회 실패 시 제공자의 Cloudflare 주소를 시도합니다. 둘 다 실패하면 배포를 중단해 마지막 정상 파일을 보존합니다.
+- 제공자가 새 데이터를 아직 내지 않았으면 같은 기준일의 값일 수 있습니다. 카드사 수수료·초 단위 시세·실제 결제 환율은 반영하지 않습니다.
 
-이번 환율 연결에는 `pubspec.yaml`에 `http`, `shared_preferences`, `url_launcher`를 추가했습니다.
-DB 구조와 Firebase 설정은 변경하지 않았습니다.
+GitHub 예약 실행과 빌드·배포는 지연될 수 있어 **06:00 정각 완료를 보장하지 않습니다**.
+공개 저장소에서 활동이 60일 없으면 예약 실행이 중지될 수 있습니다
+([GitHub 안내](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)).
+정각 보장이나 장기 무관리 운영이 필요해지면 전용 서버 스케줄러로 바꿉니다.
+
+```dart
+import 'package:tripapp/api/api.dart';
+
+await RateApi.load();
+final rate = RateApi.krwPer('JPY'); // 1 JPY당 원화, 없으면 0
+final won = RateApi.toKrw(1000, 'JPY');
+final yen = RateApi.fromKrw(9000, 'JPY');
+// rate <= 0일 때 계산/입력을 막는다. UI는 RateApi.changes를 구독한다.
+```
+
+이전 환율 연결에 추가한 `http`, `shared_preferences`, `url_launcher`를 그대로 사용합니다.
+이번 06시 갱신 변경은 `.github/workflows/pages.yml`과 `ci.yml`만 수정했고 `pubspec.yaml`은 변경하지 않았습니다.
+DB 구조·Firebase 설정·wannabb/tripledger는 변경하지 않았습니다.
 
 ## 실행
 
@@ -66,16 +88,18 @@ Firebase 모드의 영구 저장은 인증 서비스에 로그인한 사용자�
 lib/
 ├── main.dart                 앱 진입점
 ├── firebase_options.dart     개인 Firebase 설정
+├── api/                      팀 형식의 환율 API 진입점·06시 캐시
 └── trip_home/                이 저장소의 화면과 지원 코드
     ├── app.dart              테마·홈 화면 분기
     ├── screens/              여행 목록·추가·홈·연결 화면
     ├── widgets/              달력·편집 시트·계산기·요약 카드
     ├── models/               현재 프로토타입의 여행·지출 모델
     ├── data/                 메모리 상태·Firestore 저장
-    ├── services/             인증·실행 모드·사용자 연결·환율 API
+    ├── services/             인증·실행 모드·사용자 연결
     └── theme/                색상·글꼴·표시 형식
 test/                         화면·계산·Firebase 모의 테스트
 assets/fonts/                 Pretendard와 글꼴 라이선스
+tool/update_rates.mjs         서버 환율 수집·검증(추가 패키지 없음)
 ```
 
 ## 팀 저장소로 옮길 때
@@ -91,7 +115,7 @@ YAML 변경이 필요하면 먼저 팀에 알리고, DB 권한은 연결 작업�
 | 통화 | `Trip.country.currency` | `Trip.currency` |
 | 지출 컬렉션 | `trips/{tripId}/records` | `trips/{tripId}/expenses` |
 | 지출 원화 환산 | 샘플은 고정 환율, 현재 환산은 API | 지출에 저장된 `currency`·`rate`, `amountKrw` |
-| 데이터 호출 | `tripStore`·`authService` | `lib/api/api.dart`의 공용 API |
+| 데이터 호출 | 환율은 `lib/api/api.dart`, 여행은 `tripStore` | `lib/api/api.dart`의 공용 API |
 | Firebase 프로젝트 | `mytrip-fddfb` | `tripledger-ebc18` |
 
 통합 시 화면의 데이터 연결을 팀 API로 맞추고, 팀의 `main.dart`·Firebase 설정·기존 모델을 유지합니다.
@@ -102,10 +126,12 @@ YAML 변경이 필요하면 먼저 팀에 알리고, DB 권한은 연결 작업�
 ```sh
 flutter analyze --fatal-infos --fatal-warnings
 flutter test
+node tool/update_rates.mjs --check
 flutter build web --release --no-wasm-dry-run --base-href /mytrip/
 ```
 
 GitHub Actions가 브랜치와 PR을 검사합니다.
 `main` 변경 시 빌드·검사를 통과하면 GitHub Pages에 웹 미리보기가 배포됩니다.
+환율 수집까지 성공해야 새 배포로 교체합니다. 예약 실행도 같은 검사를 거칩니다.
 
 글꼴은 [Pretendard, SIL Open Font License 1.1](assets/fonts/OFL.txt)을 사용합니다.
