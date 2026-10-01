@@ -2,7 +2,8 @@ import '../theme/app_theme.dart';
 
 const kWonSymbol = '₩';
 
-/// 여행 국가 + 통화 + 환율.
+/// 여행 국가 + 통화 + 기존 샘플 지출용 고정 환율.
+/// ponytail: 샘플 지출은 고정 환율 유지; 실제 저장 연결 시 팀의 Expense.rate 사용.
 ///
 /// 환율은 "unitAmount 단위당 krwPerUnit 원" 형태로 저장한다.
 /// 예: 일본은 unitAmount 100, krwPerUnit 950 -> "100엔 = 950원"

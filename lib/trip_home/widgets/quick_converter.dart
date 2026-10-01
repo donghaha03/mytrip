@@ -10,12 +10,12 @@ import 'won_input_formatter.dart';
 ///   빠른 환산  JPY → KRW                ⇅
 ///   [ ¥  1,500        ]  =   14,250원
 ///
-/// 기록은 남기지 않는다 — 지출 기록은 장부 몫이다. 환율(기준 표시)은 여행 홈
-/// 상단바에 있어서 여기엔 없다. 환율은 country.krwPerUnit 을 그대로 쓴다.
+/// 기록은 남기지 않는다. 최신 API 환율을 사용하며, 환율이 없으면 계산하지 않는다.
 class QuickConverter extends StatefulWidget {
-  const QuickConverter({super.key, required this.country});
+  const QuickConverter({super.key, required this.country, required this.rate});
 
   final Country country;
+  final double? rate; // 1 현지 통화당 원화
 
   @override
   State<QuickConverter> createState() => _QuickConverterState();
@@ -42,6 +42,8 @@ class _QuickConverterState extends State<QuickConverter> {
   }
 
   void _swap() {
+    final rate = widget.rate;
+    if (rate == null) return;
     // 방향을 바꿀 때 지금 결과를 새 입력으로 넘겨서 흐름이 안 끊기게 한다
     final value = parseAmount(_input.text);
     setState(() => _fromForeign = !_fromForeign);
@@ -50,16 +52,19 @@ class _QuickConverterState extends State<QuickConverter> {
       return;
     }
     _input.text = _fromForeign
-        ? formatForeignPlain(_c, krwToForeign(_c, value)) // 방금까지 원화 입력
-        : formatNumber(_c.toKrw(value));
+        ? formatForeignPlain(_c, value / rate) // 방금까지 원화 입력
+        : formatNumber(value * rate);
   }
 
   @override
   Widget build(BuildContext context) {
     final value = parseAmount(_input.text);
-    final result = _fromForeign
-        ? formatWon(_c.toKrw(value))
-        : formatForeignAmount(_c, krwToForeign(_c, value));
+    final rate = widget.rate;
+    final result = rate == null
+        ? '환율 없음'
+        : _fromForeign
+        ? formatWon(value * rate)
+        : formatForeignAmount(_c, value / rate);
     final cents = _fromForeign && _hasCents(_c);
 
     return Container(
@@ -95,7 +100,7 @@ class _QuickConverterState extends State<QuickConverter> {
               Tooltip(
                 message: '방향 바꾸기',
                 child: InkResponse(
-                  onTap: _swap,
+                  onTap: rate == null ? null : _swap,
                   radius: 18,
                   child: Container(
                     width: 28,
@@ -104,8 +109,11 @@ class _QuickConverterState extends State<QuickConverter> {
                       color: AppColors.primarySoft,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.swap_vert_rounded,
-                        size: 16, color: AppColors.primary),
+                    child: const Icon(
+                      Icons.swap_vert_rounded,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
               ),
@@ -116,6 +124,7 @@ class _QuickConverterState extends State<QuickConverter> {
             children: [
               Expanded(
                 child: TextField(
+                  enabled: rate != null,
                   controller: _input,
                   keyboardType: TextInputType.numberWithOptions(decimal: cents),
                   inputFormatters: [
@@ -144,20 +153,26 @@ class _QuickConverterState extends State<QuickConverter> {
                         ),
                       ),
                     ),
-                    prefixIconConstraints:
-                        const BoxConstraints(minWidth: 0, minHeight: 0),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 0,
+                      minHeight: 0,
+                    ),
                     filled: true,
                     fillColor: AppColors.bg,
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 11),
+                      horizontal: 12,
+                      vertical: 11,
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide.none,
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: AppColors.primary, width: 2),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
@@ -181,8 +196,9 @@ class _QuickConverterState extends State<QuickConverter> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color:
-                        value == 0 ? AppColors.textTertiary : AppColors.primary,
+                    color: value == 0
+                        ? AppColors.textTertiary
+                        : AppColors.primary,
                   ),
                 ),
               ),
@@ -198,10 +214,6 @@ class _QuickConverterState extends State<QuickConverter> {
 // ---------------------------------------------------------------------------
 // 환산 도우미 (테스트에서도 쓰려고 공개)
 // ---------------------------------------------------------------------------
-
-/// 원화 -> 현지 통화
-double krwToForeign(Country c, double krw) =>
-    krw * c.unitAmount / c.krwPerUnit;
 
 /// 1 단위가 100원 이상인 통화(달러·유로·파운드·위안 …)는 센트 단위까지 쓴다.
 /// 엔·동·바트처럼 단위가 작은 통화는 정수로 충분하다.

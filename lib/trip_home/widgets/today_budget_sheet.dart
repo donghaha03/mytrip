@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/trip.dart';
+import '../services/rate_api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'app_sheet.dart';
@@ -78,9 +79,11 @@ TodayBudget todayBudget(Trip t, DateTime now) {
 
   final spentToday = before
       ? 0.0
-      : t.country.toKrw(t.expenses
-          .where((e) => day(e.date) == today)
-          .fold<double>(0, (s, e) => s + e.amount));
+      : t.country.toKrw(
+          t.expenses
+              .where((e) => day(e.date) == today)
+              .fold<double>(0, (s, e) => s + e.amount),
+        );
   final remainThisMorning = remain + spentToday;
 
   if (remainThisMorning <= 0) {
@@ -110,20 +113,25 @@ class TodayBudgetSheet extends StatelessWidget {
   final DateTime now;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: rateApi,
+    builder: (context, _) => _buildSheet(context),
+  );
+
+  Widget _buildSheet(BuildContext context) {
     final b = todayBudget(trip, now);
     final c = trip.country;
-    double foreign(double krw) => krw * c.unitAmount / c.krwPerUnit;
+    final rate = rateApi.krwPer(c.currency);
 
     final (String caption, String headline) = switch (b.phase) {
       TodayPhase.beforeTrip => (
-          '출발하면 하루에 이만큼 쓰면 예산에 딱 맞아요',
-          '하루 ${formatWon(b.allowanceKrw)}',
-        ),
+        '출발하면 하루에 이만큼 쓰면 예산에 딱 맞아요',
+        '하루 ${formatWon(b.allowanceKrw)}',
+      ),
       TodayPhase.during => (
-          '오늘 포함 ${b.daysLeft}일 남았어요',
-          formatWon(b.allowanceKrw),
-        ),
+        '오늘 포함 ${b.daysLeft}일 남았어요',
+        formatWon(b.allowanceKrw),
+      ),
       TodayPhase.finished => ('여행이 끝났어요', '—'),
       TodayPhase.overBudget => ('예산을 다 썼어요', '0원'),
     };
@@ -161,7 +169,9 @@ class TodayBudgetSheet extends StatelessWidget {
               if (b.allowanceKrw > 0) ...[
                 const SizedBox(height: 2),
                 Text(
-                  '≈ ${c.formatForeign(foreign(b.allowanceKrw))}',
+                  rate == null
+                      ? '환율 없음'
+                      : '≈ ${c.formatForeign(b.allowanceKrw / rate)}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

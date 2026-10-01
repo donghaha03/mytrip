@@ -1,5 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tripapp/trip_home/data/trip_store.dart';
 import 'package:tripapp/trip_home/app.dart';
@@ -10,6 +15,7 @@ import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/models/country.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
 import 'package:tripapp/trip_home/services/backend.dart';
+import 'package:tripapp/trip_home/services/rate_api.dart';
 import 'package:tripapp/trip_home/theme/app_theme.dart';
 import 'package:tripapp/trip_home/widgets/country_chip.dart';
 import 'package:tripapp/trip_home/widgets/sheets.dart';
@@ -20,7 +26,36 @@ import 'package:tripapp/trip_home/widgets/won_input_formatter.dart';
 
 Widget _wrap(Widget child) => MaterialApp(theme: buildAppTheme(), home: child);
 
+Future<void> _loadRates({double? yenRate}) async {
+  final client = MockClient(
+    (_) async => http.Response(
+      jsonEncode({
+        'result': 'success',
+        'base_code': 'KRW',
+        'time_last_update_unix': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        'rates': {
+          for (final c in [...kPrimaryCountries, ...kMoreCountries])
+            c.currency: c.currency == 'JPY' && yenRate != null
+                ? 1 / yenRate
+                : c.unitAmount / c.krwPerUnit,
+        },
+      }),
+      200,
+    ),
+  );
+  try {
+    await rateApi.load(force: true, client: client);
+  } finally {
+    client.close();
+  }
+}
+
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await _loadRates();
+  });
+
   // 목업 스크린샷과 같은 폰 사이즈로 맞춘다 (iPhone 14 기준).
   setUp(() {
     final view =
@@ -275,15 +310,16 @@ void main() {
 
     await tester.tap(find.text('i'));
     await tester.pumpAndSettle();
-    expect(find.text('예시 환율 정보'), findsOneWidget);
-    expect(find.text('화면 확인용 환율을 사용하고 있어요'), findsOneWidget);
-    expect(find.text('실시간 환율 API는 아직 연결되지 않았어요'), findsOneWidget);
+    expect(find.text('환율 정보'), findsOneWidget);
+    expect(find.textContaining('환율 기준: '), findsOneWidget);
+    expect(find.text('하루 한 번 갱신되는 참고 환율이에요'), findsOneWidget);
+    expect(find.text('다시 불러오기'), findsOneWidget);
     expect(find.textContaining('최근 갱신: '), findsNothing);
 
     // 바깥을 누르면 닫힌다
     await tester.tapAt(const Offset(200, 700));
     await tester.pumpAndSettle();
-    expect(find.text('예시 환율 정보'), findsNothing);
+    expect(find.text('환율 정보'), findsNothing);
   });
 
   testWidgets('여행 홈: 오늘 예산 아이콘 -> 남은 예산 ÷ 남은 날', (tester) async {
@@ -472,8 +508,26 @@ void main() {
   });
 
   group('빠른 환산', () {
-    Widget converter(String code) =>
-        _wrap(Scaffold(body: QuickConverter(country: countryByCode(code)!)));
+    Widget converter(String code) => _wrap(
+      Scaffold(
+        body: QuickConverter(
+          country: countryByCode(code)!,
+          rate: rateApi.krwPer(code),
+        ),
+      ),
+    );
+
+    testWidgets('환율이 없으면 계산을 비활성화한다', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          Scaffold(
+            body: QuickConverter(country: countryByCode('JPY')!, rate: null),
+          ),
+        ),
+      );
+      expect(find.text('환율 없음'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+    });
 
     testWidgets('엔 -> 원', (tester) async {
       await tester.pumpWidget(converter('JPY'));
@@ -509,7 +563,6 @@ void main() {
     });
 
     test('원 -> 현지 통화 변환', () {
-      expect(krwToForeign(countryByCode('JPY')!, 9500), closeTo(1000, 1e-9));
       expect(formatForeignAmount(countryByCode('USD')!, 7.4074), '\$7.41');
       expect(formatForeignAmount(countryByCode('VND')!, 12345.6), '₫12,346');
     });
@@ -772,5 +825,25 @@ void main() {
     );
     expect(formatWon(742300), '742,300원');
     expect(formatNumber(-1234567), '-1,234,567');
+  });
+
+  testWidgets('API 갱신은 화면 환산만 바꾸고 이전 지출은 유지한다', (tester) async {
+    final japan = tripStore.byId('t2')!;
+    final spent = japan.spentKrw;
+    addTearDown(() => _loadRates());
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: japan)));
+    await tester.runAsync(() => _loadRates(yenRate: 9));
+    await tester.pump();
+    expect(find.text('¥100 = ₩900'), findsOneWidget);
+    expect(japan.spentKrw, spent);
+    final input = find.descendant(
+      of: find.byType(QuickConverter),
+      matching: find.byType(TextField),
+    );
+    await tester.ensureVisible(input);
+    await tester.enterText(input, '1000');
+    await tester.pump();
+    expect(find.text('9,000원'), findsOneWidget);
+    expect(find.text('환율 제공: ExchangeRate-API'), findsOneWidget);
   });
 }

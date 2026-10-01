@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../services/rate_api.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
-/// 현재 환율이 화면 확인용 예시 값임을 안내한다.
+/// API 기준 시각·조회 상태와 다시 불러오기 버튼.
 class RateInfoButton extends StatefulWidget {
-  const RateInfoButton({super.key});
+  const RateInfoButton({super.key, required this.currency});
+
+  final String currency;
 
   @override
   State<RateInfoButton> createState() => _RateInfoButtonState();
@@ -71,7 +75,7 @@ class _RateInfoButtonState extends State<RateInfoButton> {
             left: left,
             top: top,
             width: tooltipWidth,
-            child: const _TooltipBody(),
+            child: _TooltipBody(currency: widget.currency),
           ),
         ],
       ),
@@ -113,10 +117,24 @@ class _RateInfoButtonState extends State<RateInfoButton> {
 }
 
 class _TooltipBody extends StatelessWidget {
-  const _TooltipBody();
+  const _TooltipBody({required this.currency});
+
+  final String currency;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: rateApi,
+    builder: (context, _) => _buildBody(),
+  );
+
+  Widget _buildBody() {
+    final updated = rateApi.updatedAt?.toLocal();
+    final available = rateApi.krwPer(currency) != null;
+    final stamp = updated == null
+        ? null
+        : '${formatDate(updated)} '
+              '${updated.hour.toString().padLeft(2, '0')}:'
+              '${updated.minute.toString().padLeft(2, '0')}';
     return Material(
       color: Colors.transparent,
       child: Container(
@@ -130,7 +148,7 @@ class _TooltipBody extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              '예시 환율 정보',
+              '환율 정보',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -139,7 +157,11 @@ class _TooltipBody extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '화면 확인용 환율을 사용하고 있어요',
+              available
+                  ? '환율 기준: $stamp'
+                  : rateApi.isLoading
+                  ? '환율을 불러오는 중이에요'
+                  : '환율을 불러오지 못했어요',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -148,12 +170,23 @@ class _TooltipBody extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '실시간 환율 API는 아직 연결되지 않았어요',
+              rateApi.hasError
+                  ? available
+                        ? '연결 실패 · 저장된 환율을 사용하고 있어요'
+                        : '네트워크를 확인하고 다시 시도해주세요'
+                  : '하루 한 번 갱신되는 참고 환율이에요',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: AppColors.white.withValues(alpha: 0.6),
               ),
+            ),
+            TextButton(
+              onPressed: rateApi.isLoading
+                  ? null
+                  : () => rateApi.load(force: true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.white),
+              child: Text(rateApi.isLoading ? '불러오는 중…' : '다시 불러오기'),
             ),
           ],
         ),
