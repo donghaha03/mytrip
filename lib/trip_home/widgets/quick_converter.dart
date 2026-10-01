@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/api.dart';
 import '../models/country.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -12,10 +13,9 @@ import 'won_input_formatter.dart';
 ///
 /// 기록은 남기지 않는다. 최신 API 환율을 사용하며, 환율이 없으면 계산하지 않는다.
 class QuickConverter extends StatefulWidget {
-  const QuickConverter({super.key, required this.country, required this.rate});
+  const QuickConverter({super.key, required this.country});
 
   final Country country;
-  final double? rate; // 1 현지 통화당 원화
 
   @override
   State<QuickConverter> createState() => _QuickConverterState();
@@ -42,8 +42,7 @@ class _QuickConverterState extends State<QuickConverter> {
   }
 
   void _swap() {
-    final rate = widget.rate;
-    if (rate == null || rate <= 0) return;
+    if (RateApi.krwPer(_c.currency) <= 0) return;
     // 방향을 바꿀 때 지금 결과를 새 입력으로 넘겨서 흐름이 안 끊기게 한다
     final value = parseAmount(_input.text);
     setState(() => _fromForeign = !_fromForeign);
@@ -52,19 +51,24 @@ class _QuickConverterState extends State<QuickConverter> {
       return;
     }
     _input.text = _fromForeign
-        ? formatForeignPlain(_c, value / rate) // 방금까지 원화 입력
-        : formatNumber(value * rate);
+        ? formatForeignPlain(_c, RateApi.fromKrw(value, _c.currency))
+        : formatNumber(RateApi.toKrw(value, _c.currency));
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: RateApi.changes,
+    builder: (context, _) => _buildConverter(),
+  );
+
+  Widget _buildConverter() {
     final value = parseAmount(_input.text);
-    final rate = widget.rate != null && widget.rate! > 0 ? widget.rate : null;
-    final result = rate == null
+    final available = RateApi.krwPer(_c.currency) > 0;
+    final result = !available
         ? '환율 없음'
         : _fromForeign
-        ? formatWon(value * rate)
-        : formatForeignAmount(_c, value / rate);
+        ? formatWon(RateApi.toKrw(value, _c.currency))
+        : formatForeignAmount(_c, RateApi.fromKrw(value, _c.currency));
     final cents = _fromForeign && _hasCents(_c);
 
     return Container(
@@ -100,7 +104,7 @@ class _QuickConverterState extends State<QuickConverter> {
               Tooltip(
                 message: '방향 바꾸기',
                 child: InkResponse(
-                  onTap: rate == null ? null : _swap,
+                  onTap: available ? _swap : null,
                   radius: 18,
                   child: Container(
                     width: 28,
@@ -124,7 +128,7 @@ class _QuickConverterState extends State<QuickConverter> {
             children: [
               Expanded(
                 child: TextField(
-                  enabled: rate != null,
+                  enabled: available,
                   controller: _input,
                   keyboardType: TextInputType.numberWithOptions(decimal: cents),
                   inputFormatters: [
@@ -205,6 +209,18 @@ class _QuickConverterState extends State<QuickConverter> {
               const SizedBox(width: 4),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(
+            '적용 환율: ${currentRateLabel(_c)}',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const Text(
+            'API 기준 · 원화 결과는 1원 단위 반올림',
+            style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+          ),
         ],
       ),
     );
@@ -214,6 +230,15 @@ class _QuickConverterState extends State<QuickConverter> {
 // ---------------------------------------------------------------------------
 // 환산 도우미 (테스트에서도 쓰려고 공개)
 // ---------------------------------------------------------------------------
+
+/// 상단과 계산기에 같은 API 환율을 표시한다. 계산에는 반올림 전 값을 쓴다.
+String currentRateLabel(Country c) {
+  if (RateApi.krwPer(c.currency) <= 0) {
+    return RateApi.isLoading ? '환율 확인 중' : '환율 없음';
+  }
+  final won = RateApi.toKrw(c.unitAmount.toDouble(), c.currency);
+  return '${c.formatForeign(c.unitAmount)} ≈ $kWonSymbol${won.toStringAsFixed(2)}';
+}
 
 /// 1 단위가 100원 이상인 통화(달러·유로·파운드·위안 …)는 센트 단위까지 쓴다.
 /// 엔·동·바트처럼 단위가 작은 통화는 정수로 충분하다.
