@@ -106,7 +106,7 @@ class TripListScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   AddTripCta(
-                    label: '여행 선택하기',
+                    label: '여행 추가하기',
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const AddTripScreen()),
                     ),

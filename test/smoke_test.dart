@@ -752,7 +752,7 @@ void main() {
     expect(body.width, lessThanOrEqualTo(kPhoneWidth));
 
     // 02 국가 그리드 칸은 폭과 무관하게 높이가 고정
-    await tester.tap(find.text('여행 선택하기'));
+    await tester.tap(find.text('여행 추가하기'));
     await tester.pumpAndSettle();
     expect(
       tester.getSize(find.byType(CountryChip).first).height,
