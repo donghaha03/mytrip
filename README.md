@@ -19,11 +19,12 @@
 | 장부·지출 입력 | 버튼과 연결 지점만 있음, 화면 미구현 |
 | 내 계정·설정 | 준비 중 안내만 표시 |
 
-빠른 환산과 현재 예산의 현지 통화 표시는 API 환율을 사용합니다.
+사용한 금액·남은 금액·빠른 환산·최근 지출·오늘 예산은 모두 상단에 표시한 API 정수 환율을 사용합니다.
 빠른 환산은 `RateApi.toKrw`·`fromKrw`를 직접 사용하며 API 갱신 시 입력을 유지하고 결과를 다시 계산합니다.
-상단과 계산기의 적용 환율은 같은 값을 소수점 둘째 자리까지 표시합니다. 계산은 반올림 전 API 값을 사용하고 원화 결과만 1원 단위로 반올림합니다.
-기존 샘플 지출의 원화 금액은 고정 예시 환율을 유지하며, 실제 지출 저장은 아직 팀 API에 연결되지 않았습니다.
-사용한 금액의 샘플 지출과 현재 환율로 계산하는 빠른 환산은 기준이 다를 수 있어 화면에 구분해 안내합니다.
+API 환율의 표시 단위(엔=100, 동·루피아=1000 등)에서 소수점을 버린 정수 환율을 계산에도 그대로 적용합니다.
+예를 들어 `100엔 = 862원`이면 `현지 금액 × 862 ~/ 100`, `원화 × 100 ~/ 862`로 계산합니다. 입력·환산 결과·하루 예산은 반올림하지 않고 소수점을 버립니다.
+사용액과 남은액 카드의 현지 통화도 각 원화 금액에서 공통 함수로 환산하므로 빠른 환산의 원→현지 결과와 같습니다.
+샘플 지출도 요청에 따라 현재 환율로 재계산하며, 원본 현지 지출과 DB 구조는 바꾸지 않습니다. 실제 지출 저장은 아직 팀 API에 연결되지 않았습니다.
 
 ## 환율
 
@@ -51,6 +52,7 @@ import 'package:tripapp/api/api.dart';
 
 await RateApi.load();
 final rate = RateApi.krwPer('JPY'); // 1 JPY당 원화, 없으면 0
+final quote = RateApi.quotedKrw('JPY'); // 상단 100 JPY당 원화 정수 환율
 final won = RateApi.toKrw(1000, 'JPY');
 final yen = RateApi.fromKrw(9000, 'JPY');
 // rate <= 0일 때 계산/입력을 막는다. UI는 RateApi.changes를 구독한다.
@@ -117,7 +119,7 @@ YAML 변경이 필요하면 먼저 팀에 알리고, DB 권한은 연결 작업�
 | 예산 | `Trip.budgetKrw` | `Trip.budget` — 원화 정수 |
 | 통화 | `Trip.country.currency` | `Trip.currency` |
 | 지출 컬렉션 | `trips/{tripId}/records` | `trips/{tripId}/expenses` |
-| 지출 원화 환산 | 샘플은 고정 환율, 현재 환산은 API | 지출에 저장된 `currency`·`rate`, `amountKrw` |
+| 지출 원화 환산 | 화면 전체를 현재 API 정수 환율로 재계산 | 지출에 저장된 `currency`·`rate`, `amountKrw` |
 | 데이터 호출 | 환율은 `lib/api/api.dart`, 여행은 `tripStore` | `lib/api/api.dart`의 공용 API |
 | Firebase 프로젝트 | `mytrip-fddfb` | `tripledger-ebc18` |
 

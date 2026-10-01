@@ -82,8 +82,8 @@ git restore --source=mytrip/main -- lib/trip_home
 ## 통합할 때 맞춰야 할 기준
 
 - **공용 API:** 화면에서 Firebase를 직접 호출하지 않고 팀의 `AuthApi`, `TripApi`, `ExpenseApi`, `RateApi`, `LedgerCalc`를 사용합니다. 현재 `services/`와 `data/`는 개인 프로토타입용이므로 팀 저장 계층과 함께 중복 실행하지 않습니다.
-- **모델:** 예산은 `Trip.budget`에 원화 정수로, 지출은 현지 금액과 기록 당시 `currency`·`rate`로 처리합니다. `records` 경로와 `budgetKrw` 필드를 그대로 사용하지 않습니다. 현재 샘플 지출의 고정 환율은 팀의 `Expense.rate`로 대체하며, 과거 지출을 새 환율로 재계산하지 않습니다.
-- **환율:** mytrip에서 `RateApi.load`, `ready`, `krwPer`, `toKrw`, `fromKrw`, `lastFetched`의 정적 호출과 환율 없음=0을 팀 형식에 맞췄습니다. 팀에 가져갈 화면에서는 팀의 `api.dart`를 import하고 기존 `RateApi`를 재사용합니다. 개인 `lib/api`를 팀 공용 API에 덮어쓰지 않습니다. `changes` 구독과 06시 서버 스냅샷은 mytrip 확장이므로 팀 API 담당자와 조율합니다. `http`·`shared_preferences`는 팀에 이미 있으며 출처 링크용 패키지는 필요하지 않습니다.
+- **모델:** 팀 통합 시 예산은 `Trip.budget`에 원화 정수로, 지출은 기록 당시 `currency`·`rate`로 처리합니다. `records` 경로와 `budgetKrw` 필드를 그대로 사용하지 않습니다. mytrip 미리보기는 사용자 요청에 따라 모든 금액을 현재 API 정수 환율로 재계산합니다. 팀의 과거 지출 정책과 다른 부분이므로 통합 전에 조율하고 팀의 `Expense.rate`·`amountKrw` 계약을 유지합니다.
+- **환율:** mytrip에서 `RateApi.load`, `ready`, `krwPer`, `toKrw`, `fromKrw`, `lastFetched`의 호출 이름과 환율 없음=0을 팀 형식에 맞췄습니다. `quotedKrw`는 표시 단위의 API 환율에서 소수점을 버리고, `toKrw`·`fromKrw`는 이 정수 환율로 계산해 정수를 반환합니다. 팀에 가져갈 화면에서는 팀의 `api.dart`를 import하고 기존 `RateApi`를 재사용합니다. 개인 `lib/api`를 팀 공용 API에 덮어쓰지 않습니다. 정수 계산·`changes` 구독·06시 서버 스냅샷은 mytrip 확장이므로 팀 API 담당자와 조율합니다. `http`·`shared_preferences`는 팀에 이미 있으며 출처 링크용 패키지는 필요하지 않습니다.
 - **앱 진입점:** 팀의 `lib/main.dart`에 화면을 연결하고, 이 저장소의 앱 초기화 코드를 통째로 대체하지 않습니다. Firebase와 소셜 로그인·환율 초기화는 앱 시작 시 한 번만 수행합니다.
 - **Firebase:** 팀의 `lib/firebase_options.dart`와 `tripledger-ebc18` 설정을 사용합니다. 개인 프로젝트 설정이나 `firestore.rules`를 팀 프로젝트에 덮어쓰지 않습니다.
 - **글꼴·패키지:** 팀에 Pretendard와 Firebase 패키지가 이미 있으므로 먼저 기존 설정을 확인합니다. 테스트 의존성이나 추가 글꼴이 필요하면 실제 사용하는 항목만 반영합니다.
@@ -97,4 +97,4 @@ git restore --source=mytrip/main -- lib/trip_home
 - `tool/update_rates.mjs`는 CC0 공개 API를 KRW 기준 `rates`·`rate_date`·`fetched_at`으로 정리합니다. 제공 기준일과 수집 시각을 혼동하지 않습니다.
 - 예약 실행만 새 환율을 수집합니다. 코드 변경·수동 배포는 기존 파일과 수집 시각을 보존하며, 공개 파일이 없는 최초 배포만 즉시 수집합니다. 앱에는 수동 재조회 버튼을 두지 않습니다.
 - 예약 실행·배포 지연 시 이전 환율을 유지합니다. GitHub 무료 예약의 지연·60일 무활동 중지 제한은 README에 안내합니다.
-- 기존 샘플 지출은 현재 환율로 다시 계산하지 않습니다. 로그인·여행·지출 API 전체 연결과 DB 모델 변경은 이번 작업에 포함하지 않습니다.
+- 샘플 지출·사용액·남은액·빠른 환산·오늘 예산은 같은 API 정수 환율로 계산합니다. DB에 원화 금액을 덮어쓰지 않으며, 로그인·여행·지출 API 전체 연결과 DB 구조 변경은 포함하지 않습니다.

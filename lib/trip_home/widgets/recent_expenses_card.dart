@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/api.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -88,8 +89,11 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
                           color: AppColors.primary,
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded,
-                          size: 16, color: AppColors.primary),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
                     ],
                   ),
                 ),
@@ -100,12 +104,15 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
             _Empty(onAdd: widget.onAddExpense)
           else ...[
             const SizedBox(height: 10),
-            _WeekBars(
-              trip: trip,
-              days: days,
-              selected: _selected,
-              onSelect: (i) => setState(() => _selected = i),
-            ),
+            if (RateApi.quotedKrw(trip.country.currency) <= 0)
+              const Text('환율 없음')
+            else
+              _WeekBars(
+                trip: trip,
+                days: days,
+                selected: _selected,
+                onSelect: (i) => setState(() => _selected = i),
+              ),
             const SizedBox(height: 12),
             Container(height: 1, color: AppColors.border),
             for (final e in recent) _ExpenseRow(trip: trip, expense: e),
@@ -117,15 +124,15 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
 }
 
 /// 오늘까지 7일치 (날짜, 원화 합계). 인덱스 6 이 오늘.
-List<({DateTime day, double krw})> dailySpending(Trip t, DateTime now) {
+List<({DateTime day, int krw})> dailySpending(Trip t, DateTime now) {
   DateTime dayOf(DateTime d) => DateTime(d.year, d.month, d.day);
   final today = dayOf(now);
   return List.generate(7, (i) {
     final day = today.subtract(Duration(days: 6 - i));
     final foreign = t.expenses
         .where((e) => dayOf(e.date) == day)
-        .fold<double>(0, (s, e) => s + e.amount);
-    return (day: day, krw: t.country.toKrw(foreign));
+        .fold<int>(0, (s, e) => s + e.amount.truncate());
+    return (day: day, krw: RateApi.toKrw(foreign, t.country.currency));
   });
 }
 
@@ -138,7 +145,7 @@ class _WeekBars extends StatelessWidget {
   });
 
   final Trip trip;
-  final List<({DateTime day, double krw})> days;
+  final List<({DateTime day, int krw})> days;
   final int selected;
   final ValueChanged<int> onSelect;
 
@@ -147,7 +154,7 @@ class _WeekBars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final max = days.fold<double>(0, (m, d) => d.krw > m ? d.krw : m);
+    final max = days.fold<int>(0, (m, d) => d.krw > m ? d.krw : m);
     final picked = days[selected];
 
     return Column(
@@ -233,8 +240,8 @@ class _Bar extends StatelessWidget {
                 color: ratio == 0
                     ? AppColors.border
                     : isSelected
-                        ? AppColors.primary
-                        : AppColors.primaryLight,
+                    ? AppColors.primary
+                    : AppColors.primaryLight,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(4), // 데이터 끝만 둥글게
                 ),
@@ -305,7 +312,9 @@ class _ExpenseRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                formatWon(trip.country.toKrw(e.amount)),
+                RateApi.quotedKrw(trip.country.currency) <= 0
+                    ? '환율 없음'
+                    : formatWon(RateApi.toKrw(e.amount, trip.country.currency)),
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -353,8 +362,7 @@ class _Empty extends StatelessWidget {
             onTap: onAdd,
             borderRadius: BorderRadius.circular(10),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.primarySoft,
                 borderRadius: BorderRadius.circular(10),

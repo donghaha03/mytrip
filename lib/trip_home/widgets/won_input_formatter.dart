@@ -11,7 +11,7 @@ import '../theme/app_theme.dart';
 class AmountInputFormatter extends TextInputFormatter {
   const AmountInputFormatter({this.decimals = 0, this.maxDigits = 12});
 
-  /// 소수점 아래 최대 자릿수. 0 이면 소수점 입력을 무시한다.
+  /// 소수점 아래 최대 자릿수. 0 이면 소수점 뒤를 버린다.
   final int decimals;
 
   /// 정수부 최대 자릿수. 넘어가면 입력을 그냥 무시한다.
@@ -31,6 +31,7 @@ class AmountInputFormatter extends TextInputFormatter {
     var keptBeforeCaret = 0;
     for (var i = 0; i < raw.length; i++) {
       final ch = raw[i];
+      if (ch == '.' && decimals == 0) break;
       final code = ch.codeUnitAt(0);
       final isDigit = code >= 0x30 && code <= 0x39; // '0'..'9'
       final isDot = ch == '.' && decimals > 0 && !seenDot;
@@ -55,7 +56,10 @@ class AmountInputFormatter extends TextInputFormatter {
     keptBeforeCaret -= intPart.length - trimmed.length;
     final formatted =
         '${formatNumber(int.parse(trimmed))}${frac == null ? '' : '.$frac'}';
-    final target = keptBeforeCaret.clamp(0, formatted.replaceAll(',', '').length);
+    final target = keptBeforeCaret.clamp(
+      0,
+      formatted.replaceAll(',', '').length,
+    );
 
     // 포맷된 문자열을 훑으면서 콤마가 아닌 글자를 target 개 지난 지점이 새 커서.
     var seen = 0;

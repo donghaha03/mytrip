@@ -31,12 +31,22 @@ class RateApi {
     return value == null ? 0 : 1 / value;
   }
 
-  static double toKrw(double amount, String currency) =>
-      amount * krwPer(currency);
+  /// 상단에 표시하는 통화 단위(엔=100, 동=1000)의 정수 원화 환율.
+  static int quotedKrw(String currency) =>
+      (krwPer(currency) * (countryByCode(currency)?.unitAmount ?? 1))
+          .truncate();
 
-  static double fromKrw(num krw, String currency) {
-    final rate = krwPer(currency);
-    return rate == 0 ? 0 : krw / rate;
+  /// 표시 환율로 정수끼리 계산하며, 입력과 결과의 소수점은 버린다.
+  static int toKrw(num amount, String currency) =>
+      amount.truncate() *
+      quotedKrw(currency) ~/
+      (countryByCode(currency)?.unitAmount ?? 1);
+
+  static int fromKrw(num krw, String currency) {
+    final quote = quotedKrw(currency);
+    return quote == 0
+        ? 0
+        : krw.truncate() * (countryByCode(currency)?.unitAmount ?? 1) ~/ quote;
   }
 
   /// 기기 시간대와 무관하게 가장 최근 한국 시간 오전 6시(UTC 반환).
@@ -133,7 +143,8 @@ class RateApi {
       if (value is! num ||
           !value.isFinite ||
           value <= 0 ||
-          !(1 / value).isFinite) {
+          !(1 / value).isFinite ||
+          !(country.unitAmount / value).isFinite) {
         throw FormatException('${country.currency} 환율이 올바르지 않습니다');
       }
       rates[country.currency] = value.toDouble();

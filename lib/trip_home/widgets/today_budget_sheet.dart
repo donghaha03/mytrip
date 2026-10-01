@@ -34,19 +34,19 @@ class TodayBudget {
   final TodayPhase phase;
 
   /// 오늘(또는 출발 후 하루) 쓰기 좋은 금액
-  final double allowanceKrw;
+  final int allowanceKrw;
 
   /// 나눈 날 수 (오늘 포함)
   final int daysLeft;
 
   /// 오늘 이미 쓴 금액 (여행 중일 때만 의미 있음)
-  final double spentTodayKrw;
+  final int spentTodayKrw;
 
   /// 지금 남은 예산 (음수면 초과)
-  final double remainKrw;
+  final int remainKrw;
 
   /// 오늘 쓸 수 있는 금액 중 아직 남은 것 (음수면 오늘 몫을 넘김)
-  double get leftTodayKrw => allowanceKrw - spentTodayKrw;
+  int get leftTodayKrw => allowanceKrw - spentTodayKrw;
 }
 
 /// 남은 예산을 남은 날로 나눠서 오늘 몫을 구한다.
@@ -78,11 +78,12 @@ TodayBudget todayBudget(Trip t, DateTime now) {
       : end.difference(today).inDays + 1;
 
   final spentToday = before
-      ? 0.0
-      : t.country.toKrw(
+      ? 0
+      : RateApi.toKrw(
           t.expenses
               .where((e) => day(e.date) == today)
-              .fold<double>(0, (s, e) => s + e.amount),
+              .fold<int>(0, (s, e) => s + e.amount.truncate()),
+          t.country.currency,
         );
   final remainThisMorning = remain + spentToday;
 
@@ -98,7 +99,7 @@ TodayBudget todayBudget(Trip t, DateTime now) {
 
   return TodayBudget(
     phase: before ? TodayPhase.beforeTrip : TodayPhase.during,
-    allowanceKrw: remainThisMorning / daysLeft,
+    allowanceKrw: remainThisMorning ~/ daysLeft,
     daysLeft: daysLeft,
     spentTodayKrw: spentToday,
     remainKrw: remain,
@@ -121,7 +122,19 @@ class TodayBudgetSheet extends StatelessWidget {
   Widget _buildSheet(BuildContext context) {
     final b = todayBudget(trip, now);
     final c = trip.country;
-    final rate = RateApi.krwPer(c.currency);
+    final rate = RateApi.quotedKrw(c.currency);
+    if (rate <= 0) {
+      return AppSheet(
+        title: '오늘 예산',
+        children: [
+          const Text('환율을 불러온 후 예산을 확인할 수 있어요'),
+          SheetPrimaryButton(
+            label: '확인',
+            onTap: () => Navigator.of(context).pop(),
+          ),
+        ],
+      );
+    }
 
     final (String caption, String headline) = switch (b.phase) {
       TodayPhase.beforeTrip => (
@@ -169,9 +182,7 @@ class TodayBudgetSheet extends StatelessWidget {
               if (b.allowanceKrw > 0) ...[
                 const SizedBox(height: 2),
                 Text(
-                  rate <= 0
-                      ? '환율 없음'
-                      : '≈ ${c.formatForeign(RateApi.fromKrw(b.allowanceKrw, c.currency))}',
+                  c.formatForeign(RateApi.fromKrw(b.allowanceKrw, c.currency)),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,

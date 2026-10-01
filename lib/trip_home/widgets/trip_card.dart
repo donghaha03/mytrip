@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../api/api.dart';
 import '../models/trip.dart';
 import '../screens/trip_home_screen.dart';
 import '../theme/app_colors.dart';
@@ -21,9 +22,10 @@ class TripCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final available = RateApi.quotedKrw(trip.country.currency) > 0;
     final percent = trip.budgetKrw == 0
         ? 0
-        : (trip.spentKrw / trip.budgetKrw * 100).round();
+        : trip.spentKrw * 100 ~/ trip.budgetKrw;
 
     return Material(
       color: AppColors.white,
@@ -97,7 +99,7 @@ class TripCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '${formatWon(trip.budgetKrw)} · $percent% 사용',
+                      '${formatWon(trip.budgetKrw)} · ${available ? '$percent% 사용' : '환율 없음'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

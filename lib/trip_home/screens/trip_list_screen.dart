@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/api.dart';
 import '../data/trip_store.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
@@ -40,7 +41,7 @@ class TripListScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: AnimatedBuilder(
-          animation: tripStore,
+          animation: Listenable.merge([tripStore, RateApi.changes]),
           builder: (context, _) {
             final now = DateTime.now();
             final today = DateTime.utc(now.year, now.month, now.day);

@@ -42,7 +42,7 @@ class _QuickConverterState extends State<QuickConverter> {
   }
 
   void _swap() {
-    if (RateApi.krwPer(_c.currency) <= 0) return;
+    if (RateApi.quotedKrw(_c.currency) <= 0) return;
     // 방향을 바꿀 때 지금 결과를 새 입력으로 넘겨서 흐름이 안 끊기게 한다
     final value = parseAmount(_input.text);
     setState(() => _fromForeign = !_fromForeign);
@@ -51,7 +51,7 @@ class _QuickConverterState extends State<QuickConverter> {
       return;
     }
     _input.text = _fromForeign
-        ? formatForeignPlain(_c, RateApi.fromKrw(value, _c.currency))
+        ? formatNumber(RateApi.fromKrw(value, _c.currency))
         : formatNumber(RateApi.toKrw(value, _c.currency));
   }
 
@@ -63,13 +63,12 @@ class _QuickConverterState extends State<QuickConverter> {
 
   Widget _buildConverter() {
     final value = parseAmount(_input.text);
-    final available = RateApi.krwPer(_c.currency) > 0;
+    final available = RateApi.quotedKrw(_c.currency) > 0;
     final result = !available
         ? '환율 없음'
         : _fromForeign
         ? formatWon(RateApi.toKrw(value, _c.currency))
-        : formatForeignAmount(_c, RateApi.fromKrw(value, _c.currency));
-    final cents = _fromForeign && _hasCents(_c);
+        : _c.formatForeign(RateApi.fromKrw(value, _c.currency));
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
@@ -130,10 +129,8 @@ class _QuickConverterState extends State<QuickConverter> {
                 child: TextField(
                   enabled: available,
                   controller: _input,
-                  keyboardType: TextInputType.numberWithOptions(decimal: cents),
-                  inputFormatters: [
-                    AmountInputFormatter(decimals: cents ? 2 : 0),
-                  ],
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [const WonInputFormatter()],
                   cursorColor: AppColors.primary,
                   style: const TextStyle(
                     fontSize: 17,
@@ -218,7 +215,7 @@ class _QuickConverterState extends State<QuickConverter> {
             ),
           ),
           const Text(
-            'API 기준 · 원화 결과는 1원 단위 반올림',
+            '상단 정수 환율 기준 · 소수점 버림',
             style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
           ),
         ],
@@ -231,28 +228,11 @@ class _QuickConverterState extends State<QuickConverter> {
 // 환산 도우미 (테스트에서도 쓰려고 공개)
 // ---------------------------------------------------------------------------
 
-/// 상단과 계산기에 같은 API 환율을 표시한다. 계산에는 반올림 전 값을 쓴다.
+/// 상단과 모든 환산에 실제로 사용하는 정수 환율.
 String currentRateLabel(Country c) {
-  if (RateApi.krwPer(c.currency) <= 0) {
+  final quote = RateApi.quotedKrw(c.currency);
+  if (quote <= 0) {
     return RateApi.isLoading ? '환율 확인 중' : '환율 없음';
   }
-  final won = RateApi.toKrw(c.unitAmount.toDouble(), c.currency);
-  return '${c.formatForeign(c.unitAmount)} ≈ $kWonSymbol${won.toStringAsFixed(2)}';
+  return '${c.formatForeign(c.unitAmount)} = $kWonSymbol${formatNumber(quote)}';
 }
-
-/// 1 단위가 100원 이상인 통화(달러·유로·파운드·위안 …)는 센트 단위까지 쓴다.
-/// 엔·동·바트처럼 단위가 작은 통화는 정수로 충분하다.
-bool _hasCents(Country c) => c.krwPerUnit / c.unitAmount >= 100;
-
-/// 기호 없이: 달러면 "7.41", 엔이면 "1,000"
-String formatForeignPlain(Country c, double v) {
-  if (!_hasCents(c)) return formatNumber(v);
-  final cents = (v * 100).round();
-  final whole = cents ~/ 100;
-  final frac = (cents % 100).toString().padLeft(2, '0');
-  return '${formatNumber(whole)}.$frac';
-}
-
-/// 기호 포함: "$7.41", "¥1,000"
-String formatForeignAmount(Country c, double v) =>
-    '${c.symbol}${formatForeignPlain(c, v)}';
