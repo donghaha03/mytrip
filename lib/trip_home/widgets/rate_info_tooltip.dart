@@ -129,7 +129,7 @@ class _TooltipBody extends StatelessWidget {
 
   Widget _buildBody() {
     final fetched = RateApi.lastFetched?.toUtc().add(const Duration(hours: 9));
-    final available = RateApi.krwPer(currency) > 0;
+    final available = RateApi.quotedKrw(currency) > 0;
     final stamp = fetched == null
         ? null
         : '${formatDate(fetched)} '

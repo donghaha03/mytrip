@@ -1,3 +1,4 @@
+import '../../api/api.dart';
 import 'country.dart';
 
 class Expense {
@@ -44,34 +45,34 @@ class Trip {
     return endOfTrip.isBefore(DateTime(today.year, today.month, today.day));
   }
 
-  double get spentForeign =>
-      expenses.fold<double>(0, (sum, e) => sum + e.amount);
+  int get spentForeign =>
+      expenses.fold<int>(0, (sum, e) => sum + e.amount.truncate());
 
-  double get spentKrw => country.toKrw(spentForeign);
+  int get spentKrw => RateApi.toKrw(spentForeign, country.currency);
 
-  double get remainKrw => budgetKrw - spentKrw;
+  int get remainKrw => budgetKrw - spentKrw;
 
-  double get budgetForeign =>
-      budgetKrw * country.unitAmount / country.krwPerUnit;
+  int get budgetForeign => RateApi.fromKrw(budgetKrw, country.currency);
 
-  double get remainForeign =>
-      remainKrw * country.unitAmount / country.krwPerUnit;
+  int get remainForeign => RateApi.fromKrw(remainKrw, country.currency);
 
   /// 0.0 ~ 1.0 (예산 대비 지출 비율)
   double get spentRatio =>
       budgetKrw == 0 ? 0 : (spentKrw / budgetKrw).clamp(0.0, 1.0);
 
   /// 어제 하루 동안 쓴 금액 (원화). 메인 화면 증감 배지에 사용.
-  double get yesterdaySpentKrw {
+  int get yesterdaySpentKrw {
     final now = DateTime.now();
     final yesterday = DateTime(now.year, now.month, now.day - 1);
     final total = expenses
-        .where((e) =>
-            e.date.year == yesterday.year &&
-            e.date.month == yesterday.month &&
-            e.date.day == yesterday.day)
-        .fold<double>(0, (sum, e) => sum + e.amount);
-    return country.toKrw(total);
+        .where(
+          (e) =>
+              e.date.year == yesterday.year &&
+              e.date.month == yesterday.month &&
+              e.date.day == yesterday.day,
+        )
+        .fold<int>(0, (sum, e) => sum + e.amount.truncate());
+    return RateApi.toKrw(total, country.currency);
   }
 
   /// 최근 기록이 위로 오도록 정렬된 지출 목록

@@ -125,6 +125,7 @@ void main() {
     expect(RateApi.ready, isTrue);
     for (final data in [
       responseData(at)..['rates']['JPY'] = 0.0,
+      responseData(at)..['rates']['JPY'] = 1e-308,
       responseData(at.add(const Duration(days: 1))),
       responseData(at.subtract(const Duration(days: 1))),
       responseData(at)..['rate_date'] = '2026-02-30',
@@ -146,5 +147,41 @@ void main() {
     await RateApi.load(client: bad, now: at);
     expect(RateApi.ready, isFalse);
     expect(RateApi.krwPer('JPY'), 0);
+  });
+
+  test('모든 통화는 표시된 정수 환율로 계산하고 소수점은 버린다', () async {
+    final at = DateTime.utc(2026, 10, 1, 21, 5);
+    final countries = [...kPrimaryCountries, ...kMoreCountries];
+    final data = responseData(at)
+      ..['rates'] = {
+        for (final c in countries)
+          c.currency: c.unitAmount / (c.krwPerUnit + 0.75),
+        'JPY': 0.11595312,
+      };
+    final client = MockClient(
+      (_) async => http.Response(jsonEncode(data), 200),
+    );
+    addTearDown(client.close);
+    await RateApi.load(client: client, now: at);
+    for (final c in countries) {
+      final quote = c.currency == 'JPY' ? 862 : c.krwPerUnit.truncate();
+      expect(RateApi.quotedKrw(c.currency), quote);
+      for (final amount in [0, 1, 99, 1000, 48100, 999999999999]) {
+        expect(
+          RateApi.toKrw(amount, c.currency),
+          amount * quote ~/ c.unitAmount,
+        );
+        expect(
+          RateApi.fromKrw(amount, c.currency),
+          amount * c.unitAmount ~/ quote,
+        );
+      }
+    }
+    expect(RateApi.toKrw(1000.9, 'JPY'), 8620);
+    expect(RateApi.fromKrw(456950.9, 'JPY'), 53010);
+    expect(RateApi.fromKrw(-456950.9, 'JPY'), -53010);
+    expect(RateApi.toKrw(12.9, 'KRW'), 12);
+    expect(RateApi.fromKrw(12.9, 'KRW'), 12);
+    expect(RateApi.toKrw(1000, 'UNKNOWN'), 0);
   });
 }

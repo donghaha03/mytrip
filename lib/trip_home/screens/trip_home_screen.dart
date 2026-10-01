@@ -172,11 +172,12 @@ class _SpendingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = trip.country;
+    final available = RateApi.quotedKrw(c.currency) > 0;
     final remain = trip.remainKrw;
     final over = remain < 0;
     final percent = trip.budgetKrw == 0
         ? 0
-        : (trip.spentKrw / trip.budgetKrw * 100).round();
+        : trip.spentKrw * 100 ~/ trip.budgetKrw;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 14, 20),
@@ -250,7 +251,7 @@ class _SpendingCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    formatWon(trip.spentKrw),
+                    available ? formatWon(trip.spentKrw) : '환율 없음',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 32,
@@ -261,7 +262,11 @@ class _SpendingCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  c.formatForeign(trip.spentForeign),
+                  available
+                      ? c.formatForeign(
+                          RateApi.fromKrw(trip.spentKrw, c.currency),
+                        )
+                      : c.formatForeign(trip.spentForeign),
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -273,7 +278,7 @@ class _SpendingCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            '샘플 지출 · 고정 환율 기준',
+            '상단 정수 환율 기준 · 소수점 버림',
             style: TextStyle(fontSize: 11, color: AppColors.onPrimaryMuted),
           ),
           const SizedBox(height: 16),
@@ -298,7 +303,7 @@ class _SpendingCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  '$percent%',
+                  available ? '$percent%' : '—',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -320,15 +325,17 @@ class _SpendingCard extends StatelessWidget {
                   child: _Figure(
                     label: '예산',
                     value: formatWon(trip.budgetKrw),
-                    sub: '하루 ${formatWon(trip.budgetKrw / _tripDays(trip))}',
+                    sub: '하루 ${formatWon(trip.budgetKrw ~/ _tripDays(trip))}',
                   ),
                 ),
                 _Figure(
                   label: over ? '초과' : '남은 금액',
-                  value: formatWon(remain.abs()),
-                  sub: RateApi.krwPer(c.currency) <= 0
+                  value: available ? formatWon(remain.abs()) : '환율 없음',
+                  sub: !available
                       ? '환율 없음'
-                      : '≈ ${c.formatForeign(RateApi.fromKrw(remain.abs(), c.currency))}',
+                      : c.formatForeign(
+                          RateApi.fromKrw(remain.abs(), c.currency),
+                        ),
                   alignEnd: true,
                   warn: over,
                 ),

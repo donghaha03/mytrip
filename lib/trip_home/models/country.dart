@@ -2,11 +2,7 @@ import '../theme/app_theme.dart';
 
 const kWonSymbol = '₩';
 
-/// 여행 국가 + 통화 + 기존 샘플 지출용 고정 환율.
-/// ponytail: 샘플 지출은 고정 환율 유지; 실제 저장 연결 시 팀의 Expense.rate 사용.
-///
-/// 환율은 "unitAmount 단위당 krwPerUnit 원" 형태로 저장한다.
-/// 예: 일본은 unitAmount 100, krwPerUnit 950 -> "100엔 = 950원"
+/// 여행 국가·통화 표시 정보. 실제 환산은 공통 RateApi만 사용한다.
 class Country {
   const Country({
     required this.flag,
@@ -24,21 +20,11 @@ class Country {
   final String symbol; // $, ¥ ...
   final String unitLabel; // 달러, 엔 ...
   final int unitAmount; // 1, 100, 1000
-  final double krwPerUnit; // unitAmount 당 원화
-
-  /// 현지 통화 금액 -> 원화
-  double toKrw(double foreignAmount) =>
-      foreignAmount * krwPerUnit / unitAmount;
+  final double krwPerUnit; // 테스트용 예시 API 응답에만 사용. 화면 환산에는 사용하지 않는다.
 
   /// "¥1,200"
-  String formatForeign(num amount) => '$symbol${formatNumber(amount)}';
-
-  /// "¥100 = ₩950"
-  ///
-  /// 국기·여행 이름 바로 옆에 붙는 자리라 한글 단위명("100엔 = 950원")은 길고
-  /// 투박해서 통화 기호로 쓴다.
-  String get rateLabel =>
-      '${formatForeign(unitAmount)} = $kWonSymbol${formatNumber(krwPerUnit)}';
+  String formatForeign(num amount) =>
+      '$symbol${formatNumber(amount.truncate())}';
 }
 
 /// 통화 코드("JPY") -> Country. Firestore 에는 코드만 저장한다.
