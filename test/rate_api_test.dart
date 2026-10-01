@@ -31,7 +31,7 @@ void main() {
     });
     final api = RateApi();
     final restored = RateApi();
-    final offline = MockClient((_) async => http.Response('연결 실패', 503));
+    final offline = MockClient((_) async => http.Response('offline', 503));
     addTearDown(() {
       client.close();
       offline.close();
@@ -104,7 +104,7 @@ void main() {
       (_) async => http.Response(jsonEncode(responseData()), 200),
     );
     final invalid = responseData();
-    (invalid['rates'] as Map<String, dynamic>)['JPY'] = 0;
+    (invalid['rates'] as Map<String, dynamic>)['JPY'] = 0.0;
     final bad = MockClient(
       (_) async => http.Response(jsonEncode(invalid), 200),
     );
