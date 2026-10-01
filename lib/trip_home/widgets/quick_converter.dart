@@ -207,15 +207,8 @@ class _QuickConverterState extends State<QuickConverter> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            '적용 환율: ${currentRateLabel(_c)}',
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-            ),
-          ),
           const Text(
-            '상단 정수 환율 기준 · 소수점 버림',
+            '소수점은 버려요',
             style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
           ),
         ],

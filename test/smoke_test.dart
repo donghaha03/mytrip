@@ -522,7 +522,7 @@ void main() {
         _wrap(Scaffold(body: QuickConverter(country: countryByCode('JPY')!))),
       );
       expect(find.text('환율 없음'), findsOneWidget);
-      expect(find.text('적용 환율: 환율 없음'), findsOneWidget);
+      expect(find.text('소수점은 버려요'), findsOneWidget);
       expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
     });
 
@@ -569,7 +569,6 @@ void main() {
 
       await tester.runAsync(() => _loadRates(yenRate: 8.624175011418408));
       await tester.pump();
-      expect(find.text('적용 환율: ¥100 = ₩862'), findsOneWidget);
       expect(find.text('8,620원'), findsOneWidget);
       expect(find.text('1,000'), findsOneWidget); // 갱신해도 입력은 유지한다.
       expect(find.text('9,500원'), findsNothing);
@@ -851,7 +850,9 @@ void main() {
     await tester.runAsync(() => _loadRates(yenRate: 8.624175011418408));
     await tester.pump();
     expect(find.text('¥100 = ₩862'), findsOneWidget);
-    expect(find.text('적용 환율: ¥100 = ₩862'), findsOneWidget);
+    expect(find.textContaining('적용 환율:'), findsNothing);
+    expect(find.text('소수점은 버려요'), findsOneWidget);
+    expect(find.text('상단 정수 환율 기준 · 소수점 버림'), findsNothing);
     expect(find.text('샘플 지출 · 고정 환율 기준'), findsNothing);
     expect(japan.spentKrw, 414622);
     expect(japan.remainKrw, 785378);
