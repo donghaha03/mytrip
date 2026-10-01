@@ -9,30 +9,35 @@ import 'package:tripapp/trip_home/screens/trip_list_screen.dart';
 import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/models/country.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
+import 'package:tripapp/trip_home/services/backend.dart';
 import 'package:tripapp/trip_home/theme/app_theme.dart';
 import 'package:tripapp/trip_home/widgets/country_chip.dart';
 import 'package:tripapp/trip_home/widgets/sheets.dart';
 import 'package:tripapp/trip_home/widgets/quick_converter.dart';
-import 'package:tripapp/trip_home/widgets/rate_info_tooltip.dart';
 import 'package:tripapp/trip_home/widgets/recent_expenses_card.dart';
 import 'package:tripapp/trip_home/widgets/today_budget_sheet.dart';
 import 'package:tripapp/trip_home/widgets/won_input_formatter.dart';
 
-Widget _wrap(Widget child) =>
-    MaterialApp(theme: buildAppTheme(), home: child);
+Widget _wrap(Widget child) => MaterialApp(theme: buildAppTheme(), home: child);
 
 void main() {
   // 목업 스크린샷과 같은 폰 사이즈로 맞춘다 (iPhone 14 기준).
   setUp(() {
-    final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
+    final view =
+        TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     view.physicalSize = const Size(1170, 2532);
     view.devicePixelRatio = 3.0;
   });
 
   tearDown(() {
-    final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
+    final view =
+        TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     view.resetPhysicalSize();
     view.resetDevicePixelRatio();
+  });
+
+  test('기본 실행은 DB 연결 없는 화면 미리보기', () async {
+    expect(await Backend.init(), BackendMode.local);
   });
 
   testWidgets('00 빈 화면이 그려진다', (tester) async {
@@ -109,7 +114,7 @@ void main() {
   });
 
   // ── 여행 홈 (01 에서 여행을 누르면) ─────────────────────────────
-  // 03 메인(남은 예산·지출 목록)과 07 환율 툴팁은 장부 담당 몫이라 여기 없다.
+  // 홈은 요약 화면이며, 전체 장부·지출 입력은 별도로 연결한다.
 
   testWidgets('여행 홈: 사용한 금액과 예산이 메인', (tester) async {
     await tester.pumpWidget(const TripApp());
@@ -147,7 +152,12 @@ void main() {
       budgetKrw: 10000,
       expenses: [
         Expense(
-            id: 'x', icon: '🛍', place: '쇼핑', amount: 2000, date: DateTime(2026, 10, 1)),
+          id: 'x',
+          icon: '🛍',
+          place: '쇼핑',
+          amount: 2000,
+          date: DateTime(2026, 10, 1),
+        ),
       ],
     );
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: trip)));
@@ -173,8 +183,7 @@ void main() {
 
     await tester.tap(find.text('지출 기록'));
     await tester.pump();
-    expect(find.text('지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'),
-        findsOneWidget);
+    expect(find.text('지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'), findsOneWidget);
     expect(find.byType(TripHomeScreen), findsOneWidget);
   });
 
@@ -186,6 +195,8 @@ void main() {
     await tester.tap(find.byTooltip('더보기'));
     await tester.pumpAndSettle();
     expect(find.byType(MoreScreen), findsOneWidget);
+    expect(find.text('계정 및 설정 메뉴는 준비 중이에요.'), findsOneWidget);
+    expect(find.textContaining('담당'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
     await tester.pumpAndSettle();
@@ -214,7 +225,9 @@ void main() {
 
     // 화면에 계산기 입력칸도 있어서 시트 안으로 좁힌다. 시트 안: [이름, 예산]
     final fields = find.descendant(
-        of: find.byType(TripEditSheet), matching: find.byType(TextField));
+      of: find.byType(TripEditSheet),
+      matching: find.byType(TextField),
+    );
     await tester.enterText(fields.at(0), '치앙마이 여행');
     await tester.enterText(fields.at(1), '2000000');
     await tester.pump();
@@ -242,8 +255,12 @@ void main() {
   });
 
   testWidgets('편집 결과가 기간까지 반영된다', (tester) async {
-    tripStore.update('t3',
-        start: DateTime(2027, 1, 10), end: DateTime(2027, 1, 12), budgetKrw: 300000);
+    tripStore.update(
+      't3',
+      start: DateTime(2027, 1, 10),
+      end: DateTime(2027, 1, 12),
+      budgetKrw: 300000,
+    );
     final t = tripStore.byId('t3')!;
     expect(t.durationLabel, '2박 3일');
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: t)));
@@ -258,23 +275,15 @@ void main() {
 
     await tester.tap(find.text('i'));
     await tester.pumpAndSettle();
-    expect(find.text('환율 갱신 정보'), findsOneWidget);
-    expect(find.textContaining('최근 갱신: '), findsOneWidget);
-    expect(find.text('환율은 24시간마다 한 번 갱신돼요'), findsOneWidget);
+    expect(find.text('예시 환율 정보'), findsOneWidget);
+    expect(find.text('화면 확인용 환율을 사용하고 있어요'), findsOneWidget);
+    expect(find.text('실시간 환율 API는 아직 연결되지 않았어요'), findsOneWidget);
+    expect(find.textContaining('최근 갱신: '), findsNothing);
 
     // 바깥을 누르면 닫힌다
     await tester.tapAt(const Offset(200, 700));
     await tester.pumpAndSettle();
-    expect(find.text('환율 갱신 정보'), findsNothing);
-  });
-
-  test('환율 갱신 시각: 매일 06:00', () {
-    expect(lastRateUpdate(DateTime(2026, 9, 20, 14, 30)),
-        DateTime(2026, 9, 20, 6));
-    expect(lastRateUpdate(DateTime(2026, 9, 20, 5, 59)),
-        DateTime(2026, 9, 19, 6)); // 아직 오늘 갱신 전
-    expect(lastRateUpdate(DateTime(2026, 9, 1, 3)),
-        DateTime(2026, 8, 31, 6)); // 달이 넘어가도
+    expect(find.text('예시 환율 정보'), findsNothing);
   });
 
   testWidgets('여행 홈: 오늘 예산 아이콘 -> 남은 예산 ÷ 남은 날', (tester) async {
@@ -295,14 +304,14 @@ void main() {
 
   group('todayBudget', () {
     Trip trip({int budget = 100000, List<Expense>? expenses}) => Trip(
-          id: 'x',
-          name: 'x',
-          country: countryByCode('JPY')!, // ¥100 = ₩950
-          start: DateTime(2026, 10, 1),
-          end: DateTime(2026, 10, 5), // 5일
-          budgetKrw: budget,
-          expenses: expenses,
-        );
+      id: 'x',
+      name: 'x',
+      country: countryByCode('JPY')!, // ¥100 = ₩950
+      start: DateTime(2026, 10, 1),
+      end: DateTime(2026, 10, 5), // 5일
+      budgetKrw: budget,
+      expenses: expenses,
+    );
     Expense spend(double yen, DateTime at) =>
         Expense(id: '$yen$at', icon: '·', place: '·', amount: yen, date: at);
 
@@ -315,10 +324,12 @@ void main() {
 
     test('여행 중: 오늘 아침 기준으로 나누고, 오늘 쓴 만큼 뺀다', () {
       // 3일차. 1일차에 ¥2,000(19,000원), 오늘 ¥1,000(9,500원)
-      final t = trip(expenses: [
-        spend(2000, DateTime(2026, 10, 1, 12)),
-        spend(1000, DateTime(2026, 10, 3, 9)),
-      ]);
+      final t = trip(
+        expenses: [
+          spend(2000, DateTime(2026, 10, 1, 12)),
+          spend(1000, DateTime(2026, 10, 3, 9)),
+        ],
+      );
       final b = todayBudget(t, DateTime(2026, 10, 3, 18));
       expect(b.phase, TodayPhase.during);
       expect(b.daysLeft, 3); // 3·4·5일
@@ -335,7 +346,10 @@ void main() {
     });
 
     test('예산을 이미 다 썼으면 0', () {
-      final t = trip(budget: 10000, expenses: [spend(2000, DateTime(2026, 10, 1))]);
+      final t = trip(
+        budget: 10000,
+        expenses: [spend(2000, DateTime(2026, 10, 1))],
+      );
       final b = todayBudget(t, DateTime(2026, 10, 2));
       expect(b.phase, TodayPhase.overBudget);
       expect(b.allowanceKrw, 0);
@@ -401,8 +415,7 @@ void main() {
     expect(find.text('아직 기록한 지출이 없어요'), findsOneWidget);
     await tester.tap(find.text('첫 지출 기록하기'));
     await tester.pump();
-    expect(find.text('지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'),
-        findsOneWidget);
+    expect(find.text('지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'), findsOneWidget);
   });
 
   test('dailySpending: 오늘까지 7일치로 묶는다', () {
@@ -416,12 +429,36 @@ void main() {
       budgetKrw: 100000,
       expenses: [
         // 오늘 두 건 -> 합쳐진다
-        Expense(id: '1', icon: '·', place: 'a', amount: 1000, date: DateTime(2026, 10, 10, 9)),
-        Expense(id: '2', icon: '·', place: 'b', amount: 2000, date: DateTime(2026, 10, 10, 20)),
+        Expense(
+          id: '1',
+          icon: '·',
+          place: 'a',
+          amount: 1000,
+          date: DateTime(2026, 10, 10, 9),
+        ),
+        Expense(
+          id: '2',
+          icon: '·',
+          place: 'b',
+          amount: 2000,
+          date: DateTime(2026, 10, 10, 20),
+        ),
         // 6일 전 (구간 맨 앞)
-        Expense(id: '3', icon: '·', place: 'c', amount: 500, date: DateTime(2026, 10, 4, 12)),
+        Expense(
+          id: '3',
+          icon: '·',
+          place: 'c',
+          amount: 500,
+          date: DateTime(2026, 10, 4, 12),
+        ),
         // 7일 전 -> 구간 밖이라 빠진다
-        Expense(id: '4', icon: '·', place: 'd', amount: 9999, date: DateTime(2026, 10, 3)),
+        Expense(
+          id: '4',
+          icon: '·',
+          place: 'd',
+          amount: 9999,
+          date: DateTime(2026, 10, 3),
+        ),
       ],
     );
 
@@ -481,8 +518,13 @@ void main() {
   group('AmountInputFormatter (소수점)', () {
     const f = AmountInputFormatter(decimals: 2);
     String type(String t) => f
-        .formatEditUpdate(TextEditingValue.empty,
-            TextEditingValue(text: t, selection: TextSelection.collapsed(offset: t.length)))
+        .formatEditUpdate(
+          TextEditingValue.empty,
+          TextEditingValue(
+            text: t,
+            selection: TextSelection.collapsed(offset: t.length),
+          ),
+        )
         .text;
 
     test('정수부만 콤마, 소수부는 그대로', () {
@@ -506,8 +548,12 @@ void main() {
     test('decimals 0 이면 소수점을 버린다 (원화 예산)', () {
       const won = WonInputFormatter();
       expect(
-        won.formatEditUpdate(TextEditingValue.empty,
-            const TextEditingValue(text: '12.5')).text,
+        won
+            .formatEditUpdate(
+              TextEditingValue.empty,
+              const TextEditingValue(text: '12.5'),
+            )
+            .text,
         '125',
       );
     });
@@ -526,7 +572,11 @@ void main() {
 
     test('오늘이 기간 안이면 그 여행 (시작·종료일 포함)', () {
       final now = DateTime(2026, 10, 3, 14);
-      final t = ongoing('a', start: DateTime(2026, 10, 1), end: DateTime(2026, 10, 5));
+      final t = ongoing(
+        'a',
+        start: DateTime(2026, 10, 1),
+        end: DateTime(2026, 10, 5),
+      );
       expect(ongoingTrip([t], now)?.id, 'a');
       // 시작일 당일 / 종료일 당일도 "여행 중"
       expect(ongoingTrip([t], DateTime(2026, 10, 1, 0, 5))?.id, 'a');
@@ -534,25 +584,39 @@ void main() {
     });
 
     test('기간 밖이면 null', () {
-      final t = ongoing('a', start: DateTime(2026, 10, 1), end: DateTime(2026, 10, 5));
+      final t = ongoing(
+        'a',
+        start: DateTime(2026, 10, 1),
+        end: DateTime(2026, 10, 5),
+      );
       expect(ongoingTrip([t], DateTime(2026, 9, 30, 23)), isNull);
       expect(ongoingTrip([t], DateTime(2026, 10, 6)), isNull);
       expect(ongoingTrip([], DateTime(2026, 10, 3)), isNull);
     });
 
     test('겹치면 먼저 시작한 여행', () {
-      final a = ongoing('a', start: DateTime(2026, 10, 1), end: DateTime(2026, 10, 9));
-      final b = ongoing('b', start: DateTime(2026, 10, 2), end: DateTime(2026, 10, 4));
+      final a = ongoing(
+        'a',
+        start: DateTime(2026, 10, 1),
+        end: DateTime(2026, 10, 9),
+      );
+      final b = ongoing(
+        'b',
+        start: DateTime(2026, 10, 2),
+        end: DateTime(2026, 10, 4),
+      );
       expect(ongoingTrip([b, a], DateTime(2026, 10, 3))?.id, 'a');
     });
 
     testWidgets('앱을 켜면 여행 목록 대신 메인 페이지, 뒤로가기로 목록', (tester) async {
       final now = DateTime.now();
-      tripStore.add(ongoing(
-        'now',
-        start: now.subtract(const Duration(days: 1)),
-        end: now.add(const Duration(days: 1)),
-      ));
+      tripStore.add(
+        ongoing(
+          'now',
+          start: now.subtract(const Duration(days: 1)),
+          end: now.add(const Duration(days: 1)),
+        ),
+      );
       addTearDown(() => tripStore.remove('now'));
 
       await tester.pumpWidget(const TripApp());
@@ -605,7 +669,8 @@ void main() {
   });
 
   testWidgets('데스크톱 폭에서도 폰 폭으로 묶인다', (tester) async {
-    final view = TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
+    final view =
+        TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     view.physicalSize = const Size(2580, 2000); // 1290x1000 @2x
     view.devicePixelRatio = 2.0;
 
@@ -651,13 +716,12 @@ void main() {
     const f = WonInputFormatter();
 
     TextEditingValue type(String text, {int? caret}) => f.formatEditUpdate(
-          TextEditingValue.empty,
-          TextEditingValue(
-            text: text,
-            selection:
-                TextSelection.collapsed(offset: caret ?? text.length),
-          ),
-        );
+      TextEditingValue.empty,
+      TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: caret ?? text.length),
+      ),
+    );
 
     test('천 단위마다 콤마', () {
       expect(type('1200000').text, '1,200,000');

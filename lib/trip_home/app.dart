@@ -13,17 +13,13 @@ import 'theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // firebase_options.dart 가 채워져 있으면 Firebase, 아니면 로컬 임시 모드.
+  // 기본은 DB 없이 샘플 데이터로 화면을 확인한다.
   if (await Backend.init() == BackendMode.firebase) {
-    // 로그인 화면은 이 저장소 범위 밖이다 (로그인 담당). 로그인 기능 자체
-    // (authService)와 "로그인하면 그 사람의 Firestore 에 붙는" 연결은 미리 해
-    // 뒀으니, 로그인 화면에서 authService.signIn 을 부르기만 하면 된다.
-    // 로그인 전에는 데이터가 메모리에만 있다.
+    // Firebase를 명시적으로 켠 경우 로그인한 사용자의 저장소에 연결한다.
     authService = FirebaseAuthService();
     bindTripStoreToAuth(authService, tripStore);
   } else {
-    // 로컬에서는 목업 여행 3건으로 시작한다.
-    // 00 빈 화면을 보려면 이 줄을 주석 처리하면 된다.
+    // 이전 여행·지출이 있다고 가정한 예시 3건.
     tripStore.seedMockTrips();
   }
 
@@ -88,12 +84,14 @@ class _HomeRouterState extends State<HomeRouter> {
     _autoOpened = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Navigator.of(context).push(PageRouteBuilder(
-        // 앱을 켜자마자 뜨는 화면이라 넘어가는 애니메이션은 없앤다
-        transitionDuration: Duration.zero,
-        reverseTransitionDuration: Duration.zero,
-        pageBuilder: (_, _, _) => TripHomeScreen(trip: trip),
-      ));
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          // 앱을 켜자마자 뜨는 화면이라 넘어가는 애니메이션은 없앤다
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+          pageBuilder: (_, _, _) => TripHomeScreen(trip: trip),
+        ),
+      );
     });
   }
 
@@ -118,9 +116,7 @@ class _Loading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      ),
+      body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
     );
   }
 }

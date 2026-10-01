@@ -11,21 +11,18 @@ enum BackendMode {
   firebase,
 }
 
-/// 앱이 어느 모드로 떴는지.
-///
-/// naite-reservation 의 store.js 와 같은 방식이다 — 설정이 있으면 붙고,
-/// 없거나 붙다가 실패하면 조용히 로컬 임시 모드로 뜬다. 덕분에 조원들은
-/// Firebase 키 없이도 clone 하자마자 `flutter run` 이 된다.
+/// 기본은 샘플 데이터로 화면만 확인하는 로컬 모드다.
 class Backend {
   Backend._();
 
   static BackendMode mode = BackendMode.local;
   static bool get isFirebase => mode == BackendMode.firebase;
 
-  /// 키가 있어도 강제로 로컬 모드로 띄운다. Firebase 콘솔 설정이 덜 됐거나
-  /// 오프라인에서 화면만 만질 때:
-  ///   flutter run -d chrome --dart-define=LOCAL_MODE=true
-  static const _forceLocal = bool.fromEnvironment('LOCAL_MODE');
+  /// Firebase를 명시적으로 사용할 때만 LOCAL_MODE=false로 실행한다.
+  static const _forceLocal = bool.fromEnvironment(
+    'LOCAL_MODE',
+    defaultValue: true,
+  );
 
   static Future<BackendMode> init() async {
     if (_forceLocal) return mode = BackendMode.local;

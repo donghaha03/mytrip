@@ -14,26 +14,8 @@ import '../widgets/today_budget_sheet.dart';
 import 'ledger_entry.dart';
 import 'more_screen.dart';
 
-/// 여행 홈. 01 리스트에서 여행을 누르면 들어온다.
-///
-/// 메인은 "예산 대비 얼마 썼나" 요약이다. 읽기만 한다 — 지출 목록·기록 입력·
-/// 환율 툴팁(Figma 03/07)은 장부 몫이라 여기 없고, 하단 버튼으로 장부에 넘긴다.
-/// 장부 연결은 ledger_entry.dart 에서 한다.
-///
-///   ← 🇯🇵 일본 여행                         ≡   ≡ = 더보기 (Figma 03 과 같은 자리)
-///   ┌ 파란 카드 ─────────────────────────┐
-///   │ D-11 · 10.04 – 10.08 · 4박 5일   ✎  │   ✎ = 06 여행 편집
-///   │ 사용한 금액                          │
-///   │ 456,950원              ¥48,100      │
-///   │ ▓▓▓▓▓▓░░░░░░░░░░░░░░░         38%   │
-///   │ 예산 1,200,000원     남은 743,050원  │
-///   │ 하루 240,000원                       │
-///   └────────────────────────────────────┘
-///   ┌ 최근 지출 ─────────────── 전체 보기 ›┐   7일 막대 + 마지막 3건 (요약)
-///   └────────────────────────────────────┘
-///   ┌ 빠른 환산 ─────────────────────────┐   기록 안 남는 계산기
-///   └────────────────────────────────────┘
-///   [ + 지출 기록 ]  [ 장부 보기 ]                -> 장부
+/// 여행별 예산·지출 요약과 환산 화면.
+/// 전체 장부와 지출 입력은 ledger_entry.dart에서 연결한다.
 class TripHomeScreen extends StatelessWidget {
   const TripHomeScreen({super.key, required this.trip});
 
@@ -73,7 +55,7 @@ class TripHomeScreen extends StatelessWidget {
             children: [
               ScreenTopBar(
                 title: '${trip.country.flag} ${trip.name}',
-                // Figma 07: 여행 이름 오른쪽에 환율 + ⓘ (누르면 갱신 시각 안내)
+                // 여행 이름 오른쪽에 예시 환율과 안내를 표시한다.
                 titleSuffix: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -85,7 +67,7 @@ class TripHomeScreen extends StatelessWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    RateInfoButton(lastUpdated: lastRateUpdate(DateTime.now())),
+                    const RateInfoButton(),
                   ],
                 ),
                 trailing: _CircleIconButton(
@@ -107,8 +89,8 @@ class TripHomeScreen extends StatelessWidget {
                         onEdit: () => _edit(context),
                         onToday: () => showAppSheet<void>(
                           context: context,
-                          builder: (_) => TodayBudgetSheet(
-                              trip: trip, now: DateTime.now()),
+                          builder: (_) =>
+                              TodayBudgetSheet(trip: trip, now: DateTime.now()),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -116,8 +98,11 @@ class TripHomeScreen extends StatelessWidget {
                         trip: trip,
                         now: DateTime.now(),
                         onOpenLedger: () => openLedger(context, trip),
-                        onAddExpense: () => openLedger(context, trip,
-                            start: LedgerStart.addExpense),
+                        onAddExpense: () => openLedger(
+                          context,
+                          trip,
+                          start: LedgerStart.addExpense,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       QuickConverter(country: trip.country),
@@ -205,8 +190,7 @@ class _SpendingCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(8),
@@ -301,7 +285,8 @@ class _SpendingCard extends StatelessWidget {
                       minHeight: 8,
                       backgroundColor: AppColors.white.withValues(alpha: 0.22),
                       valueColor: AlwaysStoppedAnimation(
-                          over ? const Color(0xFFFFB4B4) : AppColors.white),
+                        over ? const Color(0xFFFFB4B4) : AppColors.white,
+                      ),
                     ),
                   ),
                 ),
@@ -399,8 +384,9 @@ class _Figure extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment:
-          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Text(
           label,
@@ -458,8 +444,8 @@ class _BottomBar extends StatelessWidget {
                   icon: Icons.add_rounded,
                   label: '지출 기록',
                   filled: false,
-                  onTap: () => openLedger(context, trip,
-                      start: LedgerStart.addExpense),
+                  onTap: () =>
+                      openLedger(context, trip, start: LedgerStart.addExpense),
                 ),
               ),
               const SizedBox(width: 10),
