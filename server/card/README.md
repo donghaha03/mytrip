@@ -16,7 +16,7 @@ CODEF 개인카드 승인내역을 조회해 `mytrip-fddfb`의 사용자별 여�
 
 ## 서버 설정
 
-Node.js 22 이상과 Firebase Application Default Credentials가 필요합니다.
+Node.js 24(npm 11) 이상과 Firebase Application Default Credentials가 필요합니다.
 서비스 계정 키는 Git에 넣지 않고 호스트의 비밀 저장소/워크로드 인증을 사용합니다.
 
 | 환경 변수 | 값 |
