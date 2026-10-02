@@ -165,6 +165,8 @@ void main() {
     await tester.ensureVisible(find.text('결제수단을 선택해주세요'));
     await tester.pumpAndSettle();
     expect(find.text('결제수단을 선택해주세요'), findsOneWidget);
+    await tester.ensureVisible(find.text('현금'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('현금'));
     await tester.pump();
     expect(find.text('결제수단을 선택해주세요'), findsNothing);
@@ -314,6 +316,8 @@ void main() {
   testWidgets('빈 장부는 첫 기록을 안내한다', (tester) async {
     trip.expenses.clear();
     await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
+    await tester.scrollUntilVisible(find.text('아직 기록한 지출이 없어요'), 150);
+    await tester.pumpAndSettle();
     expect(find.text('아직 기록한 지출이 없어요'), findsOneWidget);
     await tester.tap(find.text('지출 기록'));
     await tester.pumpAndSettle();
@@ -521,6 +525,8 @@ void main() {
   testWidgets('통화 선택·메모·현재 환산·기록 당시 환율을 저장하고 상세에서 읽는다', (tester) async {
     await tester.pumpWidget(_wrap(ExpenseFormScreen(trip: trip)));
     await tester.tap(find.byKey(const ValueKey('expense-currency')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('🇰🇷 KRW · 원').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('🇰🇷 KRW · 원').last);
     await tester.pumpAndSettle();

@@ -259,6 +259,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                           key: const ValueKey('expense-currency'),
                           initialValue: _currency.currency,
                           isExpanded: true,
+                          menuMaxHeight: 320,
                           decoration: _decoration('결제 통화'),
                           items: [
                             for (final c in kExpenseCurrencies)
