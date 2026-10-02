@@ -554,6 +554,8 @@ void main() {
     expect(saved.amount, 1000);
     expect(saved.memo, '기념품 메모');
     expect(saved.recordedQuote, 1);
+    // 저장으로 닫힌 Navigator를 재사용하지 않고 상세 화면을 새로 연다.
+    await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(
       _wrap(ExpenseDetailScreen(trip: trip, expenseId: saved.id)),
     );
