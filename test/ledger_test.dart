@@ -186,6 +186,11 @@ void main() {
     await tester.pump();
     expect(find.text('금액은 1 이상 입력해주세요'), findsOneWidget);
     expect(trip.expenses.length, 3);
+    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '1000');
+    await tester.enterText(find.byKey(const ValueKey('expense-place')), '올바른 사용처');
+    await tester.pump();
+    expect(find.text('금액은 1 이상 입력해주세요'), findsNothing);
+    expect(find.text('사용처를 입력해주세요'), findsNothing);
     RateApi.reset();
     RateApi.changes.value++;
     await tester.pump();

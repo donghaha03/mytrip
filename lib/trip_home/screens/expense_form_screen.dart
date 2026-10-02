@@ -237,6 +237,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                       TextFormField(
                         key: const ValueKey('expense-amount'),
                         controller: _amount,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
                         enabled: !_busy,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
@@ -301,6 +302,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                       TextFormField(
                         key: const ValueKey('expense-place'),
                         controller: _place,
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
                         enabled: !_busy,
                         maxLength: 50,
                         textInputAction: TextInputAction.done,
