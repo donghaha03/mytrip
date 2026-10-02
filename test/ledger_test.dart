@@ -563,7 +563,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(options, findsOneWidget);
     expect(
-      tester.getTopLeft(options).dy,
+      tester
+          .getTopLeft(
+            find
+                .descendant(of: options, matching: find.byType(DecoratedBox))
+                .first,
+          )
+          .dy,
       greaterThan(
         tester.getBottomLeft(find.widgetWithText(ChoiceChip, '카테고리별')).dy,
       ),

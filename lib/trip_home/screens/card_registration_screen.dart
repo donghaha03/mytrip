@@ -118,6 +118,7 @@ class _CardRegistrationScreenState extends State<CardRegistrationScreen> {
                       decoration: const InputDecoration(
                         labelText: '카드 별칭',
                         helperText: '카드번호·이름·전화번호 대신 별칭을 사용하세요',
+                        helperMaxLines: 2,
                       ),
                       maxLength: 30,
                       validator: (v) => TestCard.nicknameError(v ?? ''),

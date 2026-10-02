@@ -39,8 +39,9 @@ class MoreScreen extends StatelessWidget {
                           ),
                           title: const Text('카드 연동'),
                           subtitle: Text(
-                            tripStore.testCardFor(trip.id)?.displayLabel ??
-                                '카드 등록 및 연결 상태',
+                            tripStore.testCardFor(trip.id) == null
+                                ? '카드 등록 및 연결 상태'
+                                : '임시 등록 · ${tripStore.testCardFor(trip.id)!.displayLabel}',
                           ),
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: () => Navigator.of(context).push(
