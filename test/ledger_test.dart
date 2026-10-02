@@ -14,6 +14,10 @@ import 'package:tripapp/trip_home/models/country.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
 import 'package:tripapp/trip_home/screens/expense_form_screen.dart';
 import 'package:tripapp/trip_home/screens/ledger_screen.dart';
+import 'package:tripapp/trip_home/screens/card_connection_screen.dart';
+import 'package:tripapp/trip_home/screens/expense_detail_screen.dart';
+import 'package:tripapp/trip_home/screens/rates_screen.dart';
+import 'package:tripapp/trip_home/services/card_sync_api.dart';
 import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/theme/app_theme.dart';
 import 'package:tripapp/trip_home/widgets/recent_expenses_card.dart';
@@ -135,10 +139,12 @@ void main() {
     expect(find.text('47,434원'), findsOneWidget);
     await tester.tap(find.text('장부 보기'));
     await tester.pumpAndSettle();
-    expect(find.text('편의점'), findsOneWidget);
     expect(find.text('47,434원'), findsOneWidget);
     expect(find.text('현금 38,814원'), findsOneWidget);
     expect(find.text('카드 8,620원'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('편의점'), 200);
+    await tester.pumpAndSettle();
+    expect(find.text('편의점'), findsOneWidget);
     expect(find.text('카드 · 면세'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -177,9 +183,12 @@ void main() {
   testWidgets('수정은 ID·날짜를 유지하며 삭제 취소와 확인을 구분한다', (tester) async {
     final original = trip.expenses.first;
     await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
-    await tester.ensureVisible(find.text('상점1'));
+    await tester.scrollUntilVisible(find.text('상점1'), 200);
     await tester.pumpAndSettle();
     await tester.tap(find.text('상점1'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ExpenseDetailScreen), findsOneWidget);
+    await tester.tap(find.text('수정'));
     await tester.pumpAndSettle();
     expect(find.text('지출 수정'), findsOneWidget);
     await tester.enterText(
@@ -205,9 +214,7 @@ void main() {
     expect(updated.paymentMethod, PaymentMethod.card);
     expect(updated.isTaxFree, isTrue);
     expect(trip.spentKrw, 43116);
-    await tester.ensureVisible(find.text('수정한 상점'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('수정한 상점'));
+    await tester.tap(find.text('수정'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('카드'));
     await tester.pumpAndSettle();
@@ -228,10 +235,7 @@ void main() {
     expect(trip.expenses.first.paymentMethod, PaymentMethod.cash);
     expect(trip.expenses.first.isTaxFree, isFalse);
     expect(trip.spentKrw, 43116);
-    await tester.ensureVisible(find.text('수정한 상점'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('수정한 상점'));
-    await tester.pumpAndSettle();
+    expect(find.byType(ExpenseDetailScreen), findsOneWidget);
     await tester.tap(find.byTooltip('지출 삭제'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('취소'));
@@ -288,9 +292,11 @@ void main() {
   testWidgets('날짜는 하루만 선택하며 시각은 유지한다', (tester) async {
     final original = trip.expenses.first;
     await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
-    await tester.ensureVisible(find.text(original.place));
+    await tester.scrollUntilVisible(find.text(original.place), 200);
     await tester.pumpAndSettle();
     await tester.tap(find.text(original.place));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('수정'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('2026.10.01'));
     await tester.pumpAndSettle();
@@ -423,7 +429,11 @@ void main() {
     });
     final loaded = tripStore.byId(trip.id)!;
     await tester.pumpWidget(_wrap(LedgerScreen(trip: loaded)));
+    await tester.scrollUntilVisible(find.text('상점1'), 200);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('상점1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('수정'));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('expense-amount')),
@@ -440,5 +450,215 @@ void main() {
     expect(find.text('2,000'), findsOneWidget);
     expect(find.text('저장하지 못했어요. 입력 내용을 유지했으니 다시 시도해주세요.'), findsOneWidget);
     expect(loaded.expenses.single.amount, 1501);
+  });
+
+  test('통화별 항목 합계·취소 제외·D-day가 같은 기준으로 계산된다', () {
+    trip.expenses.addAll([
+      Expense(
+        id: 'usd',
+        icon: '🛍',
+        place: '달러 지출',
+        amount: 10.9,
+        currency: 'USD',
+        date: DateTime(2026, 10, 2),
+      ),
+      Expense(
+        id: 'cancel',
+        icon: '💳',
+        place: '취소',
+        amount: 0,
+        originalAmount: 1000,
+        currency: 'JPY',
+        status: ExpenseStatus.cancelled,
+        date: DateTime(2026, 10, 2),
+      ),
+    ]);
+    expect(trip.spentKrw, 52314);
+    expect(trip.dayLabel(DateTime(2026, 9, 30)), 'D-1');
+    expect(trip.dayLabel(DateTime(2026, 10, 1)), 'D-day');
+    expect(trip.dayLabel(DateTime(2026, 10, 3)), 'D+2');
+    expect(trip.dayLabel(DateTime(2026, 10, 6)), '여행 완료');
+  });
+
+  testWidgets('결제수단·카테고리·정렬을 조합하고 빈 필터를 안내한다', (tester) async {
+    trip.expenses.add(
+      Expense(
+        id: 'shop',
+        icon: '🛍',
+        place: '큰 쇼핑',
+        amount: 10000,
+        category: '쇼핑',
+        paymentMethod: PaymentMethod.card,
+        date: DateTime(2026, 10, 2),
+      ),
+    );
+    await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('ledger-payment-card')),
+      150,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ledger-payment-card')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('큰 쇼핑'), 150);
+    await tester.pumpAndSettle();
+    expect(find.text('상점1'), findsNothing);
+    await tester.ensureVisible(find.text('카테고리별'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카테고리별'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('금액순'));
+    await tester.pumpAndSettle();
+    expect(find.text('🛍 쇼핑 · 1건'), findsOneWidget);
+    trip.expenses.removeWhere((e) => e.id == 'shop');
+    tripStore.rename(trip.id, trip.name);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('이 결제수단으로 기록한 지출이 없어요'), 150);
+    expect(find.text('이 결제수단으로 기록한 지출이 없어요'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('통화 선택·메모·현재 환산·기록 당시 환율을 저장하고 상세에서 읽는다', (tester) async {
+    await tester.pumpWidget(_wrap(ExpenseFormScreen(trip: trip)));
+    await tester.tap(find.byKey(const ValueKey('expense-currency')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('🇰🇷 KRW · 원').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-amount')),
+      '1000.9',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-place')),
+      '한국 결제',
+    );
+    await tester.ensureVisible(find.text('현금'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('현금'));
+    await tester.ensureVisible(find.byKey(const ValueKey('expense-memo')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-memo')),
+      '기념품 메모',
+    );
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+    final saved = trip.expenses.last;
+    expect(saved.currency, 'KRW');
+    expect(saved.amount, 1000);
+    expect(saved.memo, '기념품 메모');
+    expect(saved.recordedQuote, 1);
+    await tester.pumpWidget(
+      _wrap(ExpenseDetailScreen(trip: trip, expenseId: saved.id)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('현재 환산 1,000원'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('기념품 메모'), 150);
+    expect(find.text('기념품 메모'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('환율 화면은 실제 정수 환율과 통화별 빠른 환산을 사용한다', (tester) async {
+    await tester.pumpWidget(_wrap(RatesScreen(country: trip.country)));
+    await tester.pumpAndSettle();
+    expect(find.text('¥100 = ₩862'), findsOneWidget);
+    await tester.tap(find.text('USD · 달러'));
+    await tester.pumpAndSettle();
+    expect(find.text('USD → KRW'), findsOneWidget);
+    expect(find.textContaining('+1.2%'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('테스트 승인·중복·부분취소·전체취소가 바로 장부에 반영된다', (tester) async {
+    final before = trip.spentKrw;
+    await tester.pumpWidget(_wrap(CardConnectionScreen(trip: trip)));
+    await tester.tap(find.text('테스트 카드 연결'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('테스트 승인 · 1,000 JPY'));
+    await tester.pumpAndSettle();
+    expect(trip.spentKrw, before + 8620);
+    expect(trip.expenses.length, 4);
+    await tester.scrollUntilVisible(find.text('동일 이벤트 재수신'), 100);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('동일 이벤트 재수신'));
+    await tester.pumpAndSettle();
+    expect(trip.expenses.length, 4);
+    await tester.tap(find.text('테스트 부분 취소 · 500'));
+    await tester.pumpAndSettle();
+    expect(trip.spentKrw, before + 4310);
+    await tester.tap(find.text('테스트 전체 취소'));
+    await tester.pumpAndSettle();
+    expect(trip.spentKrw, before);
+    final cancelled = trip.expenses.last;
+    await tripStore.deleteExpense(trip.id, cancelled.id);
+    await tripStore.applyDemoCardEvent(trip.id, cancelled);
+    expect(trip.expenses.length, 3); // 숨긴 내역은 재수신해도 되살리지 않는다.
+    expect(tester.takeException(), isNull);
+  });
+
+  test('Firestore 카드 내역 갱신·통화·메모·숨김이 구독에 반영된다', () async {
+    final db = FakeFirebaseFirestore();
+    final repo = FirestoreTripRepository(uid: 'test', db: db);
+    await repo.saveTrip(trip);
+    await repo.saveExpense(
+      trip.id,
+      Expense(
+        id: 'card_1',
+        icon: '💳',
+        place: '카드 상점',
+        amount: 1000,
+        originalAmount: 1000,
+        source: 'codef',
+        currency: 'JPY',
+        memo: '선물',
+        recordedQuote: 862,
+        paymentMethod: PaymentMethod.card,
+        date: DateTime(2026, 10, 2),
+      ),
+    );
+    tripStore.connect(repo);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final loaded = tripStore.byId(trip.id)!;
+    expect(loaded.expenses.single.memo, '선물');
+    expect(loaded.expenses.single.currency, 'JPY');
+    final ref = db.doc('users/test/trips/${trip.id}/records/card_1');
+    await ref.update({'amount': 500, 'status': 'partiallyCancelled'});
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(loaded.spentKrw, 4310);
+    await ref.update({'amount': 0, 'status': 'cancelled'});
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(loaded.spentKrw, 0);
+    await tripStore.deleteExpense(trip.id, 'card_1');
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(loaded.expenses, isEmpty);
+    expect((await ref.get()).data()?['hidden'], true);
+  });
+
+  test('카드 동기화 요청은 인증 토큰·여행 ID만 보내고 실패를 표시한다', () async {
+    final client = MockClient((request) async {
+      expect(request.headers['Authorization'], 'Bearer test-token');
+      expect(jsonDecode(request.body), {'tripId': 'ledger'});
+      return http.Response('{"received":2,"skipped":1}', 200);
+    });
+    final result = await CardSyncApi.synchronize(
+      tripId: 'ledger',
+      idToken: 'test-token',
+      client: client,
+      endpoint: Uri.parse('https://example.invalid/sync'),
+    );
+    expect(result.received, 2);
+    expect(result.skipped, 1);
+    client.close();
+    final failed = MockClient((_) async => http.Response('{}', 409));
+    await expectLater(
+      CardSyncApi.synchronize(
+        tripId: 'ledger',
+        idToken: 'test-token',
+        client: failed,
+        endpoint: Uri.parse('https://example.invalid/sync'),
+      ),
+      throwsStateError,
+    );
+    failed.close();
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../api/api.dart';
 import '../data/trip_store.dart';
+import '../models/country.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -26,6 +27,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   final _form = GlobalKey<FormState>();
   late final TextEditingController _place;
   late final TextEditingController _amount;
+  late final TextEditingController _memo;
+  late Country _currency;
   late final String _id;
   late String _category;
   PaymentMethod? _paymentMethod;
@@ -39,6 +42,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     super.initState();
     final e = widget.expense;
     _place = TextEditingController(text: e?.place ?? '');
+    _memo = TextEditingController(text: e?.memo ?? '');
+    _currency = countryByCode(e?.currency ?? '') ?? widget.trip.country;
     _amount = TextEditingController(
       text: e == null ? '' : formatNumber(e.amount.truncate()),
     );
@@ -54,6 +59,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   void dispose() {
     _place.dispose();
     _amount.dispose();
+    _memo.dispose();
     super.dispose();
   }
 
@@ -129,7 +135,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
   Future<void> _save() async {
     if (_busy || !_form.currentState!.validate()) return;
-    if (RateApi.quotedKrw(widget.trip.country.currency) <= 0) return;
+    if (RateApi.quotedKrw(_currency.currency) <= 0) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -141,11 +147,23 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           id: _id,
           icon: expenseCategoryIcons[_category]!,
           place: _place.text.trim(),
-          amount: parseAmount(_amount.text).truncateToDouble(),
+          amount: widget.expense?.isImported == true
+              ? widget.expense!.amount
+              : parseAmount(_amount.text).truncateToDouble(),
           date: _date,
           category: _category,
           paymentMethod: _paymentMethod,
           isTaxFree: _isTaxFree,
+          currency: _currency.currency,
+          memo: _memo.text.trim(),
+          recordedQuote:
+              widget.expense?.currencyOf(widget.trip) == _currency.currency
+              ? widget.expense?.recordedQuote ??
+                    RateApi.quotedKrw(_currency.currency)
+              : RateApi.quotedKrw(_currency.currency),
+          source: widget.expense?.source,
+          status: widget.expense?.status ?? ExpenseStatus.approved,
+          originalAmount: widget.expense?.originalAmount,
         ),
       );
       if (mounted) Navigator.of(context).pop();
@@ -160,31 +178,17 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
 
   Future<void> _delete() async {
     if (_busy) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('이 지출을 삭제할까요?'),
-        content: Text(widget.expense!.place),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('삭제', style: TextStyle(color: AppColors.danger)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      await tripStore.deleteExpense(widget.trip.id, widget.expense!.id);
-      if (mounted) Navigator.of(context).pop();
+      final deleted = await deleteExpenseWithConfirmation(
+        context,
+        widget.trip,
+        widget.expense!,
+      );
+      if (deleted && mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) setState(() => _error = '삭제하지 못했어요. 기록은 그대로 유지됩니다.');
     } finally {
@@ -208,7 +212,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     animation: RateApi.changes,
     builder: (context, _) {
       final trip = widget.trip;
-      final available = RateApi.quotedKrw(trip.country.currency) > 0;
+      final available = RateApi.quotedKrw(_currency.currency) > 0;
+      final imported = widget.expense?.isImported ?? false;
       final amount = parseAmount(_amount.text);
       return Scaffold(
         body: SafeArea(
@@ -244,11 +249,38 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        if (imported) ...[
+                          const Text(
+                            '자동 기록의 금액·통화·사용처·일시는 바꿀 수 없어요. 분류·면세·메모는 수정할 수 있어요.',
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        DropdownButtonFormField<String>(
+                          key: const ValueKey('expense-currency'),
+                          initialValue: _currency.currency,
+                          isExpanded: true,
+                          decoration: _decoration('결제 통화'),
+                          items: [
+                            for (final c in kExpenseCurrencies)
+                              DropdownMenuItem(
+                                value: c.currency,
+                                child: Text(
+                                  '${c.flag} ${c.currency} · ${c.unitLabel}',
+                                ),
+                              ),
+                          ],
+                          onChanged: _busy || imported
+                              ? null
+                              : (code) => setState(() {
+                                  _currency = countryByCode(code!)!;
+                                }),
+                        ),
+                        const SizedBox(height: 16),
                         TextFormField(
                           key: const ValueKey('expense-amount'),
                           controller: _amount,
                           autovalidateMode: AutovalidateMode.onUserInteraction,
-                          enabled: !_busy,
+                          enabled: !_busy && !imported,
                           keyboardType: TextInputType.number,
                           inputFormatters: [
                             TextInputFormatter.withFunction(
@@ -263,15 +295,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
                           ),
-                          decoration:
-                              _decoration(
-                                '금액 (${trip.country.currency})',
-                              ).copyWith(
-                                prefixText: '${trip.country.symbol} ',
+                          decoration: _decoration('금액 (${_currency.currency})')
+                              .copyWith(
+                                prefixText: '${_currency.symbol} ',
                                 hintText: '0',
                               ),
                           onChanged: (_) => setState(() {}),
                           validator: (value) {
+                            if (imported) return null;
                             final parsed = parseAmount(value ?? '');
                             return parsed.isFinite && parsed.truncate() > 0
                                 ? null
@@ -290,7 +321,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                             children: [
                               Text(
                                 available
-                                    ? '원화 환산 ${formatWon(RateApi.toKrw(amount, trip.country.currency))}'
+                                    ? '원화 환산 ${formatWon(RateApi.toKrw(amount, _currency.currency))}'
                                     : '환율을 불러오면 기록할 수 있어요',
                                 style: const TextStyle(
                                   fontSize: 16,
@@ -300,7 +331,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${currentRateLabel(trip.country)} · 소수점은 버려요',
+                                '${currentRateLabel(_currency)} · 소수점은 버려요',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textSecondary,
@@ -314,7 +345,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                           key: const ValueKey('expense-place'),
                           controller: _place,
                           autovalidateMode: AutovalidateMode.onUserInteraction,
-                          enabled: !_busy,
+                          enabled: !_busy && !imported,
                           maxLength: 50,
                           textInputAction: TextInputAction.done,
                           decoration: _decoration(
@@ -346,7 +377,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                                     ChoiceChip(
                                       label: Text(method.label),
                                       selected: field.value == method,
-                                      onSelected: _busy
+                                      onSelected: _busy || imported
                                           ? null
                                           : (_) {
                                               field.didChange(method);
@@ -412,7 +443,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                           runSpacing: 8,
                           children: [
                             OutlinedButton.icon(
-                              onPressed: _busy ? null : _pickDate,
+                              onPressed: _busy || imported ? null : _pickDate,
                               icon: const Icon(
                                 Icons.calendar_today_outlined,
                                 size: 18,
@@ -420,7 +451,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                               label: Text(formatDate(_date)),
                             ),
                             OutlinedButton.icon(
-                              onPressed: _busy ? null : _pickTime,
+                              onPressed: _busy || imported ? null : _pickTime,
                               icon: const Icon(
                                 Icons.schedule_rounded,
                                 size: 18,
@@ -430,6 +461,15 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 24),
+                        TextFormField(
+                          key: const ValueKey('expense-memo'),
+                          controller: _memo,
+                          enabled: !_busy,
+                          maxLength: 300,
+                          maxLines: 3,
+                          decoration: _decoration('메모 (선택)'),
                         ),
                       ],
                     ),
@@ -478,4 +518,35 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       );
     },
   );
+}
+
+Future<bool> deleteExpenseWithConfirmation(
+  BuildContext context,
+  Trip trip,
+  Expense expense,
+) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('이 지출을 삭제할까요?'),
+      content: Text(
+        expense.isImported
+            ? '${expense.place}\n장부에서 숨기며 실제 카드 결제를 취소하지는 않아요.'
+            : expense.place,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('취소'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('삭제', style: TextStyle(color: AppColors.danger)),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return false;
+  await tripStore.deleteExpense(trip.id, expense.id);
+  return true;
 }

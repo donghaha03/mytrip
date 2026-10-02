@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../api/api.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
 import 'trip_repository.dart';
@@ -29,6 +30,8 @@ class TripStore extends ChangeNotifier {
   /// Firestore 에서 첫 스냅샷을 기다리는 중. 이때 빈 화면(00)을 띄우면
   /// 여행이 있는 사용자한테도 "아직 떠날 준비가..." 가 번쩍 보인다.
   bool get isLoading => _loading;
+  bool get isRemote => _repo != null;
+  final Set<String> _hiddenImported = {};
 
   Trip? byId(String id) {
     for (final t in _trips) {
@@ -86,7 +89,14 @@ class TripStore extends ChangeNotifier {
     if (expense.id.isEmpty ||
         expense.place.trim().isEmpty ||
         !expense.amount.isFinite ||
-        expense.amount.truncate() <= 0) {
+        expense.amount < 0 ||
+        (expense.status.countsAsSpending &&
+            (expense.isImported
+                ? expense.amount <= 0
+                : expense.amount.truncate() <= 0)) ||
+        expense.memo.length > 300 ||
+        (expense.currency != null &&
+            countryByCode(expense.currency!) == null)) {
       throw ArgumentError('사용처와 금액을 확인해주세요');
     }
     final repo = _repo;
@@ -111,8 +121,53 @@ class TripStore extends ChangeNotifier {
     if (!identical(byId(tripId), trip) || !identical(repo, _repo)) {
       throw StateError('여행 정보가 변경됐어요');
     }
+    if (trip.expenses.any((e) => e.id == expenseId && e.isImported)) {
+      _hiddenImported.add('$tripId/$expenseId');
+    }
     trip.expenses.removeWhere((e) => e.id == expenseId);
     notifyListeners();
+  }
+
+  /// 테스트 승인 이벤트도 일반 장부 저장 경로를 쓴다. 실계좌와 섞지 않는다.
+  Future<void> applyDemoCardEvent(String tripId, Expense event) async {
+    if (isRemote || event.source != 'demo-card') {
+      throw StateError('테스트 결제는 임시 모드에서만 가능해요');
+    }
+    if (_hiddenImported.contains('$tripId/${event.id}')) return;
+    final trip = byId(tripId);
+    if (trip == null) throw StateError('여행을 찾을 수 없어요');
+    final old = trip.expenses.where((e) => e.id == event.id).firstOrNull;
+    if (old?.status == ExpenseStatus.cancelled &&
+        event.status.countsAsSpending) {
+      return;
+    }
+    if (old?.status == ExpenseStatus.partiallyCancelled &&
+        event.status == ExpenseStatus.approved) {
+      return;
+    }
+    await saveExpense(
+      tripId,
+      Expense(
+        id: event.id,
+        icon: old?.icon ?? event.icon,
+        place: event.place,
+        amount: event.amount,
+        date: event.date,
+        category: old?.category ?? event.category,
+        paymentMethod: PaymentMethod.card,
+        isTaxFree: old?.isTaxFree ?? false,
+        currency: event.currency,
+        memo: old?.memo ?? event.memo,
+        recordedQuote:
+            old?.recordedQuote ??
+            (RateApi.quotedKrw(event.currencyOf(trip)) > 0
+                ? RateApi.quotedKrw(event.currencyOf(trip))
+                : null),
+        source: event.source,
+        status: event.status,
+        originalAmount: event.originalAmount ?? event.amount,
+      ),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -128,6 +183,7 @@ class TripStore extends ChangeNotifier {
     }
     _expenseSubs.clear();
     _trips.clear();
+    _hiddenImported.clear();
 
     _repo = repo;
     _loading = repo != null;
