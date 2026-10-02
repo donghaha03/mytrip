@@ -203,6 +203,7 @@ void main() {
     await tester.tap(find.text(original.place));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('2026.10.01'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('2026.10.01'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('4'));
