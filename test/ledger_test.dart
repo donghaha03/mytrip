@@ -178,6 +178,7 @@ void main() {
     final original = trip.expenses.first;
     await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
     await tester.ensureVisible(find.text('상점1'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('상점1'));
     await tester.pumpAndSettle();
     expect(find.text('지출 수정'), findsOneWidget);
@@ -205,6 +206,7 @@ void main() {
     expect(updated.isTaxFree, isTrue);
     expect(trip.spentKrw, 43116);
     await tester.ensureVisible(find.text('수정한 상점'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('수정한 상점'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('카드'));
@@ -287,6 +289,7 @@ void main() {
     final original = trip.expenses.first;
     await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
     await tester.ensureVisible(find.text(original.place));
+    await tester.pumpAndSettle();
     await tester.tap(find.text(original.place));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('2026.10.01'));
