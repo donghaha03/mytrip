@@ -9,12 +9,25 @@ import '../widgets/expense_tile.dart';
 import '../widgets/quick_converter.dart';
 import '../widgets/rate_info_tooltip.dart';
 import '../widgets/screen_top_bar.dart';
+import 'card_connection_screen.dart';
+import 'expense_detail_screen.dart';
 import 'expense_form_screen.dart';
+import 'rates_screen.dart';
 
-class LedgerScreen extends StatelessWidget {
+class LedgerScreen extends StatefulWidget {
   const LedgerScreen({super.key, required this.trip});
 
   final Trip trip;
+
+  @override
+  State<LedgerScreen> createState() => _LedgerScreenState();
+}
+
+class _LedgerScreenState extends State<LedgerScreen> {
+  String? _payment;
+  bool _categories = false;
+  bool _byAmount = false;
+  Trip get trip => widget.trip;
 
   void _edit(BuildContext context, [Expense? expense]) {
     Navigator.of(context).push(
@@ -28,12 +41,43 @@ class LedgerScreen extends StatelessWidget {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: Listenable.merge([tripStore, RateApi.changes]),
     builder: (context, _) {
-      final available = RateApi.quotedKrw(trip.country.currency) > 0;
-      final groups = <DateTime, List<Expense>>{};
-      for (final e in trip.expensesNewestFirst) {
-        final day = DateTime(e.date.year, e.date.month, e.date.day);
-        (groups[day] ??= []).add(e);
+      final available =
+          RateApi.quotedKrw(trip.country.currency) > 0 &&
+          trip.ratesAvailable(trip.expenses);
+      final entries = trip.expensesNewestFirst
+          .where(
+            (e) =>
+                _payment == null ||
+                (e.paymentMethod?.name ?? 'unknown') == _payment,
+          )
+          .toList();
+      if (_categories && _byAmount) {
+        entries.sort((a, b) {
+          final amount = b.krwOf(trip).compareTo(a.krwOf(trip));
+          return amount == 0 ? b.date.compareTo(a.date) : amount;
+        });
       }
+      final groups = <Object, List<Expense>>{};
+      for (final e in entries) {
+        final Object key = _categories
+            ? (e.category == '숙소' ? '숙박' : e.category)
+            : DateTime(e.date.year, e.date.month, e.date.day);
+        (groups[key] ??= []).add(e);
+      }
+      final orderedGroups = groups.entries.toList();
+      if (_categories && _byAmount) {
+        orderedGroups.sort(
+          (a, b) =>
+              trip.spentKrwOf(b.value).compareTo(trip.spentKrwOf(a.value)),
+        );
+      }
+      final now = DateTime.now();
+      final today = trip.expenses.where(
+        (e) =>
+            e.date.year == now.year &&
+            e.date.month == now.month &&
+            e.date.day == now.day,
+      );
       return Scaffold(
         body: SafeArea(
           bottom: false,
@@ -60,11 +104,16 @@ class LedgerScreen extends StatelessWidget {
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
-                        Text(
-                          currentRateLabel(trip.country),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+                        TextButton(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  RatesScreen(country: trip.country),
+                            ),
+                          ),
+                          child: Text(
+                            currentRateLabel(trip.country),
+                            style: const TextStyle(fontSize: 12),
                           ),
                         ),
                         RateInfoButton(currency: trip.country.currency),
@@ -118,6 +167,16 @@ class LedgerScreen extends StatelessWidget {
                                     ? formatWon(trip.remainKrw.abs())
                                     : '환율 없음',
                               ),
+                              _Figure(
+                                label: '오늘 지출',
+                                value: available
+                                    ? formatWon(trip.spentKrwOf(today))
+                                    : '환율 없음',
+                              ),
+                              _Figure(
+                                label: '여행 일정',
+                                value: trip.dayLabel(now),
+                              ),
                             ],
                           ),
                         ],
@@ -153,21 +212,97 @@ class LedgerScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        ChoiceChip(
+                          key: const ValueKey('ledger-payment-all'),
+                          label: Text('전체 ${trip.expenses.length}'),
+                          selected: _payment == null,
+                          onSelected: (_) => setState(() => _payment = null),
+                        ),
+                        for (final method in PaymentMethod.values)
+                          ChoiceChip(
+                            key: ValueKey('ledger-payment-${method.name}'),
+                            label: Text(
+                              '${method.label} ${trip.expenses.where((e) => e.paymentMethod == method).length}',
+                            ),
+                            selected: _payment == method.name,
+                            onSelected: (_) =>
+                                setState(() => _payment = method.name),
+                          ),
+                        if (trip.expenses.any((e) => e.paymentMethod == null))
+                          ChoiceChip(
+                            label: const Text('미지정'),
+                            selected: _payment == 'unknown',
+                            onSelected: (_) =>
+                                setState(() => _payment = 'unknown'),
+                          ),
+                      ],
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => CardConnectionScreen(trip: trip),
+                          ),
+                        ),
+                        icon: const Icon(Icons.credit_card_rounded, size: 18),
+                        label: const Text('카드 연동'),
+                      ),
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('날짜별'),
+                          selected: !_categories,
+                          onSelected: (_) =>
+                              setState(() => _categories = false),
+                        ),
+                        ChoiceChip(
+                          label: const Text('카테고리별'),
+                          selected: _categories,
+                          onSelected: (_) => setState(() => _categories = true),
+                        ),
+                        if (_categories) ...[
+                          ChoiceChip(
+                            label: const Text('금액순'),
+                            selected: _byAmount,
+                            onSelected: (_) => setState(() => _byAmount = true),
+                          ),
+                          ChoiceChip(
+                            label: const Text('날짜순'),
+                            selected: !_byAmount,
+                            onSelected: (_) =>
+                                setState(() => _byAmount = false),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     if (groups.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 48),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
                         child: Column(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.receipt_long_outlined,
                               size: 44,
                               color: AppColors.textTertiary,
                             ),
-                            SizedBox(height: 12),
-                            Text('아직 기록한 지출이 없어요'),
-                            SizedBox(height: 6),
+                            const SizedBox(height: 12),
                             Text(
-                              '첫 지출을 기록해보세요',
+                              trip.expenses.isEmpty
+                                  ? '아직 기록한 지출이 없어요'
+                                  : '이 결제수단으로 기록한 지출이 없어요',
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              '아래에서 지출을 기록할 수 있어요',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: AppColors.textSecondary,
@@ -176,12 +311,16 @@ class LedgerScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                    for (final group in groups.entries) ...[
+                    for (final group in orderedGroups) ...[
                       Row(
                         children: [
                           Expanded(
                             child: Text(
-                              formatShortDateWithWeekday(group.key),
+                              _categories
+                                  ? '${expenseCategoryIcons[group.key] ?? '💸'} ${group.key} · ${group.value.length}건'
+                                  : formatShortDateWithWeekday(
+                                      group.key as DateTime,
+                                    ),
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                               ),
@@ -220,8 +359,15 @@ class LedgerScreen extends StatelessWidget {
                               ExpenseTile(
                                 trip: trip,
                                 expense: group.value[i],
-                                showDate: false,
-                                onTap: () => _edit(context, group.value[i]),
+                                showDate: _categories,
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => ExpenseDetailScreen(
+                                      trip: trip,
+                                      expenseId: group.value[i].id,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ],
                           ],

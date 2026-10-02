@@ -2,6 +2,13 @@ import '../theme/app_theme.dart';
 
 const kWonSymbol = '₩';
 
+const kKrwCountry = Country(
+  flag: '🇰🇷', name: '대한민국', currency: 'KRW', symbol: kWonSymbol,
+  unitLabel: '원', unitAmount: 1, krwPerUnit: 1,
+);
+
+const kExpenseCurrencies = [kKrwCountry, ...kPrimaryCountries, ...kMoreCountries];
+
 /// 여행 국가·통화 표시 정보. 실제 환산은 공통 RateApi만 사용한다.
 class Country {
   const Country({
@@ -29,6 +36,7 @@ class Country {
 
 /// 통화 코드("JPY") -> Country. Firestore 에는 코드만 저장한다.
 Country? countryByCode(String code) {
+  if (code == 'KRW') return kKrwCountry;
   for (final c in kPrimaryCountries) {
     if (c.currency == code) return c;
   }

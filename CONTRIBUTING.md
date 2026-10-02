@@ -20,6 +20,7 @@ flutter build web --release --no-wasm-dry-run --base-href /mytrip/
 - `lib/api/`: 환율 조회와 정수 환산
 - `tool/update_rates.mjs`: 서버 환율 수집과 검증
 - `test/`: 화면·계산·환율·Firebase 모의 테스트
+- `server/card/`: 인증된 사용자용 카드 승인내역 조회 서버와 테스트
 
 기본 실행은 메모리 데이터로 동작합니다. Firebase 모드는
 `--dart-define=LOCAL_MODE=false`로 실행하며 인증된 사용자에게만 원격 저장을 연결합니다.
@@ -53,8 +54,16 @@ flutter build web --release --no-wasm-dry-run --base-href /mytrip/
 개인 저장 계층을 중복 연결하거나 팀의 `main.dart`·API·Firebase 설정·보안 규칙을 덮어쓰지 않습니다.
 정수 환산과 과거 지출 처리 정책은 API 담당자와 먼저 맞춥니다.
 `paymentMethod`(현금·카드)와 `isTaxFree`(면세 표시)는 개인 추가 필드이므로 팀 API에 합칠 때 함께 조율합니다. `amount`는 면세 처리 후 실제 결제액입니다.
+통화·메모·기록 당시 환율·자동 기록 출처·취소 상태 필드도 팀 모델과 조율합니다. 기존 필드가 없는 문서는 여행 통화와 정상 지출로 읽습니다.
 
 장부 연결은 `screens/ledger_entry.dart`, 계정·설정 연결은 `screens/more_screen.dart`에서 담당합니다.
+
+## 카드 연동
+
+공개 앱의 테스트 카드는 실제 API·실카드와 연결되지 않은 로컬 이벤트입니다.
+실제 연결용 서버의 권한·제공자 설정·실행 안내는 [카드 서버](server/card/README.md)를 참고하세요.
+서버는 여행의 기존 `records` 경로에 저장하며 앱은 Firestore 구독으로 갱신합니다.
+카드 기록의 삭제는 숨김 처리이며 실제 결제를 취소하지 않습니다.
 
 ## 환율 운영
 

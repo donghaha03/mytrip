@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api.dart';
+import '../models/country.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -23,6 +24,8 @@ class ExpenseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final e = expense;
+    final currency = e.currencyOf(trip);
+    final amount = e.status.countsAsSpending ? e.amount : 0;
     final time =
         '${e.date.hour.toString().padLeft(2, '0')}:'
         '${e.date.minute.toString().padLeft(2, '0')}';
@@ -60,7 +63,13 @@ class ExpenseTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${e.paymentMethod?.label ?? '결제수단 미지정'}${e.isTaxFree ? ' · 면세' : ''}',
+                      '${e.paymentMethod?.label ?? '결제수단 미지정'}${e.isTaxFree ? ' · 면세' : ''}'
+                      '${e.source == 'demo-card'
+                          ? ' · 테스트'
+                          : e.isImported
+                          ? ' · 자동'
+                          : ''}'
+                      '${e.status != ExpenseStatus.approved ? ' · ${e.status.label}' : ''}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -77,10 +86,9 @@ class ExpenseTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      RateApi.quotedKrw(trip.country.currency) > 0
-                          ? formatWon(
-                              RateApi.toKrw(e.amount, trip.country.currency),
-                            )
+                      !e.status.countsAsSpending ||
+                              RateApi.quotedKrw(currency) > 0
+                          ? formatWon(e.krwOf(trip))
                           : '환율 없음',
                       textAlign: TextAlign.end,
                       style: const TextStyle(
@@ -90,7 +98,7 @@ class ExpenseTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      trip.country.formatForeign(e.amount),
+                      '${countryByCode(currency)?.formatForeign(amount) ?? formatNumber(amount.truncate())} $currency',
                       textAlign: TextAlign.end,
                       style: const TextStyle(
                         fontSize: 11,

@@ -18,6 +18,17 @@ enum PaymentMethod {
   final String label;
 }
 
+enum ExpenseStatus {
+  approved('승인'),
+  partiallyCancelled('부분 취소'),
+  cancelled('취소'),
+  declined('거절');
+
+  const ExpenseStatus(this.label);
+  final String label;
+  bool get countsAsSpending => this == approved || this == partiallyCancelled;
+}
+
 class Expense {
   Expense({
     required this.id,
@@ -28,6 +39,12 @@ class Expense {
     this.category = '기타',
     this.paymentMethod,
     this.isTaxFree = false,
+    this.currency,
+    this.memo = '',
+    this.recordedQuote,
+    this.source,
+    this.status = ExpenseStatus.approved,
+    this.originalAmount,
   });
 
   final String id;
@@ -38,6 +55,17 @@ class Expense {
   final String category;
   final PaymentMethod? paymentMethod; // 기존 기록은 미지정으로 유지한다.
   final bool isTaxFree;
+  final String? currency; // 이전 기록은 여행 통화를 따른다.
+  final String memo;
+  final int? recordedQuote; // 기록 당시 표시 환율. 합계는 현재 환율로 계산한다.
+  final String? source; // demo-card / codef. 직접 입력한 기록은 null.
+  final ExpenseStatus status;
+  final double? originalAmount;
+
+  bool get isImported => source != null;
+  String currencyOf(Trip trip) => currency ?? trip.country.currency;
+  int krwOf(Trip trip) =>
+      status.countsAsSpending ? RateApi.toKrw(amount, currencyOf(trip)) : 0;
 }
 
 class Trip {
@@ -66,14 +94,16 @@ class Trip {
     return endOfTrip.isBefore(DateTime(today.year, today.month, today.day));
   }
 
-  int get spentForeign =>
-      expenses.fold<int>(0, (sum, e) => sum + e.amount.truncate());
+  int get spentForeign => RateApi.fromKrw(spentKrw, country.currency);
+
+  bool ratesAvailable(Iterable<Expense> entries) => entries.every(
+    (e) =>
+        !e.status.countsAsSpending || RateApi.quotedKrw(e.currencyOf(this)) > 0,
+  );
 
   /// 항목별 정수 환산액을 더한다. 목록·날짜별 합계·홈이 같은 값을 쓴다.
-  int spentKrwOf(Iterable<Expense> entries) => entries.fold<int>(
-    0,
-    (sum, e) => sum + RateApi.toKrw(e.amount, country.currency),
-  );
+  int spentKrwOf(Iterable<Expense> entries) =>
+      entries.fold<int>(0, (sum, e) => sum + e.krwOf(this));
 
   int get spentKrw => spentKrwOf(expenses);
 
@@ -103,8 +133,24 @@ class Trip {
 
   /// 최근 기록이 위로 오도록 정렬된 지출 목록
   List<Expense> get expensesNewestFirst {
-    final sorted = [...expenses]..sort((a, b) => b.date.compareTo(a.date));
+    final sorted = [...expenses]
+      ..sort((a, b) {
+        final date = b.date.compareTo(a.date);
+        return date == 0 ? a.id.compareTo(b.id) : date;
+      });
     return sorted;
+  }
+
+  String dayLabel(DateTime at) {
+    DateTime day(DateTime d) => DateTime.utc(d.year, d.month, d.day);
+    final today = day(at);
+    if (today.isAfter(day(end))) return '여행 완료';
+    final days = today.difference(day(start)).inDays;
+    return days < 0
+        ? 'D${days.toString()}'
+        : days == 0
+        ? 'D-day'
+        : 'D+$days';
   }
 
   String get dateRangeLabel {

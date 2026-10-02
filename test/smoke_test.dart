@@ -446,7 +446,7 @@ void main() {
     expect(find.text('돈키호테'), findsOneWidget);
     expect(find.text('신주쿠 호텔'), findsNothing);
     expect(find.text('11,400원'), findsWidgets); // ¥1,200
-    expect(find.text('¥1,200'), findsOneWidget);
+    expect(find.text('¥1,200 JPY'), findsOneWidget);
 
     await tester.tap(find.text('전체 보기'));
     await tester.pumpAndSettle();

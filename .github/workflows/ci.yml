@@ -16,6 +16,16 @@ jobs:
       - uses: actions/checkout@v4
       - run: node tool/update_rates.mjs --check
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: server/card
+      - run: npm test
+        working-directory: server/card
+      - run: npm audit --omit=dev --audit-level=moderate
+        working-directory: server/card
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.47.5
@@ -31,3 +41,9 @@ jobs:
 
       # 웹 빌드까지 되는지 확인 (배포가 웹이라서)
       - run: flutter build web --release --no-wasm-dry-run
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-preview
+          path: build/web
+          retention-days: 3

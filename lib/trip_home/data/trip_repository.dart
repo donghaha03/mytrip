@@ -50,7 +50,12 @@ class FirestoreTripRepository implements TripRepository {
   Stream<List<Expense>> watchExpenses(String tripId) => _records(tripId)
       .orderBy('date', descending: true)
       .snapshots()
-      .map((s) => s.docs.map(_expenseFrom).toList());
+      .map(
+        (s) => s.docs
+            .where((d) => d.data()['hidden'] != true)
+            .map(_expenseFrom)
+            .toList(),
+      );
 
   @override
   Future<void> saveTrip(Trip t) => _trips.doc(t.id).set({
@@ -98,11 +103,24 @@ class FirestoreTripRepository implements TripRepository {
         'paymentMethod': e.paymentMethod?.name,
         'isTaxFree': e.isTaxFree,
         'date': Timestamp.fromDate(e.date),
-      });
+        'currency': e.currency,
+        'memo': e.memo,
+        'recordedQuote': e.recordedQuote,
+        'source': e.source,
+        'status': e.status.name,
+        'originalAmount': e.originalAmount,
+      }, SetOptions(merge: true));
 
   @override
-  Future<void> deleteExpense(String tripId, String expenseId) =>
-      _records(tripId).doc(expenseId).delete();
+  Future<void> deleteExpense(String tripId, String expenseId) async {
+    final ref = _records(tripId).doc(expenseId);
+    final record = await ref.get();
+    if (record.data()?['source'] != null) {
+      await ref.set({'hidden': true}, SetOptions(merge: true));
+    } else {
+      await ref.delete();
+    }
+  }
 
   /// 통화 코드를 모르는 문서(앱에서 국가를 뺀 경우 등)는 건너뛴다.
   static Trip? _tripFrom(QueryDocumentSnapshot<Map<String, dynamic>> d) {
@@ -133,6 +151,16 @@ class FirestoreTripRepository implements TripRepository {
           .firstOrNull,
       isTaxFree: m['isTaxFree'] == true,
       date: (m['date'] as Timestamp).toDate(),
+      currency: m['currency'] as String?,
+      memo: m['memo'] as String? ?? '',
+      recordedQuote: (m['recordedQuote'] as num?)?.toInt(),
+      source: m['source'] as String?,
+      status:
+          ExpenseStatus.values
+              .where((s) => s.name == m['status'])
+              .firstOrNull ??
+          ExpenseStatus.approved,
+      originalAmount: (m['originalAmount'] as num?)?.toDouble(),
     );
   }
 }
