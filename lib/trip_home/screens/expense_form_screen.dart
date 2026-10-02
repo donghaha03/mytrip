@@ -210,7 +210,19 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ScreenTopBar(title: widget.expense == null ? '지출 기록' : '지출 수정'),
+              ScreenTopBar(
+                title: widget.expense == null ? '지출 기록' : '지출 수정',
+                trailing: widget.expense == null
+                    ? null
+                    : IconButton(
+                        tooltip: '지출 삭제',
+                        onPressed: _busy ? null : _delete,
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: AppColors.danger,
+                        ),
+                      ),
+              ),
               Expanded(
                 child: Form(
                   key: _form,
@@ -349,26 +361,6 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                           ),
                         ],
                       ),
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(color: AppColors.danger),
-                          ),
-                        ),
-                      if (widget.expense != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 20),
-                          child: TextButton.icon(
-                            onPressed: _busy ? null : _delete,
-                            icon: const Icon(Icons.delete_outline_rounded),
-                            label: const Text('지출 삭제'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.danger,
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
@@ -380,21 +372,35 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(54),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.danger),
+                    ),
+                  ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(54),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: _busy || !available ? null : _save,
+                  child: Text(
+                    _busy ? '저장 중…' : '저장',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-              ),
-              onPressed: _busy || !available ? null : _save,
-              child: Text(
-                _busy ? '저장 중…' : '저장',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              ],
             ),
           ),
         ),

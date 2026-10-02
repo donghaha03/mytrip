@@ -154,13 +154,12 @@ void main() {
     await tester.ensureVisible(find.text('수정한 상점'));
     await tester.tap(find.text('수정한 상점'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('지출 삭제'));
-    await tester.tap(find.text('지출 삭제'));
+    await tester.tap(find.byTooltip('지출 삭제'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('취소'));
     await tester.pumpAndSettle();
     expect(trip.expenses.length, 3);
-    await tester.tap(find.text('지출 삭제'));
+    await tester.tap(find.byTooltip('지출 삭제'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('삭제'));
     await tester.pumpAndSettle();
@@ -188,6 +187,7 @@ void main() {
     expect(find.text('금액은 1 이상 입력해주세요'), findsOneWidget);
     expect(trip.expenses.length, 3);
     RateApi.reset();
+    RateApi.changes.value++;
     await tester.pump();
     final save = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, '저장'),
