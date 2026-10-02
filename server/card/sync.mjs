@@ -74,6 +74,7 @@ export function mergeApproval(old, next) {
   if (old?.source && old.source !== 'codef') throw new Error('기록 출처 불일치');
   if (old?.status === 'cancelled' && next.status !== 'cancelled') return old;
   if (old?.status === 'partiallyCancelled' && next.status === 'approved') return old;
+  if (old?.status === 'partiallyCancelled' && next.status === 'partiallyCancelled' && next.amount > old.amount) return old;
   // 사용자가 정한 분류·메모·면세와 숨김 상태를 보존한다.
   return { ...old, ...next, category: old?.category ?? '기타', memo: old?.memo ?? '',
     isTaxFree: old?.isTaxFree ?? false, hidden: old?.hidden ?? false };

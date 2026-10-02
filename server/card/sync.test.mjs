@@ -35,6 +35,7 @@ test('전체·부분 취소·거절과 사용자 분류·숨김을 보존한다'
   assert.equal(merged.memo, '선물'); assert.equal(merged.isTaxFree, true); assert.equal(merged.hidden, true);
   assert.equal(mergeApproval(cancelled, approved).status, 'cancelled');
   assert.equal(mergeApproval(partial, approved).amount, 500);
+  assert.equal(mergeApproval(partial, { ...partial, amount: 750 }).amount, 500);
   assert.equal(parseApprovals(success([row, { ...row, resCancelYN: '1' }, row]), '0301').records[0].status, 'cancelled');
 });
 

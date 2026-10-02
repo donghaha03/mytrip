@@ -661,4 +661,37 @@ void main() {
     );
     failed.close();
   });
+
+  testWidgets('자동 기록의 메모 수정은 원금·취소 상태·알 수 없는 과거 환율을 보존한다', (tester) async {
+    final imported = Expense(
+      id: 'fractional',
+      icon: '💳',
+      place: '자동 결제',
+      amount: 12.75,
+      originalAmount: 25.50,
+      status: ExpenseStatus.partiallyCancelled,
+      currency: 'USD',
+      source: 'demo-card',
+      paymentMethod: PaymentMethod.card,
+      date: DateTime(2026, 10, 1),
+    );
+    trip.expenses.add(imported);
+    await tester.pumpWidget(
+      _wrap(ExpenseFormScreen(trip: trip, expense: imported)),
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('expense-memo')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-memo')),
+      '메모만 변경',
+    );
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+    final saved = trip.expenses.last;
+    expect(saved.amount, 12.75);
+    expect(saved.originalAmount, 25.50);
+    expect(saved.status, ExpenseStatus.partiallyCancelled);
+    expect(saved.recordedQuote, isNull);
+    expect(saved.memo, '메모만 변경');
+  });
 }

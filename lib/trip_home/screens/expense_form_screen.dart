@@ -157,10 +157,10 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           currency: _currency.currency,
           memo: _memo.text.trim(),
           recordedQuote:
-              widget.expense?.currencyOf(widget.trip) == _currency.currency
-              ? widget.expense?.recordedQuote ??
-                    RateApi.quotedKrw(_currency.currency)
-              : RateApi.quotedKrw(_currency.currency),
+              widget.expense == null ||
+                  widget.expense!.currencyOf(widget.trip) != _currency.currency
+              ? RateApi.quotedKrw(_currency.currency)
+              : widget.expense!.recordedQuote,
           source: widget.expense?.source,
           status: widget.expense?.status ?? ExpenseStatus.approved,
           originalAmount: widget.expense?.originalAmount,
