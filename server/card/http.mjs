@@ -18,7 +18,7 @@ export function createHandler({ verifyToken, synchronize, allowedOrigin }) {
     const token = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '')?.[1];
     let uid;
     try { uid = token ? (await verifyToken(token)).uid : null; } catch { /* 인증정보는 로그에 남기지 않는다. */ }
-    if (!uid) { res.writeHead(401).end(); return; }
+    if (typeof uid !== 'string' || !/^[A-Za-z0-9:_-]{1,128}$/.test(uid)) { res.writeHead(401).end(); return; }
     try {
       let text = '';
       for await (const chunk of req) {

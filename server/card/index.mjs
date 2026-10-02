@@ -5,7 +5,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { createCodefClient } from './provider.mjs';
 import { createHandler } from './http.mjs';
-import { kstDate, mergeApproval, parseApprovals, validateTripId } from './sync.mjs';
+import { kstDate, mergeApproval, mayDuplicateManual, parseApprovals, validateTripId } from './sync.mjs';
 
 const projectId = process.env.GOOGLE_CLOUD_PROJECT;
 if (projectId !== 'mytrip-fddfb') throw new Error('mytrip-fddfb 프로젝트만 사용할 수 있습니다');
@@ -54,6 +54,7 @@ async function synchronize(uid, requestedTripId) {
       cardNo: link.cardNo, cardName: link.cardName ?? '', duplicateCardIdx: link.duplicateCardIdx ?? '1',
     });
     const parsed = parseApprovals(response, link.organization);
+    const existing = (await tripRef.collection('records').get()).docs.map(doc => doc.data());
     let skipped = parsed.skipped;
     let received = 0;
     for (const record of parsed.records) {
@@ -63,6 +64,8 @@ async function synchronize(uid, requestedTripId) {
         const currentTrip = await tx.get(tripRef);
         if (!currentTrip.exists || !currentLink?.enabled || currentLink.lockKey !== lease || currentLink.connectedId !== link.connectedId || currentLink.tripId !== tripId) throw failure(409);
         const old = (await tx.get(ref)).data();
+        // ponytail: 금액·통화·10분 이내 수동 카드 기록은 검토 보류. 운영 시 명시적인 원거래 매칭 UI로 확장한다.
+        if (!old && mayDuplicateManual(record, existing, trip.currency)) return false;
         // 취소와 원거래의 매칭이 불명확하면 지출 합계를 임의로 바꾸지 않는다.
         if (!old && ['cancelled', 'partiallyCancelled'].includes(record.status)) return false;
         const merged = mergeApproval(old, { ...record, date: Timestamp.fromDate(record.date) });

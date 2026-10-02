@@ -79,6 +79,13 @@ export function mergeApproval(old, next) {
     isTaxFree: old?.isTaxFree ?? false, hidden: old?.hidden ?? false };
 }
 
+export function mayDuplicateManual(record, existing, tripCurrency) {
+  return existing.some(old => !old.source && old.paymentMethod === 'card' &&
+    (old.currency ?? tripCurrency) === record.currency &&
+    Math.trunc(old.amount) === Math.trunc(record.originalAmount) &&
+    Math.abs((old.date?.toDate?.() ?? old.date)?.getTime?.() - record.date.getTime()) <= 10 * 60000);
+}
+
 export function validateTripId(value) {
   if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value)) throw new Error('여행 ID 확인 필요');
   return value;

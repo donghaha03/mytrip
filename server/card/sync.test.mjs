@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createHandler } from './http.mjs';
 import { createCodefClient } from './provider.mjs';
-import { normalizeApproval, parseApprovals, mergeApproval, validateTripId, kstDate } from './sync.mjs';
+import { normalizeApproval, parseApprovals, mergeApproval, mayDuplicateManual, validateTripId, kstDate } from './sync.mjs';
 
 const row = {
   resUsedDate: '20261003', resUsedTime: '123456', resCardNo: '1234********5678',
@@ -51,6 +51,15 @@ test('모호한 해외 통화·승인번호·부분 취소·잘못된 날짜는 
   assert.throws(() => parseApprovals({ result: { code: 'CF-ERROR' }, data: [] }, '0301'));
   assert.throws(() => validateTripId('../other-user'));
   assert.equal(kstDate(new Date('2026-10-02T16:00:00Z')), '20261003');
+});
+
+test('수동 카드 기록과 중복 가능성이 있으면 자동 합치지 않고 보류한다', () => {
+  const record = normalizeApproval(row, '0301');
+  const manual = { amount: 1000, paymentMethod: 'card', date: record.date };
+  assert.equal(mayDuplicateManual(record, [manual], 'JPY'), true);
+  assert.equal(mayDuplicateManual(record, [{ ...manual, paymentMethod: 'cash' }], 'JPY'), false);
+  assert.equal(mayDuplicateManual(record, [{ ...manual, currency: 'USD' }], 'JPY'), false);
+  assert.equal(mayDuplicateManual(record, [{ ...manual, date: new Date(record.date.getTime() - 11 * 60000) }], 'JPY'), false);
 });
 
 test('제공자 호출은 토큰 재사용·1회 갱신·URI 인코딩을 지키며 임의 호스트로 보내지 않는다', async () => {
