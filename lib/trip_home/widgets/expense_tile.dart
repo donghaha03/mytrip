@@ -25,6 +25,7 @@ class ExpenseTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final e = expense;
     final currency = e.currencyOf(trip);
+    final amount = e.status.countsAsSpending ? e.amount : 0;
     final time =
         '${e.date.hour.toString().padLeft(2, '0')}:'
         '${e.date.minute.toString().padLeft(2, '0')}';
@@ -97,7 +98,7 @@ class ExpenseTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${countryByCode(currency)?.formatForeign(e.originalAmount ?? e.amount) ?? formatNumber(e.amount.truncate())} $currency',
+                      '${countryByCode(currency)?.formatForeign(amount) ?? formatNumber(amount.truncate())} $currency',
                       textAlign: TextAlign.end,
                       style: const TextStyle(
                         fontSize: 11,

@@ -66,6 +66,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
       final code = e.currencyOf(trip);
       final currency = countryByCode(code);
       final quote = RateApi.quotedKrw(code);
+      final amount = e.status.countsAsSpending ? e.amount : 0;
       return Scaffold(
         body: SafeArea(
           child: Column(
@@ -114,7 +115,7 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                           ),
                           const SizedBox(height: 24),
                           Text(
-                            '${currency?.formatForeign(e.originalAmount ?? e.amount) ?? formatNumber(e.amount.truncate())} $code',
+                            '${currency?.formatForeign(amount) ?? formatNumber(amount.truncate())} $code',
                             style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.w700,
@@ -141,6 +142,11 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                     ),
                     _Info('결제수단', e.paymentMethod?.label ?? '미지정'),
                     _Info('결제 상태', e.status.label),
+                    if (e.originalAmount != null && e.originalAmount != amount)
+                      _Info(
+                        '승인 당시 금액',
+                        '${currency?.formatForeign(e.originalAmount!) ?? formatNumber(e.originalAmount!)} $code',
+                      ),
                     if (e.isImported)
                       _Info(
                         '기록 방식',

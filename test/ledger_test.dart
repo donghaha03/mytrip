@@ -21,6 +21,7 @@ import 'package:tripapp/trip_home/services/card_sync_api.dart';
 import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/theme/app_theme.dart';
 import 'package:tripapp/trip_home/widgets/recent_expenses_card.dart';
+import 'package:tripapp/trip_home/widgets/expense_tile.dart';
 import 'package:tripapp/trip_home/widgets/today_budget_sheet.dart';
 
 Widget _wrap(Widget child) => MaterialApp(theme: buildAppTheme(), home: child);
@@ -563,6 +564,56 @@ void main() {
     expect(find.text('현재 환산 1,000원'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('기념품 메모'), 150);
     expect(find.text('기념품 메모'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('취소 내역의 외화 표시도 현재 환산액과 같은 순결제액을 사용한다', (tester) async {
+    final partial = Expense(
+      id: 'partial',
+      icon: '💳',
+      place: '부분 취소 상점',
+      amount: 500,
+      originalAmount: 1000,
+      status: ExpenseStatus.partiallyCancelled,
+      paymentMethod: PaymentMethod.card,
+      currency: 'JPY',
+    );
+    final cancelled = Expense(
+      id: 'cancelled',
+      icon: '💳',
+      place: '취소 상점',
+      amount: 1000,
+      originalAmount: 1000,
+      status: ExpenseStatus.cancelled,
+      currency: 'JPY',
+    );
+    await tester.pumpWidget(
+      _wrap(
+        Scaffold(
+          body: Column(
+            children: [
+              ExpenseTile(trip: trip, expense: partial),
+              ExpenseTile(trip: trip, expense: cancelled),
+            ],
+          ),
+        ),
+      ),
+    );
+    expect(find.text('¥500 JPY'), findsOneWidget);
+    expect(find.text('4,310원'), findsOneWidget);
+    expect(find.text('¥0 JPY'), findsOneWidget);
+    expect(find.text('0원'), findsOneWidget);
+    expect(find.text('¥1,000 JPY'), findsNothing);
+    trip.expenses.add(partial);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(
+      _wrap(ExpenseDetailScreen(trip: trip, expenseId: partial.id)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('¥500 JPY'), findsWidgets);
+    expect(find.text('현재 환산 4,310원'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('승인 당시 금액'), 150);
+    expect(find.text('¥1,000 JPY'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
