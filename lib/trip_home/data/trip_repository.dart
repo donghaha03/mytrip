@@ -95,6 +95,8 @@ class FirestoreTripRepository implements TripRepository {
         'place': e.place,
         'amount': e.amount,
         'category': e.category,
+        'paymentMethod': e.paymentMethod?.name,
+        'isTaxFree': e.isTaxFree,
         'date': Timestamp.fromDate(e.date),
       });
 
@@ -126,6 +128,10 @@ class FirestoreTripRepository implements TripRepository {
       // 1200.0 을 넣어도 웹에서는 int 로 돌아올 수 있다
       amount: (m['amount'] as num).toDouble(),
       category: m['category'] as String? ?? '기타',
+      paymentMethod: PaymentMethod.values
+          .where((method) => method.name == m['paymentMethod'])
+          .firstOrNull,
+      isTaxFree: m['isTaxFree'] == true,
       date: (m['date'] as Timestamp).toDate(),
     );
   }

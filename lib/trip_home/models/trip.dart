@@ -10,6 +10,14 @@ const expenseCategoryIcons = {
   '기타': '💸',
 };
 
+enum PaymentMethod {
+  cash('현금'),
+  card('카드');
+
+  const PaymentMethod(this.label);
+  final String label;
+}
+
 class Expense {
   Expense({
     required this.id,
@@ -18,14 +26,18 @@ class Expense {
     required this.amount,
     required this.date,
     this.category = '기타',
+    this.paymentMethod,
+    this.isTaxFree = false,
   });
 
   final String id;
   final String icon; // 카테고리 대표 아이콘 (이모지)
   final String place; // 사용처
-  final double amount; // 현지 통화 기준 사용 금액
+  final double amount; // 현지 통화 기준 실제 결제액. 면세 금액을 다시 차감하지 않는다.
   final DateTime date; // 기록 시각 (시스템 시간)
   final String category;
+  final PaymentMethod? paymentMethod; // 기존 기록은 미지정으로 유지한다.
+  final bool isTaxFree;
 }
 
 class Trip {

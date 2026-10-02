@@ -28,6 +28,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   late final TextEditingController _amount;
   late final String _id;
   late String _category;
+  PaymentMethod? _paymentMethod;
+  bool _isTaxFree = false;
   late DateTime _date;
   bool _busy = false;
   String? _error;
@@ -44,6 +46,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     _category = e?.category == '숙소' ? '숙박' : e?.category ?? '식비';
     if (!expenseCategoryIcons.containsKey(_category)) _category = '기타';
     _date = e?.date ?? DateTime.now();
+    _paymentMethod = e?.paymentMethod;
+    _isTaxFree = e?.isTaxFree ?? false;
   }
 
   @override
@@ -140,6 +144,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           amount: parseAmount(_amount.text).truncateToDouble(),
           date: _date,
           category: _category,
+          paymentMethod: _paymentMethod,
+          isTaxFree: _isTaxFree,
         ),
       );
       if (mounted) Navigator.of(context).pop();
@@ -226,144 +232,207 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               Expanded(
                 child: Form(
                   key: _form,
-                  child: ListView(
+                  child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                    children: [
-                      Text(
-                        '${trip.country.flag} ${trip.name}',
-                        style: const TextStyle(color: AppColors.textSecondary),
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        key: const ValueKey('expense-amount'),
-                        controller: _amount,
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
-                        enabled: !_busy,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          TextInputFormatter.withFunction(
-                            (oldValue, newValue) => newValue.text.contains('-')
-                                ? oldValue
-                                : const AmountInputFormatter().formatEditUpdate(
-                                    oldValue,
-                                    newValue,
-                                  ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '${trip.country.flag} ${trip.name}',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
                           ),
-                        ],
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
                         ),
-                        decoration: _decoration('금액 (${trip.country.currency})')
-                            .copyWith(
-                              prefixText: '${trip.country.symbol} ',
-                              hintText: '0',
+                        const SizedBox(height: 20),
+                        TextFormField(
+                          key: const ValueKey('expense-amount'),
+                          controller: _amount,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          enabled: !_busy,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            TextInputFormatter.withFunction(
+                              (oldValue, newValue) =>
+                                  newValue.text.contains('-')
+                                  ? oldValue
+                                  : const AmountInputFormatter()
+                                        .formatEditUpdate(oldValue, newValue),
                             ),
-                        onChanged: (_) => setState(() {}),
-                        validator: (value) {
-                          final parsed = parseAmount(value ?? '');
-                          return parsed.isFinite && parsed.truncate() > 0
-                              ? null
-                              : '금액은 1 이상 입력해주세요';
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: AppColors.primarySoft,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              available
-                                  ? '원화 환산 ${formatWon(RateApi.toKrw(amount, trip.country.currency))}'
-                                  : '환율을 불러오면 기록할 수 있어요',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
+                          ],
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          decoration:
+                              _decoration(
+                                '금액 (${trip.country.currency})',
+                              ).copyWith(
+                                prefixText: '${trip.country.symbol} ',
+                                hintText: '0',
                               ),
+                          onChanged: (_) => setState(() {}),
+                          validator: (value) {
+                            final parsed = parseAmount(value ?? '');
+                            return parsed.isFinite && parsed.truncate() > 0
+                                ? null
+                                : '금액은 1 이상 입력해주세요';
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                available
+                                    ? '원화 환산 ${formatWon(RateApi.toKrw(amount, trip.country.currency))}'
+                                    : '환율을 불러오면 기록할 수 있어요',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${currentRateLabel(trip.country)} · 소수점은 버려요',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        TextFormField(
+                          key: const ValueKey('expense-place'),
+                          controller: _place,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          enabled: !_busy,
+                          maxLength: 50,
+                          textInputAction: TextInputAction.done,
+                          decoration: _decoration(
+                            '사용처',
+                          ).copyWith(hintText: '예: 이치란 라멘'),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? '사용처를 입력해주세요'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '결제수단',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        FormField<PaymentMethod>(
+                          initialValue: _paymentMethod,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
+                          validator: (value) =>
+                              value == null ? '결제수단을 선택해주세요' : null,
+                          builder: (field) => Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  for (final method in PaymentMethod.values)
+                                    ChoiceChip(
+                                      label: Text(method.label),
+                                      selected: field.value == method,
+                                      onSelected: _busy
+                                          ? null
+                                          : (_) {
+                                              field.didChange(method);
+                                              setState(
+                                                () => _paymentMethod = method,
+                                              );
+                                            },
+                                    ),
+                                ],
+                              ),
+                              if (field.hasError)
+                                Text(
+                                  field.errorText!,
+                                  style: const TextStyle(
+                                    color: AppColors.danger,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('면세 적용'),
+                          subtitle: const Text('면세 처리 후 실제 결제액을 입력하세요.'),
+                          value: _isTaxFree,
+                          onChanged: _busy
+                              ? null
+                              : (value) => setState(() => _isTaxFree = value),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          '카테고리',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            for (final category in expenseCategoryIcons.entries)
+                              ChoiceChip(
+                                label: Text(
+                                  '${category.value} ${category.key}',
+                                ),
+                                selected: _category == category.key,
+                                onSelected: _busy
+                                    ? null
+                                    : (_) => setState(
+                                        () => _category = category.key,
+                                      ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          '날짜 · 시각',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _busy ? null : _pickDate,
+                              icon: const Icon(
+                                Icons.calendar_today_outlined,
+                                size: 18,
+                              ),
+                              label: Text(formatDate(_date)),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${currentRateLabel(trip.country)} · 소수점은 버려요',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                            OutlinedButton.icon(
+                              onPressed: _busy ? null : _pickTime,
+                              icon: const Icon(
+                                Icons.schedule_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
+                                '${_date.hour.toString().padLeft(2, '0')}:${_date.minute.toString().padLeft(2, '0')}',
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        key: const ValueKey('expense-place'),
-                        controller: _place,
-                        autovalidateMode: AutovalidateMode.onUserInteraction,
-                        enabled: !_busy,
-                        maxLength: 50,
-                        textInputAction: TextInputAction.done,
-                        decoration: _decoration(
-                          '사용처',
-                        ).copyWith(hintText: '예: 이치란 라멘'),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                            ? '사용처를 입력해주세요'
-                            : null,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        '카테고리',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          for (final category in expenseCategoryIcons.entries)
-                            ChoiceChip(
-                              label: Text('${category.value} ${category.key}'),
-                              selected: _category == category.key,
-                              onSelected: _busy
-                                  ? null
-                                  : (_) => setState(
-                                      () => _category = category.key,
-                                    ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        '날짜 · 시각',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: _busy ? null : _pickDate,
-                            icon: const Icon(
-                              Icons.calendar_today_outlined,
-                              size: 18,
-                            ),
-                            label: Text(formatDate(_date)),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _busy ? null : _pickTime,
-                            icon: const Icon(Icons.schedule_rounded, size: 18),
-                            label: Text(
-                              '${_date.hour.toString().padLeft(2, '0')}:${_date.minute.toString().padLeft(2, '0')}',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
