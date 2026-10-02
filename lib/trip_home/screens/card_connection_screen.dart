@@ -8,6 +8,7 @@ import '../services/card_sync_api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/screen_top_bar.dart';
+import 'card_registration_screen.dart';
 
 class CardConnectionScreen extends StatefulWidget {
   const CardConnectionScreen({super.key, required this.trip});
@@ -18,7 +19,6 @@ class CardConnectionScreen extends StatefulWidget {
 
 class _CardConnectionScreenState extends State<CardConnectionScreen> {
   bool _busy = false;
-  bool _demoLinked = false;
   String? _message;
   bool _failed = false;
   Trip get trip => widget.trip;
@@ -55,6 +55,9 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
     bool repeat = false,
     bool newPayment = false,
   }) => _run(() async {
+    if (tripStore.testCardFor(trip.id) == null) {
+      throw StateError('먼저 카드 정보를 임시 등록해주세요');
+    }
     final old = newPayment ? null : _latestDemo;
     final event = repeat && old != null
         ? old
@@ -94,13 +97,42 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
     return '${result.received}건을 확인했어요. ${result.skipped > 0 ? '${result.skipped}건은 통화·취소 정보를 확인해야 해 자동 등록을 보류했어요.' : '새 내역은 장부에 자동 반영돼요.'}';
   });
 
+  void _register() => Navigator.of(context).push(
+    MaterialPageRoute<void>(builder: (_) => CardRegistrationScreen(trip: trip)),
+  );
+
+  Future<void> _unlink() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('임시 등록을 해제할까요?'),
+        content: const Text('입력한 카드 식별 정보만 삭제돼요. 장부에 이미 기록한 테스트 내역은 유지돼요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('유지'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('등록 해제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      tripStore.removeTestCard(trip.id);
+      setState(() => _message = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: tripStore,
     builder: (context, _) {
       final demo = _latestDemo;
       final local = !tripStore.isRemote;
-      final linked = _demoLinked || demo != null;
+      final card = tripStore.testCardFor(trip.id);
+      final linked = card != null;
       return Scaffold(
         body: SafeArea(
           child: Column(
@@ -144,18 +176,31 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
                     const SizedBox(height: 20),
                     if (local) ...[
                       Text(
-                        linked ? '테스트 모드 사용 중' : '테스트 카드 미연결',
+                        linked ? '임시 등록됨 · 실카드 미연결' : '등록된 카드가 없어요',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 12),
                       if (!linked)
                         FilledButton(
-                          onPressed: _busy
-                              ? null
-                              : () => setState(() => _demoLinked = true),
-                          child: const Text('테스트 카드 연결'),
+                          onPressed: _busy ? null : _register,
+                          child: const Text('카드 정보 입력'),
                         ),
                       if (linked) ...[
+                        Text(card.displayLabel),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            TextButton(
+                              onPressed: _busy ? null : _register,
+                              child: const Text('등록 정보 수정'),
+                            ),
+                            TextButton(
+                              onPressed: _busy ? null : _unlink,
+                              child: const Text('임시 등록 해제'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         FilledButton.icon(
                           onPressed: _busy
                               ? null
@@ -221,6 +266,14 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       '결제 즉시 수신은 카드사·제공자 지원에 따라 달라요. 조회 제한과 반영 지연이 있으며, 면세 여부는 직접 확인해야 해요.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '토스뱅크 체크카드는 현재 CODEF 카드 기관 목록에서 직접 조회 지원을 확인하지 못했어요. 임시 등록만으로 실제 결제내역을 가져올 수는 없어요.',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,

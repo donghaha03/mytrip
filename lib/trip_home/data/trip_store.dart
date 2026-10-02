@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../api/api.dart';
 import '../models/country.dart';
+import '../models/test_card.dart';
 import '../models/trip.dart';
 import 'trip_repository.dart';
 
@@ -32,6 +33,28 @@ class TripStore extends ChangeNotifier {
   bool get isLoading => _loading;
   bool get isRemote => _repo != null;
   final Set<String> _hiddenImported = {};
+  final Map<String, TestCard> _testCards = {};
+
+  TestCard? testCardFor(String tripId) => _testCards[tripId];
+
+  void registerTestCard(
+    String tripId,
+    TestCard card, {
+    required bool noticeAccepted,
+  }) {
+    if (isRemote) throw StateError('임시 등록은 테스트 모드에서만 가능해요');
+    if (byId(tripId) == null) throw StateError('여행을 찾을 수 없어요');
+    if (!noticeAccepted) throw StateError('개발용 안내를 확인해주세요');
+    final error = card.validationError;
+    if (error != null) throw ArgumentError(error);
+    _testCards[tripId] = card;
+    notifyListeners();
+  }
+
+  void removeTestCard(String tripId) {
+    _testCards.remove(tripId);
+    notifyListeners();
+  }
 
   Trip? byId(String id) {
     for (final t in _trips) {
@@ -48,6 +71,7 @@ class TripStore extends ChangeNotifier {
 
   void remove(String id) {
     _trips.removeWhere((t) => t.id == id);
+    _testCards.remove(id);
     _expenseSubs.remove(id)?.cancel();
     notifyListeners();
     _push(_repo?.deleteTrip(id));
@@ -184,6 +208,7 @@ class TripStore extends ChangeNotifier {
     _expenseSubs.clear();
     _trips.clear();
     _hiddenImported.clear();
+    _testCards.clear();
 
     _repo = repo;
     _loading = repo != null;
