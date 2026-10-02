@@ -79,12 +79,7 @@ TodayBudget todayBudget(Trip t, DateTime now) {
 
   final spentToday = before
       ? 0
-      : RateApi.toKrw(
-          t.expenses
-              .where((e) => day(e.date) == today)
-              .fold<int>(0, (s, e) => s + e.amount.truncate()),
-          t.country.currency,
-        );
+      : t.spentKrwOf(t.expenses.where((e) => day(e.date) == today));
   final remainThisMorning = remain + spentToday;
 
   if (remainThisMorning <= 0) {

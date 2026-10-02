@@ -19,11 +19,13 @@ class CalendarRangePicker extends StatefulWidget {
     required this.initialMonth,
     required this.onChanged,
     this.initialRange,
+    this.singleDay = false,
   });
 
   final DateTime initialMonth;
   final DateRange? initialRange;
   final ValueChanged<DateRange?> onChanged;
+  final bool singleDay;
 
   @override
   State<CalendarRangePicker> createState() => _CalendarRangePickerState();
@@ -79,6 +81,11 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
     if (date == null) return;
 
     setState(() {
+      if (widget.singleDay) {
+        _start = date;
+        _end = date;
+        return;
+      }
       _anchor ??= date;
       if (date.isBefore(_anchor!)) {
         _start = date;
@@ -174,18 +181,20 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
     const labels = ['일', '월', '화', '수', '목', '금', '토'];
     return Row(
       children: labels
-          .map((d) => Expanded(
-                child: Center(
-                  child: Text(
-                    d,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
+          .map(
+            (d) => Expanded(
+              child: Center(
+                child: Text(
+                  d,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
                   ),
                 ),
-              ))
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -212,43 +221,55 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
     final isStart = _start != null && _isSameDay(date, _start!);
     final isEnd = _end != null && _isSameDay(date, _end!);
 
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // 선택 구간 연결 배경 — 양 끝만 둥글고 가운데는 직각이라 쭉 이어져 보인다
-        if (inRange)
-          Positioned.fill(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.horizontal(
-                    left: Radius.circular(isStart ? 18 : 0),
-                    right: Radius.circular(isEnd ? 18 : 0),
+    return Semantics(
+      button: true,
+      selected: isEdge,
+      label: '${date.year}년 ${date.month}월 ${date.day}일',
+      onTap: () {
+        setState(() {
+          _start = date;
+          _end = date;
+        });
+        _emit();
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 선택 구간 연결 배경 — 양 끝만 둥글고 가운데는 직각이라 쭉 이어져 보인다
+          if (inRange)
+            Positioned.fill(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.horizontal(
+                      left: Radius.circular(isStart ? 18 : 0),
+                      right: Radius.circular(isEnd ? 18 : 0),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: isEdge ? AppColors.primary : Colors.transparent,
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '$dayNum',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isEdge ? FontWeight.w700 : FontWeight.w500,
-              color: isEdge ? AppColors.white : AppColors.textPrimary,
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isEdge ? AppColors.primary : Colors.transparent,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$dayNum',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isEdge ? FontWeight.w700 : FontWeight.w500,
+                color: isEdge ? AppColors.white : AppColors.textPrimary,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

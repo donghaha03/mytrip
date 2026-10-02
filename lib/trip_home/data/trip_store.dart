@@ -76,12 +76,43 @@ class TripStore extends ChangeNotifier {
     _push(_repo?.updateTrip(trip));
   }
 
-  void addExpense(String tripId, Expense expense) {
+  Future<void> addExpense(String tripId, Expense expense) =>
+      saveExpense(tripId, expense);
+
+  /// 같은 ID면 수정한다. 원격 저장 실패 시 기존 목록과 입력을 유지한다.
+  Future<void> saveExpense(String tripId, Expense expense) async {
     final trip = byId(tripId);
-    if (trip == null) return;
-    trip.expenses.add(expense);
+    if (trip == null) throw StateError('여행을 찾을 수 없어요');
+    if (expense.id.isEmpty ||
+        expense.place.trim().isEmpty ||
+        !expense.amount.isFinite ||
+        expense.amount.truncate() <= 0) {
+      throw ArgumentError('사용처와 금액을 확인해주세요');
+    }
+    final repo = _repo;
+    await repo?.saveExpense(tripId, expense);
+    if (!identical(byId(tripId), trip) || !identical(repo, _repo)) {
+      throw StateError('여행 정보가 변경됐어요');
+    }
+    final index = trip.expenses.indexWhere((e) => e.id == expense.id);
+    if (index < 0) {
+      trip.expenses.add(expense);
+    } else {
+      trip.expenses[index] = expense;
+    }
     notifyListeners();
-    _push(_repo?.saveExpense(tripId, expense));
+  }
+
+  Future<void> deleteExpense(String tripId, String expenseId) async {
+    final trip = byId(tripId);
+    if (trip == null) throw StateError('여행을 찾을 수 없어요');
+    final repo = _repo;
+    await repo?.deleteExpense(tripId, expenseId);
+    if (!identical(byId(tripId), trip) || !identical(repo, _repo)) {
+      throw StateError('여행 정보가 변경됐어요');
+    }
+    trip.expenses.removeWhere((e) => e.id == expenseId);
+    notifyListeners();
   }
 
   // -------------------------------------------------------------------------
@@ -217,7 +248,7 @@ class TripStore extends ChangeNotifier {
           Expense(
             id: 'e4',
             icon: '🏨',
-            category: '숙소',
+            category: '숙박',
             place: '신주쿠 호텔',
             amount: 40600,
             date: now.subtract(const Duration(days: 2)),

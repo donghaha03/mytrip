@@ -17,6 +17,7 @@ abstract class TripRepository {
   Future<void> updateTrip(Trip trip);
   Future<void> deleteTrip(String tripId);
   Future<void> saveExpense(String tripId, Expense expense);
+  Future<void> deleteExpense(String tripId, String expenseId);
 }
 
 /// Firestore 구조:
@@ -28,7 +29,7 @@ abstract class TripRepository {
 /// 같은 날 여러 건을 기록해도 순서가 안 섞인다.
 class FirestoreTripRepository implements TripRepository {
   FirestoreTripRepository({required this.uid, FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+    : _db = db ?? FirebaseFirestore.instance;
 
   final String uid;
   final FirebaseFirestore _db;
@@ -53,13 +54,13 @@ class FirestoreTripRepository implements TripRepository {
 
   @override
   Future<void> saveTrip(Trip t) => _trips.doc(t.id).set({
-        'name': t.name,
-        'currency': t.country.currency,
-        'start': Timestamp.fromDate(t.start),
-        'end': Timestamp.fromDate(t.end),
-        'budgetKrw': t.budgetKrw,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+    'name': t.name,
+    'currency': t.country.currency,
+    'start': Timestamp.fromDate(t.start),
+    'end': Timestamp.fromDate(t.end),
+    'budgetKrw': t.budgetKrw,
+    'createdAt': FieldValue.serverTimestamp(),
+  });
 
   @override
   Future<void> renameTrip(String tripId, String name) =>
@@ -68,11 +69,11 @@ class FirestoreTripRepository implements TripRepository {
   // set() 이 아니라 update() — createdAt 을 덮어쓰지 않으려고
   @override
   Future<void> updateTrip(Trip t) => _trips.doc(t.id).update({
-        'name': t.name,
-        'start': Timestamp.fromDate(t.start),
-        'end': Timestamp.fromDate(t.end),
-        'budgetKrw': t.budgetKrw,
-      });
+    'name': t.name,
+    'start': Timestamp.fromDate(t.start),
+    'end': Timestamp.fromDate(t.end),
+    'budgetKrw': t.budgetKrw,
+  });
 
   /// 문서를 지워도 하위 컬렉션은 안 지워지는 게 Firestore 규칙이라
   /// records 를 먼저 같이 지운다.
@@ -96,6 +97,10 @@ class FirestoreTripRepository implements TripRepository {
         'category': e.category,
         'date': Timestamp.fromDate(e.date),
       });
+
+  @override
+  Future<void> deleteExpense(String tripId, String expenseId) =>
+      _records(tripId).doc(expenseId).delete();
 
   /// 통화 코드를 모르는 문서(앱에서 국가를 뺀 경우 등)는 건너뛴다.
   static Trip? _tripFrom(QueryDocumentSnapshot<Map<String, dynamic>> d) {

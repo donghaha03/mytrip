@@ -30,13 +30,17 @@ class ScreenTopBar extends StatelessWidget {
       child: Row(
         children: [
           if (Navigator.of(context).canPop()) ...[
-            InkResponse(
-              onTap: () => Navigator.of(context).pop(),
-              radius: 22,
-              child: const Icon(
-                Icons.arrow_back_rounded,
-                size: 24,
-                color: AppColors.textPrimary,
+            Semantics(
+              button: true,
+              label: '뒤로가기',
+              child: InkResponse(
+                onTap: () => Navigator.of(context).pop(),
+                radius: 22,
+                child: const Icon(
+                  Icons.arrow_back_rounded,
+                  size: 24,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
             const SizedBox(width: 12),
