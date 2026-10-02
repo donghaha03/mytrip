@@ -123,6 +123,35 @@ class LedgerScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Wrap(
+                        spacing: 20,
+                        runSpacing: 8,
+                        children: [
+                          for (final method in [
+                            ...PaymentMethod.values,
+                            if (trip.expenses.any(
+                              (e) => e.paymentMethod == null,
+                            ))
+                              null,
+                          ])
+                            Text(
+                              '${method?.label ?? '미지정'} '
+                              '${available ? formatWon(trip.spentKrwOf(trip.expenses.where((e) => e.paymentMethod == method))) : '환율 없음'}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     if (groups.isEmpty)
                       const Padding(

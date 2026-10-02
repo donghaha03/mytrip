@@ -218,6 +218,8 @@ void main() {
     await tester.tap(find.text('장부 보기'));
     await tester.pumpAndSettle();
     expect(find.byType(LedgerScreen), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('신주쿠 호텔'), 200);
+    await tester.pumpAndSettle();
     expect(find.text('신주쿠 호텔'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
     await tester.pumpAndSettle();
@@ -449,6 +451,8 @@ void main() {
     await tester.tap(find.text('전체 보기'));
     await tester.pumpAndSettle();
     expect(find.byType(LedgerScreen), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('신주쿠 호텔'), 200);
+    await tester.pumpAndSettle();
     expect(find.text('신주쿠 호텔'), findsOneWidget);
   });
 

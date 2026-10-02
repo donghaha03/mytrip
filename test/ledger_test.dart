@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -61,6 +62,7 @@ Trip _trip() => Trip(
         place: '상점$i',
         amount: 1501,
         category: '식비',
+        paymentMethod: PaymentMethod.cash,
         date: DateTime(2026, 10, 1, 10, i),
       ),
   ],
@@ -112,7 +114,14 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('expense-place')), '편의점');
     await tester.pump();
     expect(find.text('원화 환산 8,620원'), findsOneWidget);
+    await tester.ensureVisible(find.text('카드'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카드'));
+    await tester.ensureVisible(find.text('면세 적용'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('면세 적용'));
     await tester.ensureVisible(find.text('🛍 쇼핑'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('🛍 쇼핑'));
     await tester.tap(find.text('저장'));
     await tester.pumpAndSettle();
@@ -120,19 +129,56 @@ void main() {
     expect(trip.expenses.length, 4);
     expect(trip.expenses.last.amount, 1000);
     expect(trip.expenses.last.category, '쇼핑');
+    expect(trip.expenses.last.paymentMethod, PaymentMethod.card);
+    expect(trip.expenses.last.isTaxFree, isTrue);
     expect(trip.spentKrw, 47434);
     expect(find.text('47,434원'), findsOneWidget);
     await tester.tap(find.text('장부 보기'));
     await tester.pumpAndSettle();
     expect(find.text('편의점'), findsOneWidget);
     expect(find.text('47,434원'), findsOneWidget);
+    expect(find.text('현금 38,814원'), findsOneWidget);
+    expect(find.text('카드 8,620원'), findsOneWidget);
+    expect(find.text('카드 · 면세'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('결제수단을 선택해야 저장되며 면세 금액을 이중 차감하지 않는다', (tester) async {
+    await tester.pumpWidget(_wrap(ExpenseFormScreen(trip: trip)));
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-amount')),
+      '1000',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-place')),
+      '면세 결제',
+    );
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+    expect(trip.expenses.length, 3);
+    await tester.ensureVisible(find.text('결제수단을 선택해주세요'));
+    await tester.pumpAndSettle();
+    expect(find.text('결제수단을 선택해주세요'), findsOneWidget);
+    await tester.tap(find.text('현금'));
+    await tester.pump();
+    expect(find.text('결제수단을 선택해주세요'), findsNothing);
+    await tester.ensureVisible(find.text('면세 적용'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('면세 적용'));
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+    final added = trip.expenses.last;
+    expect(added.paymentMethod, PaymentMethod.cash);
+    expect(added.isTaxFree, isTrue);
+    expect(added.amount, 1000);
+    expect(trip.spentKrw, 47434);
   });
 
   testWidgets('수정은 ID·날짜를 유지하며 삭제 취소와 확인을 구분한다', (tester) async {
     final original = trip.expenses.first;
     await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
     await tester.ensureVisible(find.text('상점1'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('상점1'));
     await tester.pumpAndSettle();
     expect(find.text('지출 수정'), findsOneWidget);
@@ -144,14 +190,46 @@ void main() {
       find.byKey(const ValueKey('expense-place')),
       '수정한 상점',
     );
+    await tester.ensureVisible(find.text('카드'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카드'));
+    await tester.ensureVisible(find.text('면세 적용'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('면세 적용'));
     await tester.tap(find.text('저장'));
     await tester.pumpAndSettle();
     expect(trip.expenses.length, 3);
     final updated = trip.expenses.firstWhere((e) => e.id == original.id);
     expect(updated.date, original.date);
     expect(updated.amount, 2000);
+    expect(updated.paymentMethod, PaymentMethod.card);
+    expect(updated.isTaxFree, isTrue);
     expect(trip.spentKrw, 43116);
     await tester.ensureVisible(find.text('수정한 상점'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('수정한 상점'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('카드'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, '카드')).selected,
+      isTrue,
+    );
+    expect(
+      tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+      isTrue,
+    );
+    await tester.tap(find.text('현금'));
+    await tester.ensureVisible(find.text('면세 적용'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('면세 적용'));
+    await tester.tap(find.text('저장'));
+    await tester.pumpAndSettle();
+    expect(trip.expenses.first.paymentMethod, PaymentMethod.cash);
+    expect(trip.expenses.first.isTaxFree, isFalse);
+    expect(trip.spentKrw, 43116);
+    await tester.ensureVisible(find.text('수정한 상점'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('수정한 상점'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('지출 삭제'));
@@ -186,8 +264,14 @@ void main() {
     await tester.pump();
     expect(find.text('금액은 1 이상 입력해주세요'), findsOneWidget);
     expect(trip.expenses.length, 3);
-    await tester.enterText(find.byKey(const ValueKey('expense-amount')), '1000');
-    await tester.enterText(find.byKey(const ValueKey('expense-place')), '올바른 사용처');
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-amount')),
+      '1000',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-place')),
+      '올바른 사용처',
+    );
     await tester.pump();
     expect(find.text('금액은 1 이상 입력해주세요'), findsNothing);
     expect(find.text('사용처를 입력해주세요'), findsNothing);
@@ -205,6 +289,7 @@ void main() {
     final original = trip.expenses.first;
     await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
     await tester.ensureVisible(find.text(original.place));
+    await tester.pumpAndSettle();
     await tester.tap(find.text(original.place));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('2026.10.01'));
@@ -260,11 +345,15 @@ void main() {
       icon: '🍜',
       place: '수정',
       amount: 2000,
+      paymentMethod: PaymentMethod.card,
+      isTaxFree: true,
       date: loaded.expenses.first.date,
     );
     await tripStore.saveExpense(trip.id, changed);
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(loaded.expenses.single.amount, 2000);
+    expect(loaded.expenses.single.paymentMethod, PaymentMethod.card);
+    expect(loaded.expenses.single.isTaxFree, isTrue);
     await tripStore.deleteExpense(trip.id, 'e1');
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(loaded.expenses, isEmpty);
@@ -278,6 +367,31 @@ void main() {
               .get())
           .docs,
       isEmpty,
+    );
+  });
+
+  test('결제수단·면세 필드가 없는 기존 문서를 그대로 읽는다', () async {
+    final db = FakeFirebaseFirestore();
+    final repo = FirestoreTripRepository(uid: 'test', db: db);
+    final records = db
+        .collection('users')
+        .doc('test')
+        .collection('trips')
+        .doc(trip.id)
+        .collection('records');
+    await repo.saveExpense(trip.id, trip.expenses.first);
+    await records.doc('e1').update({
+      'paymentMethod': FieldValue.delete(),
+      'isTaxFree': FieldValue.delete(),
+    });
+    final old = (await repo.watchExpenses(trip.id).first).single;
+    expect(old.paymentMethod, isNull);
+    expect(old.isTaxFree, isFalse);
+    expect(old.amount, 1501);
+    await records.doc('e1').update({'paymentMethod': 'unknown'});
+    expect(
+      (await repo.watchExpenses(trip.id).first).single.paymentMethod,
+      isNull,
     );
   });
 

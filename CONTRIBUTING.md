@@ -52,6 +52,7 @@ flutter build web --release --no-wasm-dry-run --base-href /mytrip/
 화면에서 팀의 `AuthApi`·`TripApi`·`ExpenseApi`·`RateApi`·`LedgerCalc`를 재사용합니다.
 개인 저장 계층을 중복 연결하거나 팀의 `main.dart`·API·Firebase 설정·보안 규칙을 덮어쓰지 않습니다.
 정수 환산과 과거 지출 처리 정책은 API 담당자와 먼저 맞춥니다.
+`paymentMethod`(현금·카드)와 `isTaxFree`(면세 표시)는 개인 추가 필드이므로 팀 API에 합칠 때 함께 조율합니다. `amount`는 면세 처리 후 실제 결제액입니다.
 
 장부 연결은 `screens/ledger_entry.dart`, 계정·설정 연결은 `screens/more_screen.dart`에서 담당합니다.
 

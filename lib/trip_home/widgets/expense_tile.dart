@@ -58,6 +58,16 @@ class ExpenseTile extends StatelessWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${e.paymentMethod?.label ?? '결제수단 미지정'}${e.isTaxFree ? ' · 면세' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
