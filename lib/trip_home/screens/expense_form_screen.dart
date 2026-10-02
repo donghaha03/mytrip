@@ -262,7 +262,15 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                           menuMaxHeight: 320,
                           decoration: _decoration('결제 통화'),
                           items: [
-                            for (final c in kExpenseCurrencies)
+                            for (final c in [
+                              trip.country,
+                              if (trip.country.currency != 'KRW') kKrwCountry,
+                              ...kExpenseCurrencies.where(
+                                (c) =>
+                                    c.currency != trip.country.currency &&
+                                    c.currency != 'KRW',
+                              ),
+                            ])
                               DropdownMenuItem(
                                 value: c.currency,
                                 child: Text(

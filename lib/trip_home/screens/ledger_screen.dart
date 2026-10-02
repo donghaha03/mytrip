@@ -9,7 +9,6 @@ import '../widgets/expense_tile.dart';
 import '../widgets/quick_converter.dart';
 import '../widgets/rate_info_tooltip.dart';
 import '../widgets/screen_top_bar.dart';
-import 'card_connection_screen.dart';
 import 'expense_detail_screen.dart';
 import 'expense_form_screen.dart';
 import 'rates_screen.dart';
@@ -27,6 +26,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   String? _payment;
   bool _categories = false;
   bool _byAmount = false;
+  bool? _imported;
   Trip get trip => widget.trip;
 
   void _edit(BuildContext context, [Expense? expense]) {
@@ -47,8 +47,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
       final entries = trip.expensesNewestFirst
           .where(
             (e) =>
-                _payment == null ||
-                (e.paymentMethod?.name ?? 'unknown') == _payment,
+                (_payment == null ||
+                    (e.paymentMethod?.name ?? 'unknown') == _payment) &&
+                (!_categories ||
+                    _imported == null ||
+                    e.isImported == _imported),
           )
           .toList();
       if (_categories && _byAmount) {
@@ -241,18 +244,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           ),
                       ],
                     ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => CardConnectionScreen(trip: trip),
-                          ),
-                        ),
-                        icon: const Icon(Icons.credit_card_rounded, size: 18),
-                        label: const Text('카드 연동'),
-                      ),
-                    ),
+                    const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
@@ -260,29 +252,81 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         ChoiceChip(
                           label: const Text('날짜별'),
                           selected: !_categories,
-                          onSelected: (_) =>
-                              setState(() => _categories = false),
+                          onSelected: (_) => setState(() {
+                            _categories = false;
+                            _imported = null;
+                          }),
                         ),
                         ChoiceChip(
                           label: const Text('카테고리별'),
                           selected: _categories,
                           onSelected: (_) => setState(() => _categories = true),
                         ),
-                        if (_categories) ...[
-                          ChoiceChip(
-                            label: const Text('금액순'),
-                            selected: _byAmount,
-                            onSelected: (_) => setState(() => _byAmount = true),
-                          ),
-                          ChoiceChip(
-                            label: const Text('날짜순'),
-                            selected: !_byAmount,
-                            onSelected: (_) =>
-                                setState(() => _byAmount = false),
-                          ),
-                        ],
                       ],
                     ),
+                    if (_categories)
+                      Container(
+                        key: const ValueKey('ledger-category-options'),
+                        margin: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('정렬', style: TextStyle(fontSize: 12)),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                ChoiceChip(
+                                  label: const Text('금액순'),
+                                  selected: _byAmount,
+                                  onSelected: (_) =>
+                                      setState(() => _byAmount = true),
+                                ),
+                                ChoiceChip(
+                                  label: const Text('날짜순'),
+                                  selected: !_byAmount,
+                                  onSelected: (_) =>
+                                      setState(() => _byAmount = false),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            const Text('기록 방식', style: TextStyle(fontSize: 12)),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                for (final (value, label) in <(bool?, String)>[
+                                  (null, '전체 기록'),
+                                  (true, '자동 기록'),
+                                  (false, '직접 입력'),
+                                ])
+                                  ChoiceChip(
+                                    key: ValueKey(
+                                      'ledger-source-${value == null
+                                          ? 'all'
+                                          : value
+                                          ? 'auto'
+                                          : 'manual'}',
+                                    ),
+                                    label: Text(label),
+                                    selected: _imported == value,
+                                    onSelected: (_) =>
+                                        setState(() => _imported = value),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 16),
                     if (groups.isEmpty)
                       Padding(
@@ -298,6 +342,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             Text(
                               trip.expenses.isEmpty
                                   ? '아직 기록한 지출이 없어요'
+                                  : _imported != null
+                                  ? '선택한 조건에 맞는 지출이 없어요'
                                   : '이 결제수단으로 기록한 지출이 없어요',
                             ),
                             const SizedBox(height: 6),

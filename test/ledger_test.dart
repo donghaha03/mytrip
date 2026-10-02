@@ -12,14 +12,18 @@ import 'package:tripapp/trip_home/data/trip_repository.dart';
 import 'package:tripapp/trip_home/data/trip_store.dart';
 import 'package:tripapp/trip_home/models/country.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
+import 'package:tripapp/trip_home/models/test_card.dart';
+import 'package:tripapp/trip_home/screens/card_registration_screen.dart';
 import 'package:tripapp/trip_home/screens/expense_form_screen.dart';
 import 'package:tripapp/trip_home/screens/ledger_screen.dart';
+import 'package:tripapp/trip_home/screens/more_screen.dart';
 import 'package:tripapp/trip_home/screens/card_connection_screen.dart';
 import 'package:tripapp/trip_home/screens/expense_detail_screen.dart';
 import 'package:tripapp/trip_home/screens/rates_screen.dart';
 import 'package:tripapp/trip_home/services/card_sync_api.dart';
 import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/theme/app_theme.dart';
+import 'package:tripapp/trip_home/theme/app_colors.dart';
 import 'package:tripapp/trip_home/widgets/recent_expenses_card.dart';
 import 'package:tripapp/trip_home/widgets/expense_tile.dart';
 import 'package:tripapp/trip_home/widgets/today_budget_sheet.dart';
@@ -512,7 +516,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('카테고리별'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('금액순'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('금액순'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('🛍 쇼핑 · 1건'), 150);
     await tester.pumpAndSettle();
     expect(find.text('🛍 쇼핑 · 1건'), findsOneWidget);
     trip.expenses.removeWhere((e) => e.id == 'shop');
@@ -521,6 +529,323 @@ void main() {
     await tester.scrollUntilVisible(find.text('이 결제수단으로 기록한 지출이 없어요'), 150);
     expect(find.text('이 결제수단으로 기록한 지출이 없어요'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('카테고리 옵션은 아래에 펼쳐지며 자동·직접 기록과 결제수단을 함께 필터링한다', (tester) async {
+    trip.expenses.addAll([
+      Expense(
+        id: 'auto',
+        icon: '💳',
+        place: '자동 카드 상점',
+        amount: 2000,
+        category: '쇼핑',
+        paymentMethod: PaymentMethod.card,
+        source: 'codef',
+        date: DateTime(2026, 10, 3),
+      ),
+      Expense(
+        id: 'manual',
+        icon: '🛍',
+        place: '직접 카드 상점',
+        amount: 1000,
+        category: '쇼핑',
+        paymentMethod: PaymentMethod.card,
+        date: DateTime(2026, 10, 2),
+      ),
+    ]);
+    await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
+    expect(find.text('카드 연동'), findsNothing);
+    final options = find.byKey(const ValueKey('ledger-category-options'));
+    expect(options, findsNothing);
+    await tester.scrollUntilVisible(find.text('카테고리별'), 150);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카테고리별'));
+    await tester.pumpAndSettle();
+    expect(options, findsOneWidget);
+    expect(
+      tester
+          .getTopLeft(
+            find
+                .descendant(of: options, matching: find.byType(DecoratedBox))
+                .first,
+          )
+          .dy,
+      greaterThan(
+        tester.getBottomLeft(find.widgetWithText(ChoiceChip, '카테고리별')).dy,
+      ),
+    );
+    final auto = find.byKey(const ValueKey('ledger-source-auto'));
+    await tester.ensureVisible(auto);
+    await tester.pumpAndSettle();
+    await tester.tap(auto);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('자동 카드 상점'), 150);
+    await tester.pumpAndSettle();
+    expect(find.text('직접 카드 상점'), findsNothing);
+    expect(find.text('🛍 쇼핑 · 1건'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('ledger-payment-cash')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ledger-payment-cash')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('선택한 조건에 맞는 지출이 없어요'), 150);
+    expect(find.text('선택한 조건에 맞는 지출이 없어요'), findsOneWidget);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('ledger-payment-card')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ledger-payment-card')));
+    await tester.pumpAndSettle();
+    final manual = find.byKey(const ValueKey('ledger-source-manual'));
+    await tester.ensureVisible(manual);
+    await tester.pumpAndSettle();
+    await tester.tap(manual);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('직접 카드 상점'), 150);
+    await tester.pumpAndSettle();
+    expect(find.text('자동 카드 상점'), findsNothing);
+    await tester.ensureVisible(find.text('날짜별'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('날짜별'));
+    await tester.pumpAndSettle();
+    expect(options, findsNothing);
+    await tester.scrollUntilVisible(find.text('자동 카드 상점'), 150);
+    expect(find.text('자동 카드 상점'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('결제 통화는 여행 통화·한국·나머지 순서이며 수정 통화를 보존한다', (tester) async {
+    final expense = Expense(
+      id: 'usd',
+      icon: '💳',
+      place: '외화 결제',
+      amount: 10,
+      currency: 'USD',
+      date: DateTime(2026, 10, 2),
+    );
+    for (final code in ['JPY', 'USD', 'KRW']) {
+      trip.country = countryByCode(code)!;
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        _wrap(ExpenseFormScreen(trip: trip, expense: expense)),
+      );
+      final dropdown = tester.widget<DropdownButton<String>>(
+        find.byType(DropdownButton<String>),
+      );
+      final codes = dropdown.items!.map((item) => item.value).toList();
+      expect(codes.first, code);
+      if (code != 'KRW') expect(codes[1], 'KRW');
+      expect(codes.toSet().length, kExpenseCurrencies.length);
+      expect(codes.length, kExpenseCurrencies.length);
+      expect(dropdown.value, 'USD');
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('결제내역 눌림 색은 불투명 목록 위에 표시되고 탭을 전달한다', (tester) async {
+    var taps = 0;
+    await tester.pumpWidget(
+      _wrap(
+        Scaffold(
+          body: Container(
+            color: AppColors.white,
+            child: ExpenseTile(
+              trip: trip,
+              expense: trip.expenses.first,
+              onTap: () => taps++,
+            ),
+          ),
+        ),
+      ),
+    );
+    final inkFinder = find.descendant(
+      of: find.byType(ExpenseTile),
+      matching: find.byType(InkWell),
+    );
+    final ink = tester.widget<InkWell>(inkFinder);
+    expect(ink.highlightColor, AppColors.primaryLight);
+    expect(ink.hoverColor, AppColors.primarySoft);
+    expect(
+      tester.element(inkFinder).findAncestorWidgetOfExactType<Material>()!.type,
+      MaterialType.transparency,
+    );
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.text('상점1')),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(taps, 0);
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(taps, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('더보기에서 카드 연동 화면으로 이동한다', (tester) async {
+    await tester.pumpWidget(_wrap(TripHomeScreen(trip: trip)));
+    await tester.tap(find.byTooltip('더보기'));
+    await tester.pumpAndSettle();
+    expect(find.byType(MoreScreen), findsOneWidget);
+    await tester.tap(find.text('카드 연동'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CardConnectionScreen), findsOneWidget);
+    expect(find.text('카드 정보 입력'), findsOneWidget);
+    expect(find.text('실제 연동 서버 미설정'), findsOneWidget);
+  });
+
+  testWidgets('카드 임시 등록은 안내 확인 후 저장되며 수정·해제는 장부를 보존한다', (tester) async {
+    await tester.pumpWidget(_wrap(MoreScreen(trip: trip)));
+    await tester.tap(find.text('카드 연동'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카드 정보 입력'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CardRegistrationScreen), findsOneWidget);
+    expect(find.text('토스뱅크'), findsOneWidget);
+    expect(find.text('체크카드'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('card-nickname')),
+      '테스트 별칭',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('card-last-four')),
+      '1234567890123456',
+    );
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('card-last-four')))
+          .controller!
+          .text,
+      isEmpty,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('card-last-four')),
+      '1234',
+    );
+    await tester.ensureVisible(find.text('임시 등록'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('임시 등록'));
+    await tester.pumpAndSettle();
+    expect(tripStore.testCardFor(trip.id), isNull);
+    expect(find.text('개발용 안내 두 항목을 확인해주세요'), findsOneWidget);
+    for (final key in ['card-test-notice', 'card-storage-notice']) {
+      await tester.ensureVisible(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+    }
+    await tester.ensureVisible(find.text('임시 등록'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('임시 등록'));
+    await tester.pumpAndSettle();
+    expect(find.byType(CardConnectionScreen), findsOneWidget);
+    expect(find.text('임시 등록됨 · 실카드 미연결'), findsOneWidget);
+    expect(find.text('토스뱅크 · 체크카드 · 테스트 별칭 · •••• 1234'), findsOneWidget);
+    await tester.tap(find.text('등록 정보 수정'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('card-nickname')))
+          .controller!
+          .text,
+      '테스트 별칭',
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.byKey(const ValueKey('card-test-notice')),
+          )
+          .value,
+      isFalse,
+    );
+    await tester.tap(find.bySemanticsLabel('뒤로가기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('테스트 승인 · 1,000 JPY'));
+    await tester.pumpAndSettle();
+    final before = trip.expenses.length;
+    await tester.ensureVisible(find.text('임시 등록 해제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('임시 등록 해제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('유지'));
+    await tester.pumpAndSettle();
+    expect(tripStore.testCardFor(trip.id), isNotNull);
+    await tester.tap(find.text('임시 등록 해제'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('등록 해제'));
+    await tester.pumpAndSettle();
+    expect(tripStore.testCardFor(trip.id), isNull);
+    expect(trip.expenses.length, before);
+    expect(find.text('테스트 승인 · 1,000 JPY'), findsNothing);
+    expect(find.text('카드 정보 입력'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('임시 카드 검증·안내 확인·여행 삭제·로그아웃·원격 모드 경계를 지킨다', () {
+    const card = TestCard(issuer: '토스뱅크', kind: '체크카드', nickname: '테스트');
+    expect(
+      () => tripStore.registerTestCard(trip.id, card, noticeAccepted: false),
+      throwsStateError,
+    );
+    expect(
+      () => tripStore.registerTestCard('missing', card, noticeAccepted: true),
+      throwsStateError,
+    );
+    for (final invalid in [
+      const TestCard(issuer: 'invalid', kind: '체크카드', nickname: '테스트'),
+      const TestCard(issuer: '토스뱅크', kind: 'invalid', nickname: '테스트'),
+      const TestCard(issuer: '토스뱅크', kind: '체크카드', nickname: '  '),
+      const TestCard(
+        issuer: '토스뱅크',
+        kind: '체크카드',
+        nickname: '1234-5678-9012-3456',
+      ),
+      const TestCard(
+        issuer: '토스뱅크',
+        kind: '체크카드',
+        nickname: '테스트',
+        lastFour: '123',
+      ),
+      const TestCard(
+        issuer: '토스뱅크',
+        kind: '체크카드',
+        nickname: '테스트',
+        lastFour: 'abcd',
+      ),
+    ]) {
+      expect(
+        () =>
+            tripStore.registerTestCard(trip.id, invalid, noticeAccepted: true),
+        throwsArgumentError,
+      );
+    }
+    expect(tripStore.testCardFor(trip.id), isNull);
+    tripStore.registerTestCard(trip.id, card, noticeAccepted: true);
+    tripStore.remove(trip.id);
+    expect(tripStore.testCardFor(trip.id), isNull);
+    tripStore.add(trip);
+    tripStore.registerTestCard(trip.id, card, noticeAccepted: true);
+    tripStore.connect(null);
+    expect(tripStore.testCardFor(trip.id), isNull);
+    tripStore.connect(
+      FirestoreTripRepository(uid: 'test', db: FakeFirebaseFirestore()),
+    );
+    expect(
+      () => tripStore.registerTestCard(trip.id, card, noticeAccepted: true),
+      throwsStateError,
+    );
+  });
+
+  testWidgets('320px 카드 등록 화면도 넘치지 않으며 선택 입력은 비워둘 수 있다', (tester) async {
+    tester.view.physicalSize = const Size(320, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(_wrap(CardRegistrationScreen(trip: trip)));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('임시 등록'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(TestCard.lastFourError(''), isNull);
   });
 
   testWidgets('통화 선택·메모·현재 환산·기록 당시 환율을 저장하고 상세에서 읽는다', (tester) async {
@@ -632,9 +957,12 @@ void main() {
 
   testWidgets('테스트 승인·중복·부분취소·전체취소가 바로 장부에 반영된다', (tester) async {
     final before = trip.spentKrw;
+    tripStore.registerTestCard(
+      trip.id,
+      const TestCard(issuer: '토스뱅크', kind: '체크카드', nickname: '테스트 카드'),
+      noticeAccepted: true,
+    );
     await tester.pumpWidget(_wrap(CardConnectionScreen(trip: trip)));
-    await tester.tap(find.text('테스트 카드 연결'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('테스트 승인 · 1,000 JPY'));
     await tester.pumpAndSettle();
     expect(trip.spentKrw, before + 8620);

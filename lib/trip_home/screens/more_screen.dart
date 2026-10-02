@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../data/trip_store.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../widgets/screen_top_bar.dart';
+import 'card_connection_screen.dart';
 
-/// 팀의 계정·설정 화면을 연결하기 전의 안내 화면.
+/// 카드 연결과 계정·설정 메뉴.
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key, required this.trip});
 
@@ -24,6 +26,33 @@ class MoreScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Material(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      clipBehavior: Clip.antiAlias,
+                      child: AnimatedBuilder(
+                        animation: tripStore,
+                        builder: (context, _) => ListTile(
+                          leading: const Icon(
+                            Icons.credit_card_rounded,
+                            color: AppColors.primary,
+                          ),
+                          title: const Text('카드 연동'),
+                          subtitle: Text(
+                            tripStore.testCardFor(trip.id) == null
+                                ? '카드 등록 및 연결 상태'
+                                : '임시 등록 · ${tripStore.testCardFor(trip.id)!.displayLabel}',
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => CardConnectionScreen(trip: trip),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     const Text(
                       '계정 및 설정 메뉴는 준비 중이에요.',
                       style: TextStyle(
