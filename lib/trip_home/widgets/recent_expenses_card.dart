@@ -4,6 +4,7 @@ import '../../api/api.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'expense_tile.dart';
 
 /// 여행 홈의 "최근 지출" 카드.
 ///
@@ -115,7 +116,7 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
               ),
             const SizedBox(height: 12),
             Container(height: 1, color: AppColors.border),
-            for (final e in recent) _ExpenseRow(trip: trip, expense: e),
+            for (final e in recent) ExpenseTile(trip: trip, expense: e),
           ],
         ],
       ),
@@ -129,10 +130,10 @@ List<({DateTime day, int krw})> dailySpending(Trip t, DateTime now) {
   final today = dayOf(now);
   return List.generate(7, (i) {
     final day = today.subtract(Duration(days: 6 - i));
-    final foreign = t.expenses
-        .where((e) => dayOf(e.date) == day)
-        .fold<int>(0, (s, e) => s + e.amount.truncate());
-    return (day: day, krw: RateApi.toKrw(foreign, t.country.currency));
+    return (
+      day: day,
+      krw: t.spentKrwOf(t.expenses.where((e) => dayOf(e.date) == day)),
+    );
   });
 }
 
@@ -259,78 +260,6 @@ class _Bar extends StatelessWidget {
                   ? AppColors.textPrimary
                   : AppColors.textTertiary,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 지출 한 줄: 아이콘 / 사용처·시각 / 현지 통화 · 원화
-class _ExpenseRow extends StatelessWidget {
-  const _ExpenseRow({required this.trip, required this.expense});
-
-  final Trip trip;
-  final Expense expense;
-
-  @override
-  Widget build(BuildContext context) {
-    final e = expense;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Text(e.icon, style: const TextStyle(fontSize: 18)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  e.place,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${e.category} · ${formatShortDateWithWeekday(e.date)}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                RateApi.quotedKrw(trip.country.currency) <= 0
-                    ? '환율 없음'
-                    : formatWon(RateApi.toKrw(e.amount, trip.country.currency)),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                trip.country.formatForeign(e.amount),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            ],
           ),
         ],
       ),

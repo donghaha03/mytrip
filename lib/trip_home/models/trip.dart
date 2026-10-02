@@ -1,6 +1,15 @@
 import '../../api/api.dart';
 import 'country.dart';
 
+const expenseCategoryIcons = {
+  '식비': '🍜',
+  '교통': '🚃',
+  '숙박': '🏨',
+  '쇼핑': '🛍',
+  '관광': '📷',
+  '기타': '💸',
+};
+
 class Expense {
   Expense({
     required this.id,
@@ -48,7 +57,13 @@ class Trip {
   int get spentForeign =>
       expenses.fold<int>(0, (sum, e) => sum + e.amount.truncate());
 
-  int get spentKrw => RateApi.toKrw(spentForeign, country.currency);
+  /// 항목별 정수 환산액을 더한다. 목록·날짜별 합계·홈이 같은 값을 쓴다.
+  int spentKrwOf(Iterable<Expense> entries) => entries.fold<int>(
+    0,
+    (sum, e) => sum + RateApi.toKrw(e.amount, country.currency),
+  );
+
+  int get spentKrw => spentKrwOf(expenses);
 
   int get remainKrw => budgetKrw - spentKrw;
 
@@ -64,15 +79,14 @@ class Trip {
   int get yesterdaySpentKrw {
     final now = DateTime.now();
     final yesterday = DateTime(now.year, now.month, now.day - 1);
-    final total = expenses
-        .where(
-          (e) =>
-              e.date.year == yesterday.year &&
-              e.date.month == yesterday.month &&
-              e.date.day == yesterday.day,
-        )
-        .fold<int>(0, (sum, e) => sum + e.amount.truncate());
-    return RateApi.toKrw(total, country.currency);
+    return spentKrwOf(
+      expenses.where(
+        (e) =>
+            e.date.year == yesterday.year &&
+            e.date.month == yesterday.month &&
+            e.date.day == yesterday.day,
+      ),
+    );
   }
 
   /// 최근 기록이 위로 오도록 정렬된 지출 목록

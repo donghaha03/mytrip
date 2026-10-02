@@ -12,6 +12,8 @@ import 'package:tripapp/trip_home/screens/add_trip_screen.dart';
 import 'package:tripapp/trip_home/screens/more_screen.dart';
 import 'package:tripapp/trip_home/screens/trip_list_screen.dart';
 import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
+import 'package:tripapp/trip_home/screens/ledger_screen.dart';
+import 'package:tripapp/trip_home/screens/expense_form_screen.dart';
 import 'package:tripapp/trip_home/models/country.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
 import 'package:tripapp/trip_home/services/backend.dart';
@@ -213,15 +215,17 @@ void main() {
     expect(find.text('장부 보기'), findsOneWidget);
     expect(find.text('지출 기록'), findsOneWidget);
 
-    // 장부가 아직 없으니 두 버튼 다 안내만 띄우고 화면은 그대로
     await tester.tap(find.text('장부 보기'));
-    await tester.pump();
-    expect(find.text('장부 페이지는 준비 중이에요'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byType(LedgerScreen), findsOneWidget);
+    expect(find.text('신주쿠 호텔'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('지출 기록'));
-    await tester.pump();
-    expect(find.text('지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'), findsOneWidget);
-    expect(find.byType(TripHomeScreen), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byType(ExpenseFormScreen), findsOneWidget);
+    expect(find.byKey(const ValueKey('expense-amount')), findsOneWidget);
   });
 
   testWidgets('여행 홈: 오른쪽 위 ≡ 로 더보기에 들어가고 나온다', (tester) async {
@@ -443,8 +447,9 @@ void main() {
     expect(find.text('¥1,200'), findsOneWidget);
 
     await tester.tap(find.text('전체 보기'));
-    await tester.pump();
-    expect(find.text('장부 페이지는 준비 중이에요'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byType(LedgerScreen), findsOneWidget);
+    expect(find.text('신주쿠 호텔'), findsOneWidget);
   });
 
   testWidgets('여행 홈: 지출이 없으면 첫 기록을 권한다', (tester) async {
@@ -453,8 +458,8 @@ void main() {
 
     expect(find.text('아직 기록한 지출이 없어요'), findsOneWidget);
     await tester.tap(find.text('첫 지출 기록하기'));
-    await tester.pump();
-    expect(find.text('지출 기록은 장부 페이지에서 할 수 있어요 (준비 중)'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.byType(ExpenseFormScreen), findsOneWidget);
   });
 
   test('dailySpending: 오늘까지 7일치로 묶는다', () {

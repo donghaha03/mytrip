@@ -79,7 +79,7 @@ void main() {
       store.add(_trip('t1'));
       await settle();
 
-      store.addExpense('t1', _expense('e1'));
+      await store.addExpense('t1', _expense('e1'));
       await settle();
 
       final rec =
@@ -141,7 +141,7 @@ void main() {
       await settle();
       store.add(_trip('t1'));
       await settle();
-      store.addExpense('t1', _expense('e1'));
+      await store.addExpense('t1', _expense('e1'));
       await settle();
 
       store.remove('t1');

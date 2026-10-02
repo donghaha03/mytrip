@@ -114,8 +114,7 @@ class TripHomeScreen extends StatelessWidget {
             ],
           ),
         ),
-        // body 안에 두면 "준비 중" 스낵바가 버튼을 덮는다. bottomNavigationBar 에
-        // 두면 Scaffold 가 스낵바를 이 영역 위로 띄워 준다.
+        // 스크롤 위치와 무관하게 장부와 지출 입력으로 이동한다.
         bottomNavigationBar: _BottomBar(trip: trip),
       ),
     );
