@@ -35,7 +35,7 @@ class MoreScreen extends StatelessWidget {
                           color: AppColors.primary,
                         ),
                         title: const Text('카드 연동'),
-                        subtitle: const Text('본인 인증 및 연결 상태'),
+                        subtitle: const Text('토스뱅크 · 조회 동의 및 연결 안내'),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(

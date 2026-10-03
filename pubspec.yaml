@@ -12,6 +12,7 @@ dependencies:
   firebase_core: ^4.15.0
   http: ^1.2.1
   shared_preferences: ^2.5.5
+  url_launcher: ^6.3.3
   flutter:
     sdk: flutter
 
