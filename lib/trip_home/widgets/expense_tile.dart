@@ -14,12 +14,14 @@ class ExpenseTile extends StatelessWidget {
     required this.expense,
     this.onTap,
     this.showDate = true,
+    this.padding = const EdgeInsets.symmetric(vertical: 12),
   });
 
   final Trip trip;
   final Expense expense;
   final VoidCallback? onTap;
   final bool showDate;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -33,17 +35,14 @@ class ExpenseTile extends StatelessWidget {
       button: onTap != null,
       child: Material(
         type: MaterialType.transparency,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
           highlightColor: AppColors.primaryLight,
           splashColor: AppColors.primaryLight,
           hoverColor: AppColors.primarySoft,
           focusColor: AppColors.primarySoft,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: padding,
             child: Row(
               children: [
                 Text(e.icon, style: const TextStyle(fontSize: 20)),
@@ -89,7 +88,7 @@ class ExpenseTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Flexible(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [

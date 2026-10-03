@@ -2,9 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../api/api.dart';
 import '../models/country.dart';
-import '../models/test_card.dart';
 import '../models/trip.dart';
 import 'trip_repository.dart';
 
@@ -32,29 +30,6 @@ class TripStore extends ChangeNotifier {
   /// 여행이 있는 사용자한테도 "아직 떠날 준비가..." 가 번쩍 보인다.
   bool get isLoading => _loading;
   bool get isRemote => _repo != null;
-  final Set<String> _hiddenImported = {};
-  final Map<String, TestCard> _testCards = {};
-
-  TestCard? testCardFor(String tripId) => _testCards[tripId];
-
-  void registerTestCard(
-    String tripId,
-    TestCard card, {
-    required bool noticeAccepted,
-  }) {
-    if (isRemote) throw StateError('임시 등록은 테스트 모드에서만 가능해요');
-    if (byId(tripId) == null) throw StateError('여행을 찾을 수 없어요');
-    if (!noticeAccepted) throw StateError('개발용 안내를 확인해주세요');
-    final error = card.validationError;
-    if (error != null) throw ArgumentError(error);
-    _testCards[tripId] = card;
-    notifyListeners();
-  }
-
-  void removeTestCard(String tripId) {
-    _testCards.remove(tripId);
-    notifyListeners();
-  }
 
   Trip? byId(String id) {
     for (final t in _trips) {
@@ -71,7 +46,6 @@ class TripStore extends ChangeNotifier {
 
   void remove(String id) {
     _trips.removeWhere((t) => t.id == id);
-    _testCards.remove(id);
     _expenseSubs.remove(id)?.cancel();
     notifyListeners();
     _push(_repo?.deleteTrip(id));
@@ -145,53 +119,8 @@ class TripStore extends ChangeNotifier {
     if (!identical(byId(tripId), trip) || !identical(repo, _repo)) {
       throw StateError('여행 정보가 변경됐어요');
     }
-    if (trip.expenses.any((e) => e.id == expenseId && e.isImported)) {
-      _hiddenImported.add('$tripId/$expenseId');
-    }
     trip.expenses.removeWhere((e) => e.id == expenseId);
     notifyListeners();
-  }
-
-  /// 테스트 승인 이벤트도 일반 장부 저장 경로를 쓴다. 실계좌와 섞지 않는다.
-  Future<void> applyDemoCardEvent(String tripId, Expense event) async {
-    if (isRemote || event.source != 'demo-card') {
-      throw StateError('테스트 결제는 임시 모드에서만 가능해요');
-    }
-    if (_hiddenImported.contains('$tripId/${event.id}')) return;
-    final trip = byId(tripId);
-    if (trip == null) throw StateError('여행을 찾을 수 없어요');
-    final old = trip.expenses.where((e) => e.id == event.id).firstOrNull;
-    if (old?.status == ExpenseStatus.cancelled &&
-        event.status.countsAsSpending) {
-      return;
-    }
-    if (old?.status == ExpenseStatus.partiallyCancelled &&
-        event.status == ExpenseStatus.approved) {
-      return;
-    }
-    await saveExpense(
-      tripId,
-      Expense(
-        id: event.id,
-        icon: old?.icon ?? event.icon,
-        place: event.place,
-        amount: event.amount,
-        date: event.date,
-        category: old?.category ?? event.category,
-        paymentMethod: PaymentMethod.card,
-        isTaxFree: old?.isTaxFree ?? false,
-        currency: event.currency,
-        memo: old?.memo ?? event.memo,
-        recordedQuote:
-            old?.recordedQuote ??
-            (RateApi.quotedKrw(event.currencyOf(trip)) > 0
-                ? RateApi.quotedKrw(event.currencyOf(trip))
-                : null),
-        source: event.source,
-        status: event.status,
-        originalAmount: event.originalAmount ?? event.amount,
-      ),
-    );
   }
 
   // -------------------------------------------------------------------------
@@ -207,8 +136,6 @@ class TripStore extends ChangeNotifier {
     }
     _expenseSubs.clear();
     _trips.clear();
-    _hiddenImported.clear();
-    _testCards.clear();
 
     _repo = repo;
     _loading = repo != null;
