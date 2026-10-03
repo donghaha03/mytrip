@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -734,10 +735,50 @@ void main() {
     expect(find.byType(CheckboxListTile), findsNothing);
     expect(find.textContaining('테스트 승인'), findsNothing);
     expect(find.text('연결된 카드 내역 확인'), findsNothing);
-    await tester.tap(find.text('연결에 필요한 준비'));
+    final connect = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('toss-bank-connect')),
+    );
+    expect(connect.onPressed, isNull);
+    await tester.tap(find.text('조회 동의 안내'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.textContaining('3. 제공자 공식 화면'), 100);
-    expect(find.textContaining('3. 제공자 공식 화면'), findsOneWidget);
+    await tester.scrollUntilVisible(find.textContaining('지금은 인증 경로'), 100);
+    expect(find.textContaining('금융정보를 수집하지 않아요'), findsOneWidget);
+    expect(trip.expenses, orderedEquals(before));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('토스 공식 페이지 이동은 동의나 카드 연결로 처리하지 않는다', (tester) async {
+    const channel = MethodChannel('plugins.flutter.io/url_launcher');
+    final calls = <MethodCall>[];
+    var opens = true;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
+          return opens;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+    final before = List<Expense>.of(trip.expenses);
+    await tester.pumpWidget(_wrap(CardConnectionScreen(trip: trip)));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('toss-official-page')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('toss-official-page')));
+    await tester.pumpAndSettle();
+    expect(calls.single.method, 'launch');
+    expect(calls.single.arguments['url'], 'https://toss.im/');
+    expect(find.text('실제 카드 미연결'), findsOneWidget);
+    expect(trip.expenses, orderedEquals(before));
+    expect(find.byType(CheckboxListTile), findsNothing);
+    expect(find.byType(TextFormField), findsNothing);
+
+    opens = false;
+    await tester.tap(find.byKey(const ValueKey('toss-official-page')));
+    await tester.pump();
+    expect(find.text('페이지를 열지 못했어요. 잠시 후 다시 시도해주세요.'), findsOneWidget);
     expect(trip.expenses, orderedEquals(before));
     expect(tester.takeException(), isNull);
   });
@@ -759,7 +800,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(_wrap(CardConnectionScreen(trip: trip)));
-    await tester.tap(find.text('연결에 필요한 준비'));
+    await tester.tap(find.text('조회 동의 안내'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.textContaining('전체 카드번호'), 100);
     expect(tester.takeException(), isNull);

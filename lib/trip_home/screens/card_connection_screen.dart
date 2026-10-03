@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/trip_store.dart';
 import '../models/trip.dart';
@@ -20,6 +21,24 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
   bool _busy = false;
   String? _message;
   bool _failed = false;
+
+  Future<void> _openToss() async {
+    try {
+      // 공식 홈페이지 이동일 뿐, 카드 조회 동의나 연결 완료가 아니다.
+      final opened = await launchUrl(
+        Uri.parse('https://toss.im/'),
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_blank',
+      );
+      if (!opened) throw StateError('토스 공식 페이지를 열지 못했어요');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('페이지를 열지 못했어요. 잠시 후 다시 시도해주세요.')),
+        );
+      }
+    }
+  }
 
   Future<void> _sync() async {
     if (_busy) return;
@@ -83,7 +102,7 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      '실제 카드 연결',
+                      '토스뱅크 체크카드',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
@@ -94,42 +113,47 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
                       canSync ? '인증된 서버 연결을 확인해주세요' : '실제 카드 미연결',
                       style: const TextStyle(color: AppColors.textSecondary),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     const Text(
-                      '토스뱅크 체크카드',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      '사용내역을 자동으로 가져오려면 토스뱅크를 지원하는 조회 서비스의 API 권한이 필요해요. 현재 공개 API에서는 연결 경로를 확인하지 못했어요.',
+                    ),
+                    const SizedBox(height: 16),
+                    const FilledButton(
+                      key: ValueKey('toss-bank-connect'),
+                      onPressed: null,
+                      child: Text('토스뱅크 연결 · 지원 확인 필요'),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      key: const ValueKey('toss-official-page'),
+                      onPressed: _openToss,
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      label: const Text('토스 공식 페이지 열기'),
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      '현재 앱에서는 토스뱅크 결제내역을 받을 수 없어요. 카드 정보를 입력하는 것만으로 연결되지는 않아요.',
+                      '토스로 이동해도 mytrip과 연결되지는 않아요. 사용내역은 토스 앱에서 확인할 수 있어요.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                     Material(
                       color: AppColors.white,
                       borderRadius: BorderRadius.circular(14),
                       clipBehavior: Clip.antiAlias,
                       child: const ExpansionTile(
-                        title: Text('연결에 필요한 준비'),
+                        title: Text('조회 동의 안내'),
                         childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 16),
                         expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            '1. 토스뱅크 조회를 지원하는 서비스의 운영 권한\n2. 로그인과 사용자별 인증을 처리하는 보안 서버\n3. 제공자 공식 화면에서 본인 인증과 조회 동의',
+                            '카드 조회 동의와 본인 인증은 제공자의 공식 인증 화면에서 진행해요. 지금은 인증 경로가 준비되지 않아 동의를 받거나 금융정보를 수집하지 않아요.',
                           ),
                           SizedBox(height: 12),
                           Text(
-                            '계좌 입출금 조회와 카드 승인내역은 달라요. 토스뱅크는 오픈뱅킹 참여 은행이지만, 카드 가맹점·취소 정보와 결제 즉시 반영을 별도로 확인해야 해요.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            '연결 전 조회 항목·기간·보관 기간·동의 철회 방법을 안내해야 해요. 현재는 금융정보를 수집하지 않아요.',
+                            '연동 전 제공자·조회 항목·조회 기간·보관 기간·동의 철회 방법을 먼저 안내해요. 장부에 사용할 카드와 여행을 선택한 뒤 연결해야 해요.',
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
