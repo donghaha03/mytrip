@@ -60,7 +60,7 @@ flutter build web --release --no-wasm-dry-run --base-href /mytrip/
 
 ## 카드 연동
 
-공개 앱의 테스트 카드는 실제 API·실카드와 연결되지 않은 로컬 이벤트입니다.
+공개 앱은 실카드에 연결되어 있지 않으며 카드 인증정보를 입력받지 않습니다.
 실제 연결용 서버의 권한·제공자 설정·실행 안내는 [카드 서버](server/card/README.md)를 참고하세요.
 서버는 여행의 기존 `records` 경로에 저장하며 앱은 Firestore 구독으로 갱신합니다.
 카드 기록의 삭제는 숨김 처리이며 실제 결제를 취소하지 않습니다.

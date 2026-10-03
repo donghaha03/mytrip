@@ -2,7 +2,7 @@
 
 CODEF 개인카드 승인내역을 조회해 `mytrip-fddfb`의 사용자별 여행 장부에 저장하는 서버입니다.
 제공자 자격증명·본인 인증·사용자 동의·상시 실행 호스트가 없으면 실제 카드에 연결되지 않습니다.
-공개 앱의 **테스트 카드**는 CODEF 샌드박스도 실결제도 아닌 로컬 이벤트입니다.
+공개 앱은 실카드에 연결되어 있지 않으며 카드 인증정보를 입력받지 않습니다.
 
 ## 실행 전 확인
 
@@ -76,4 +76,6 @@ API 비밀키나 카드 인증정보를 Flutter에 넣지 않습니다.
 - [CODEF 개인카드 승인내역](https://developer.codef.io/products/card/common/p/approval)
 - [CODEF 인증과 Connected ID](https://developer.codef.io/common-guide/connected-id/cid)
 - [CODEF 공식 Node 연동 규약](https://github.com/codef-io/easycodef-node)
+- [금융결제원 오픈뱅킹 거래내역](https://developers.kftc.or.kr/dev/openapi/open-banking/transaction): 토스뱅크는 참여 은행이지만 계좌 거래내역은 카드 승인·가맹점·취소 정보와 동일하지 않습니다. 출금을 카드 승인으로 추측해 등록하지 않습니다.
+- [금융결제원 서비스 신청·API 키](https://developers.kftc.or.kr/dev/starter/starter): 운영 권한과 등록된 콜백 URL, 공식 사용자 인증이 필요합니다. 테스트 데이터로 실제 결제 수신을 검증할 수 없습니다.
 - [Firebase Admin 설정](https://firebase.google.com/docs/admin/setup)

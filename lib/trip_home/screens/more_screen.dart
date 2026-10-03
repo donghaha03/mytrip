@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../data/trip_store.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../widgets/screen_top_bar.dart';
@@ -30,24 +29,17 @@ class MoreScreen extends StatelessWidget {
                       color: AppColors.white,
                       borderRadius: BorderRadius.circular(14),
                       clipBehavior: Clip.antiAlias,
-                      child: AnimatedBuilder(
-                        animation: tripStore,
-                        builder: (context, _) => ListTile(
-                          leading: const Icon(
-                            Icons.credit_card_rounded,
-                            color: AppColors.primary,
-                          ),
-                          title: const Text('카드 연동'),
-                          subtitle: Text(
-                            tripStore.testCardFor(trip.id) == null
-                                ? '카드 등록 및 연결 상태'
-                                : '임시 등록 · ${tripStore.testCardFor(trip.id)!.displayLabel}',
-                          ),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => CardConnectionScreen(trip: trip),
-                            ),
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.credit_card_rounded,
+                          color: AppColors.primary,
+                        ),
+                        title: const Text('카드 연동'),
+                        subtitle: const Text('본인 인증 및 연결 상태'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => CardConnectionScreen(trip: trip),
                           ),
                         ),
                       ),
