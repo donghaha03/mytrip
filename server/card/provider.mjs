@@ -17,10 +17,11 @@ export function createCodefClient({ clientId, clientSecret, mode, fetcher = fetc
     token = data.access_token;
     expiresAt = Date.now() + (Number.isFinite(Number(data.expires_in)) ? Math.max(0, Number(data.expires_in) - 60) : 0) * 1000;
   }
-  return async params => {
+  return async (params, path = '/v1/kr/card/p/account/approval-list') => {
+    if (!['/v1/kr/card/p/account/approval-list', '/v1/kr/card/p/account/card-list', '/v1/account/create', '/v1/account/delete'].includes(path)) throw new Error('허용되지 않은 조회');
     if (!token || Date.now() >= expiresAt) await authenticate();
     for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await fetcher(`${host}/v1/kr/card/p/account/approval-list`, {
+      const response = await fetcher(`${host}${path}`, {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(300000),
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: encodeURIComponent(JSON.stringify(params)),

@@ -52,7 +52,7 @@ export function normalizeApproval(row, organization) {
   };
 }
 
-export function parseApprovals(response, organization) {
+export function parseApprovals(response, organization, scope) {
   if (response?.result?.code !== 'CF-00000') throw new Error('카드 조회 실패');
   const data = response.data;
   const rows = Array.isArray(data) ? data : data && typeof data === 'object' ? [data] : null;
@@ -62,6 +62,7 @@ export function parseApprovals(response, organization) {
   for (const row of rows) {
     try {
       const next = normalizeApproval(row, organization);
+      if (scope && (kstDate(next.date) < scope.firstDate || kstDate(next.date) > scope.lastDate)) throw new Error('동의한 여행 기간 밖의 내역');
       const old = records.get(next.id);
       // 같은 응답에 승인·취소가 함께 오면 취소를 우선한다. 불명확한 부분 취소는 위에서 보류.
       if (!old || old.status === 'approved' || next.status === 'cancelled') records.set(next.id, next);

@@ -721,8 +721,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CardConnectionScreen), findsOneWidget);
     expect(find.text('실제 카드 미연결'), findsOneWidget);
-    expect(find.text('토스뱅크 체크카드'), findsOneWidget);
-    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('내 카드 사용내역 연결'), findsOneWidget);
+    expect(find.byKey(const ValueKey('card-login-password')), findsOneWidget);
     expect(find.text('카드 정보 입력'), findsNothing);
   });
 
@@ -730,24 +730,45 @@ void main() {
     final before = List<Expense>.of(trip.expenses);
     await tester.pumpWidget(_wrap(CardConnectionScreen(trip: trip)));
     expect(find.text('실제 카드 미연결'), findsOneWidget);
-    expect(find.byType(TextField), findsNothing);
-    expect(find.byType(TextFormField), findsNothing);
-    expect(find.byType(CheckboxListTile), findsNothing);
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('card-login-id')))
+          .enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('card-login-password')),
+          )
+          .enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(find.byKey(const ValueKey('card-consent')))
+          .onChanged,
+      isNull,
+    );
     expect(find.textContaining('테스트 승인'), findsNothing);
     expect(find.text('연결된 카드 내역 확인'), findsNothing);
     final connect = tester.widget<FilledButton>(
-      find.byKey(const ValueKey('toss-bank-connect')),
+      find.byKey(const ValueKey('card-authenticate')),
     );
     expect(connect.onPressed, isNull);
     await tester.tap(find.text('조회 동의 안내'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.textContaining('지금은 인증 경로'), 100);
-    expect(find.textContaining('금융정보를 수집하지 않아요'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.textContaining('CODEF는 이후 조회'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.textContaining('CODEF는 이후 조회'), findsOneWidget);
     expect(trip.expenses, orderedEquals(before));
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('토스 공식 페이지 이동은 동의나 카드 연결로 처리하지 않는다', (tester) async {
+  testWidgets('CODEF 공식 안내 이동은 동의나 카드 연결로 처리하지 않는다', (tester) async {
     const channel = MethodChannel('plugins.flutter.io/url_launcher');
     final calls = <MethodCall>[];
     var opens = true;
@@ -762,23 +783,50 @@ void main() {
     });
     final before = List<Expense>.of(trip.expenses);
     await tester.pumpWidget(_wrap(CardConnectionScreen(trip: trip)));
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('toss-official-page')),
+    await tester.scrollUntilVisible(
+      find.text('CODEF 공식 안내'),
+      150,
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('toss-official-page')));
+    await tester.tap(find.text('CODEF 공식 안내'));
     await tester.pumpAndSettle();
     expect(calls.single.method, 'launch');
-    expect(calls.single.arguments['url'], 'https://toss.im/');
+    expect(
+      calls.single.arguments['url'],
+      'https://developer.codef.io/products/card/common/p/approval',
+    );
+    await tester.scrollUntilVisible(
+      find.text('실제 카드 미연결'),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('실제 카드 미연결'), findsOneWidget);
     expect(trip.expenses, orderedEquals(before));
-    expect(find.byType(CheckboxListTile), findsNothing);
-    expect(find.byType(TextFormField), findsNothing);
+    expect(
+      tester
+          .widget<CheckboxListTile>(find.byKey(const ValueKey('card-consent')))
+          .value,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('card-login-password')),
+          )
+          .enabled,
+      isFalse,
+    );
 
     opens = false;
-    await tester.tap(find.byKey(const ValueKey('toss-official-page')));
+    await tester.scrollUntilVisible(
+      find.text('CODEF 공식 안내'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('CODEF 공식 안내'));
     await tester.pump();
-    expect(find.text('페이지를 열지 못했어요. 잠시 후 다시 시도해주세요.'), findsOneWidget);
+    expect(find.text('공식 안내 페이지를 열지 못했어요.'), findsOneWidget);
     expect(trip.expenses, orderedEquals(before));
     expect(tester.takeException(), isNull);
   });
@@ -802,7 +850,11 @@ void main() {
     await tester.pumpWidget(_wrap(CardConnectionScreen(trip: trip)));
     await tester.tap(find.text('조회 동의 안내'));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.textContaining('전체 카드번호'), 100);
+    await tester.scrollUntilVisible(
+      find.textContaining('카드번호·CVC'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(tester.takeException(), isNull);
   });
 

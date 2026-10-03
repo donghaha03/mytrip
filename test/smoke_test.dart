@@ -238,7 +238,7 @@ void main() {
     await tester.tap(find.byTooltip('더보기'));
     await tester.pumpAndSettle();
     expect(find.byType(MoreScreen), findsOneWidget);
-    expect(find.text('계정 및 설정 메뉴는 준비 중이에요.'), findsOneWidget);
+    expect(find.text('mytrip 로그인'), findsOneWidget);
     expect(find.textContaining('담당'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
