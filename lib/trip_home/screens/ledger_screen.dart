@@ -326,7 +326,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       ),
                       const SizedBox(height: 8),
                       Material(
-                        key: const ValueKey('ledger-expense-group'),
+                        key: ValueKey('ledger-expense-group-${group.key}'),
                         color: AppColors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),

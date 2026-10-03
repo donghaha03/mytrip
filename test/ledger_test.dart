@@ -627,9 +627,9 @@ void main() {
     await tester.pumpWidget(_wrap(LedgerScreen(trip: trip)));
     await tester.scrollUntilVisible(find.text('상점3'), 150);
     await tester.pumpAndSettle();
-    final group = find.byKey(const ValueKey('ledger-expense-group')).first;
-    final tile = find
-        .descendant(of: group, matching: find.byType(ExpenseTile))
+    final tile = find.widgetWithText(ExpenseTile, '상점3');
+    final group = find
+        .ancestor(of: tile, matching: find.byType(Material))
         .first;
     final ink = find.descendant(of: tile, matching: find.byType(InkWell));
     final groupRect = tester.getRect(group);
