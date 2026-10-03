@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../widgets/add_trip_cta.dart';
 import 'add_trip_screen.dart';
+import 'more_screen.dart';
 
 /// 00. 여행이 하나도 없을 때 보이는 첫 화면.
 class EmptyHomeScreen extends StatelessWidget {
@@ -66,6 +67,14 @@ class EmptyHomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 26),
                   const _FeatureRow(),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const MoreScreen(),
+                      ),
+                    ),
+                    child: const Text('더보기 · 로그인'),
+                  ),
                 ],
               ),
             ),
