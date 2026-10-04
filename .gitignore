@@ -55,3 +55,8 @@ app.*.map.json
 .env
 .env.*
 *.service-account.json
+
+# Local receipt login state must never be published.
+*.dpapi
+*.dpapi.tmp
+runtime.lock

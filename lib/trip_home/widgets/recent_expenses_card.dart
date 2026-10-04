@@ -98,7 +98,8 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
           ),
           if (hasAny) ...[
             Container(height: 1, color: AppColors.border),
-            for (final e in recent) ExpenseTile(trip: trip, expense: e),
+            for (final e in recent)
+              ExpenseTile(trip: trip, expense: e, interactive: false),
           ],
         ],
       ),

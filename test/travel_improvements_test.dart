@@ -30,6 +30,7 @@ import 'package:tripapp/trip_home/widgets/category_charts.dart';
 import 'package:tripapp/trip_home/widgets/expense_tile.dart';
 import 'package:tripapp/trip_home/widgets/sheets.dart';
 import 'package:tripapp/trip_home/widgets/swipe_actions.dart';
+import 'package:tripapp/trip_home/widgets/onboarding_example.dart';
 import 'package:tripapp/trip_home/widgets/rate_info_tooltip.dart';
 import 'package:tripapp/trip_home/widgets/screen_top_bar.dart';
 import 'package:tripapp/trip_home/theme/app_colors.dart';
@@ -412,7 +413,7 @@ void main() {
     },
   );
   testWidgets(
-    'overview/bar/list react together after add, edit, delete on small screen',
+    'overview and budget totals react after add, edit, delete without a duplicate expense list',
     (tester) async {
       tester.view.physicalSize = const Size(320, 640);
       tester.view.devicePixelRatio = 1;
@@ -431,7 +432,7 @@ void main() {
       await tripStore.deleteExpense(t.id, 'b');
       await tester.pump();
       expect(find.text('총 순지출 3,000원'), findsOneWidget);
-      await tester.scrollUntilVisible(find.byType(ExpenseTile), 150);
+      expect(find.byType(ExpenseTile), findsNothing);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(wrap(CategoryBudgetBar(trip: t)));
@@ -494,11 +495,8 @@ void main() {
               onPressed: () async {
                 result = await Navigator.of(context).push<ReceiptDraft>(
                   MaterialPageRoute(
-                    builder: (_) => ReceiptReviewScreen(
-                      draft: draft,
-                      image: bytes,
-                      text: 'TEST CAFE',
-                    ),
+                    builder: (_) =>
+                        ReceiptReviewScreen(draft: draft, image: bytes),
                   ),
                 );
               },
@@ -668,6 +666,107 @@ void main() {
     },
   );
 
+  testWidgets(
+    'home previews have no click, hover, long-press or swipe actions',
+    (tester) async {
+      final t = trip([expense('a', 1000)]);
+      tripStore.add(t);
+      await tester.pumpWidget(wrap(TripHomeScreen(trip: t)));
+      final tile = find.byType(ExpenseTile).first;
+      await tester.ensureVisible(tile);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: tile, matching: find.byType(InkWell)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: tile, matching: find.byType(SwipeActions)),
+        findsNothing,
+      );
+      await tester.tapAt(tester.getCenter(tile));
+      await tester.longPressAt(tester.getCenter(tile));
+      await tester.dragFrom(tester.getCenter(tile), const Offset(-180, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(ExpenseDetailScreen), findsNothing);
+      expect(find.byType(ExpenseFormScreen), findsNothing);
+      expect(t.expenses.length, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'blue budget panel is flat and pastel categories share the chart palette',
+    (tester) async {
+      final t = trip([expense('a', 10000)]);
+      await tester.pumpWidget(wrap(BudgetProgressPanel(trip: t)));
+      final panel = find.byType(BudgetProgressPanel);
+      expect(
+        find.descendant(of: panel, matching: find.byType(Container)),
+        findsNothing,
+      );
+      final bar = tester.widget<CategoryBudgetBar>(
+        find.byType(CategoryBudgetBar),
+      );
+      expect(bar.height, 8);
+      expect(bar.track, AppColors.progressTrackOnPrimary);
+      expect(
+        tester.widget<Text>(find.text('10%')).style!.color,
+        AppColors.white,
+      );
+      expect(categoryColor('식비'), isNot(AppColors.primary));
+      expect(SpendingSummary(t).budgetRatio(t.budgetKrw), .1);
+    },
+  );
+
+  testWidgets(
+    'swipe demo reveals actions then resets without mutating records',
+    (tester) async {
+      var edits = 0, deletes = 0;
+      await tester.pumpWidget(
+        wrap(
+          SwipeActions(
+            label: '예시',
+            previewSwipe: true,
+            onEdit: () => edits++,
+            onDelete: () => deletes++,
+            child: const ColoredBox(
+              color: AppColors.white,
+              child: SizedBox(height: 120, width: double.infinity),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.byTooltip('예시 수정'), findsOneWidget);
+      expect(find.byTooltip('예시 삭제'), findsOneWidget);
+      expect(edits + deletes, 0);
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('예시 수정'), findsNothing);
+      expect(edits + deletes, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'receipt guide shows capture, recognition and review without saving',
+    (tester) async {
+      await tester.pumpWidget(
+        wrap(SingleChildScrollView(child: const OnboardingExample(step: 3))),
+      );
+      await tester.ensureVisible(find.text('촬영해 보기'));
+      await tester.tap(find.text('촬영해 보기'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('사진 확인 후 인식'));
+      await tester.tap(find.text('사진 확인 후 인식'));
+      await tester.pumpAndSettle();
+      expect(find.text('KRW · 원'), findsOneWidget);
+      expect(find.text('2027-05-01'), findsOneWidget);
+      expect(find.text('촬영 흐름 보기'), findsNothing);
+      expect(tripStore.isEmpty, isTrue);
+    },
+  );
+
   testWidgets('home and ledger use identical rate slots at 320px', (
     tester,
   ) async {
@@ -728,22 +827,14 @@ void main() {
   );
 
   testWidgets(
-    'expense swipes and long press work in home, ledger and chart lists',
+    'ledger expense swipes and long press keep edit and delete confirmation',
     (tester) async {
-      for (final page in ['home', 'ledger', 'chart']) {
+      {
         tripStore.connect(null);
         final t = trip([expense('a', 1000)]);
         tripStore.add(t);
         await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pumpWidget(
-          wrap(
-            page == 'home'
-                ? TripHomeScreen(trip: t)
-                : page == 'ledger'
-                ? LedgerScreen(trip: t)
-                : SpendingOverviewScreen(trip: t),
-          ),
-        );
+        await tester.pumpWidget(wrap(LedgerScreen(trip: t)));
         await tester.scrollUntilVisible(
           find.byType(ExpenseTile),
           250,
@@ -850,14 +941,14 @@ void main() {
       expect(find.text('여행을 추가해요'), findsOneWidget);
       expect(find.text('첫 여행을 추가해 보세요'), findsNothing);
       final pages = find.byKey(const ValueKey('welcome-pages'));
-      for (var i = 1; i <= 4; i++) {
+      for (var i = 1; i <= 5; i++) {
         // Swipe the heading, outside the interactive example card.
         await tester.dragFrom(
           tester.getTopLeft(pages) + const Offset(280, 36),
           const Offset(-280, 0),
         );
         await tester.pumpAndSettle();
-        if (i < 4) expect(find.text('${i + 1} / 4'), findsOneWidget);
+        if (i < 5) expect(find.text('${i + 1} / 5'), findsOneWidget);
       }
       expect(find.byType(PageView), findsNothing);
       expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
@@ -870,7 +961,7 @@ void main() {
       expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
       await tester.tap(find.text('사용방법 다시 보기'));
       await tester.pumpAndSettle();
-      expect(find.text('1 / 4'), findsOneWidget);
+      expect(find.text('1 / 5'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -895,12 +986,12 @@ void main() {
           home: const EmptyHomeScreen(guideOnly: true),
         ),
       );
-      for (var i = 0; i < 3; i++) {
+      for (var i = 0; i < 4; i++) {
         await tester.tap(find.byTooltip('다음 안내'));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       }
-      expect(find.text('영수증으로 간편하게'), findsOneWidget);
+      expect(find.text('지출을 한눈에 봐요'), findsOneWidget);
       final start = tester
           .widget<IconButton>(
             find.widgetWithIcon(IconButton, Icons.chevron_right_rounded),
@@ -918,7 +1009,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(wrap(const EmptyHomeScreen()));
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 4; i++) {
       await tester.tap(find.byTooltip('다음 안내'));
       await tester.pumpAndSettle();
     }

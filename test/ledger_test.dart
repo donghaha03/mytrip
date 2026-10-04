@@ -25,6 +25,7 @@ import 'package:tripapp/trip_home/theme/app_theme.dart';
 import 'package:tripapp/trip_home/theme/app_colors.dart';
 import 'package:tripapp/trip_home/widgets/recent_expenses_card.dart';
 import 'package:tripapp/trip_home/widgets/expense_tile.dart';
+import 'package:tripapp/trip_home/widgets/swipe_actions.dart';
 import 'package:tripapp/trip_home/widgets/quick_converter.dart';
 import 'package:tripapp/trip_home/widgets/today_budget_sheet.dart';
 
@@ -703,7 +704,12 @@ void main() {
     expect(ink.hoverColor, AppColors.primarySoft);
     expect(
       tester.element(inkFinder).findAncestorWidgetOfExactType<Material>()!.type,
-      MaterialType.transparency,
+      MaterialType.canvas,
+    );
+    expect(tester.getRect(inkFinder), tester.getRect(find.byType(ExpenseTile)));
+    expect(
+      tester.widget<SwipeActions>(find.byType(SwipeActions)).borderRadius,
+      BorderRadius.zero,
     );
     final gesture = await tester.startGesture(
       tester.getCenter(find.text('상점1')),

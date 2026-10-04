@@ -40,16 +40,17 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         return;
       }
       final data = jsonDecode(raw) as Map<String, dynamic>;
-      final draft = ReceiptDraft.parse(
-        data['text'] as String,
-        confidence: (data['confidence'] as num).toDouble(),
-      );
+      final draft = data['draft'] is Map<String, dynamic>
+          ? ReceiptDraft.fromLlm(data['draft'] as Map<String, dynamic>)
+          : ReceiptDraft.parse(
+              data['text'] as String,
+              confidence: (data['confidence'] as num).toDouble(),
+            );
       final result = await Navigator.of(context).push<ReceiptDraft>(
         MaterialPageRoute(
           builder: (_) => ReceiptReviewScreen(
             draft: draft,
             image: base64Decode((data['image'] as String).split(',').last),
-            text: data['text'] as String,
           ),
         ),
       );
@@ -105,11 +106,9 @@ class ReceiptReviewScreen extends StatefulWidget {
     super.key,
     required this.draft,
     required this.image,
-    required this.text,
   });
   final ReceiptDraft draft;
   final Uint8List image;
-  final String text;
   @override
   State<ReceiptReviewScreen> createState() => _ReceiptReviewScreenState();
 }
@@ -249,10 +248,6 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                               setState(() => _category = category),
                         ),
                     ],
-                  ),
-                  ExpansionTile(
-                    title: const Text('인식한 원문 보기'),
-                    children: [SelectableText(widget.text)],
                   ),
                   if (_items.isNotEmpty)
                     ReceiptItems(

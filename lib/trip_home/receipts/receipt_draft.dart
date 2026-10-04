@@ -20,6 +20,84 @@ class ReceiptDraft {
   final List<String> warnings;
   final List<ReceiptItem> items;
 
+  factory ReceiptDraft.fromLlm(Map<String, dynamic> data) {
+    final warnings = <String>[
+      for (final value
+          in (data['warnings'] is List ? data['warnings'] as List : const []))
+        if (value is String) value,
+    ];
+    final merchant = data['merchant'] is String
+        ? (data['merchant'] as String).trim()
+        : '';
+    final currency =
+        data['currency'] is String &&
+            countryByCode(data['currency'] as String) != null
+        ? data['currency'] as String
+        : null;
+    final rawAmount = data['amount'];
+    final amount = rawAmount is num && rawAmount.isFinite && rawAmount >= 0
+        ? rawAmount.toDouble()
+        : null;
+    final rawDate = data['date'];
+    final parsedDate =
+        rawDate is String && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(rawDate)
+        ? DateTime.tryParse(rawDate)
+        : null;
+    final date =
+        parsedDate != null &&
+            parsedDate.toIso8601String().substring(0, 10) == rawDate
+        ? parsedDate
+        : null;
+    if (merchant.isEmpty) warnings.add('상호명 확인 필요');
+    if (currency == null) warnings.add('통화 확인 필요');
+    if (amount == null) warnings.add('최종 결제금액 확인 필요');
+    if (date == null) warnings.add('날짜 확인 필요: 원본의 결제일을 직접 확인해주세요.');
+    if (amount != null && amount != amount.truncate()) {
+      warnings.add('소수점 금액은 앱의 정수 계산 규칙에 따라 버려요. 원본 금액을 확인해주세요.');
+    }
+    final items = <ReceiptItem>[];
+    final rows = data['items'] is List ? data['items'] as List : const [];
+    if (rows.length > 100) {
+      throw const FormatException('Too many receipt items');
+    }
+    for (final row in rows) {
+      final item = row is Map
+          ? ReceiptItem.fromJson({
+              'name': row['name'],
+              'quantity': row['quantity'],
+              'amount': row['amount'],
+              'unitPrice': row['unit_price'],
+            })
+          : null;
+      if (item == null ||
+          (item.unitPrice != null &&
+              (item.unitPrice! * item.quantity - item.amount).abs() > .01)) {
+        warnings.add('불명확하거나 단가·수량·금액이 맞지 않는 품목은 제외했어요. 원본을 확인해주세요.');
+      } else {
+        items.add(item);
+      }
+    }
+    if (amount != null &&
+        items.isNotEmpty &&
+        (items.fold<double>(0, (sum, item) => sum + item.amount) - amount)
+                .abs() >
+            .01) {
+      warnings.add('품목 합계와 결제금액이 달라요. 할인·세금·누락 품목을 원본에서 확인해주세요.');
+    }
+    final category = merchant.isEmpty
+        ? '기타'
+        : ReceiptDraft.parse(merchant).category;
+    return ReceiptDraft(
+      merchant: merchant,
+      date: date,
+      amount: amount,
+      currency: currency,
+      category: category,
+      warnings: warnings.toSet().toList(),
+      items: items,
+    );
+  }
+
   factory ReceiptDraft.parse(String text, {double confidence = 100}) {
     final lines = text
         .split('\n')

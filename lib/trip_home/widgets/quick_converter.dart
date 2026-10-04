@@ -82,40 +82,54 @@ class _QuickConverterState extends State<QuickConverter> {
         children: [
           Row(
             children: [
-              const Text(
-                '빠른 환산',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      '빠른 환산',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      _fromForeign
+                          ? '${_c.currency} → KRW'
+                          : 'KRW → ${_c.currency}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
-              Text(
-                _fromForeign ? '${_c.currency} → KRW' : 'KRW → ${_c.currency}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textTertiary,
-                ),
-              ),
-              const Spacer(),
               Tooltip(
                 message: '방향 바꾸기',
                 child: InkResponse(
                   onTap: available ? _swap : null,
                   radius: 18,
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primarySoft,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.swap_vert_rounded,
-                      size: 16,
-                      color: AppColors.primary,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primarySoft,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.swap_vert_rounded,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                      ),
                     ),
                   ),
                 ),

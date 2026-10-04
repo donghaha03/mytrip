@@ -26,9 +26,10 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
     with SingleTickerProviderStateMixin {
   static const _slides = [
     (title: '여행을 추가해요', description: '국가와 일정, 예산을 정하면 준비 끝.'),
-    (title: '지출을 기록해요', description: '사용처와 금액을 적고 현금·카드를 구분해요.'),
+    (title: '지출을 기록해요', description: '사용처와 금액, 현금·카드와 면세 여부를 기록해요.'),
     (title: '왼쪽으로 밀어 관리해요', description: '여행과 지출을 밀면 수정·삭제가 나타나요.'),
     (title: '영수증으로 간편하게', description: '촬영하거나 사진을 골라, 확인 후 기록해요.'),
+    (title: '지출을 한눈에 봐요', description: '카테고리별 구성비를 보고, 빠른 환산으로 현지 금액을 확인해요.'),
   ];
   final _pages = PageController();
   late final _flight = AnimationController(
@@ -211,7 +212,7 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
                               -80 - _flight.value * size.maxHeight * .4,
                             ),
                             child: const Icon(
-                              Icons.send_rounded,
+                              Icons.flight_takeoff_rounded,
                               size: 72,
                               color: AppColors.primary,
                             ),
@@ -270,7 +271,7 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _PlaneMark(icon: Icons.send_rounded),
+                      _PlaneMark(icon: Icons.flight_takeoff_rounded),
                       SizedBox(height: 28),
                       Text(
                         '첫 여행을 추가해 보세요',
@@ -420,13 +421,10 @@ class _FlightProgress extends StatelessWidget {
                 : const Duration(milliseconds: 250),
             curve: Curves.easeOut,
             alignment: Alignment(-1 + 2 * progress, 0),
-            child: const DecoratedBox(
-              decoration: BoxDecoration(color: AppColors.primarySoft),
-              child: Icon(
-                Icons.send_rounded,
-                size: 22,
-                color: AppColors.primary,
-              ),
+            child: const Icon(
+              Icons.flight_takeoff_rounded,
+              size: 24,
+              color: AppColors.primary,
             ),
           ),
         ],

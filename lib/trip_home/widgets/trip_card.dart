@@ -16,12 +16,14 @@ class TripCard extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     required this.onDelete,
+    this.previewSwipe = false,
   });
 
   final Trip trip;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback onDelete;
+  final bool previewSwipe;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +37,7 @@ class TripCard extends StatelessWidget {
       label: '${trip.name} 여행',
       onEdit: onLongPress,
       onDelete: onDelete,
+      previewSwipe: previewSwipe,
       child: Material(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),

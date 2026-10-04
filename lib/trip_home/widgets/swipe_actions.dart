@@ -12,31 +12,79 @@ class SwipeActions extends StatefulWidget {
     required this.onEdit,
     required this.onDelete,
     required this.label,
+    this.borderRadius = const BorderRadius.all(Radius.circular(16)),
+    this.previewSwipe = false,
   });
   final Widget child;
   final VoidCallback onEdit, onDelete;
   final String label;
+  final BorderRadius borderRadius;
+  final bool previewSwipe;
   @override
   State<SwipeActions> createState() => _SwipeActionsState();
 }
 
-class _SwipeActionsState extends State<SwipeActions> {
+class _SwipeActionsState extends State<SwipeActions>
+    with SingleTickerProviderStateMixin {
   static const _width = 144.0;
   double _offset = 0;
   bool _dragging = false;
   final _focus = FocusNode();
+  late final _preview = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  );
+  late final _previewOffset = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween<double>(
+        begin: 0,
+        end: -_width,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 40,
+    ),
+    TweenSequenceItem(tween: ConstantTween(-_width), weight: 30),
+    TweenSequenceItem(
+      tween: Tween<double>(
+        begin: -_width,
+        end: 0,
+      ).chain(CurveTween(curve: Curves.easeOutCubic)),
+      weight: 30,
+    ),
+  ]).animate(_preview);
+  @override
+  void initState() {
+    super.initState();
+    _preview.addListener(() => setState(() => _offset = _previewOffset.value));
+    if (widget.previewSwipe) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (MediaQuery.disableAnimationsOf(context)) {
+          setState(() => _offset = -_width);
+        } else {
+          _preview.forward();
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     _focus.dispose();
+    _preview.dispose();
     super.dispose();
   }
 
   void _reveal(double offset) {
+    _preview.stop();
     setState(() => _offset = offset);
     _focus.requestFocus();
   }
 
-  void _close() => setState(() => _offset = 0);
+  void _close() {
+    _preview.stop();
+    setState(() => _offset = 0);
+  }
+
   void _run(bool delete) {
     _close();
     (delete ? widget.onDelete : widget.onEdit)();
@@ -75,7 +123,10 @@ class _SwipeActionsState extends State<SwipeActions> {
         },
         child: GestureDetector(
           onTapDown: (_) => _focus.requestFocus(),
-          onHorizontalDragStart: (_) => setState(() => _dragging = true),
+          onHorizontalDragStart: (_) {
+            _preview.stop();
+            setState(() => _dragging = true);
+          },
           onHorizontalDragUpdate: (d) => setState(
             () => _offset = (_offset + d.delta.dx).clamp(-_width, 0),
           ),
@@ -94,7 +145,7 @@ class _SwipeActionsState extends State<SwipeActions> {
             });
           },
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: widget.borderRadius,
             child: Stack(
               children: [
                 if (_offset != 0)
@@ -113,7 +164,10 @@ class _SwipeActionsState extends State<SwipeActions> {
                     ),
                   ),
                 AnimatedContainer(
-                  duration: _dragging || MediaQuery.disableAnimationsOf(context)
+                  duration:
+                      _dragging ||
+                          _preview.isAnimating ||
+                          MediaQuery.disableAnimationsOf(context)
                       ? Duration.zero
                       : const Duration(milliseconds: 180),
                   transform: Matrix4.translationValues(_offset, 0, 0),
@@ -122,11 +176,8 @@ class _SwipeActionsState extends State<SwipeActions> {
                       ExcludeFocus(
                         excluding: _offset != 0,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: ColoredBox(
-                            color: AppColors.white,
-                            child: widget.child,
-                          ),
+                          borderRadius: widget.borderRadius,
+                          child: widget.child,
                         ),
                       ),
                       if (_offset != 0)

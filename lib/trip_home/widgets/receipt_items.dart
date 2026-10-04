@@ -29,11 +29,17 @@ class ReceiptItems extends StatelessWidget {
               ? ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(items[i].name),
-                  subtitle: Text('수량 ${items[i].quantity}'),
+                  subtitle: Text(
+                    '수량 ${items[i].quantity}${items[i].unitPrice == null ? '' : ' · 단가 ${formatNumber(items[i].unitPrice!)} $currency'}',
+                  ),
                   trailing: Text('${formatNumber(items[i].amount)} $currency'),
                 )
               : Column(
                   children: [
+                    if (items[i].unitPrice != null)
+                      Text(
+                        '인식한 단가 ${formatNumber(items[i].unitPrice!)} $currency',
+                      ),
                     TextFormField(
                       initialValue: items[i].name,
                       decoration: const InputDecoration(labelText: '품목명'),
@@ -100,6 +106,7 @@ class ReceiptItems extends StatelessWidget {
       name: name ?? old.name,
       quantity: quantity ?? old.quantity,
       amount: amount ?? old.amount,
+      unitPrice: quantity == null && amount == null ? old.unitPrice : null,
     );
     onChanged!(updated);
   }

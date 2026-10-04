@@ -7,11 +7,9 @@ import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/category_charts.dart';
-import '../widgets/expense_tile.dart';
 import '../widgets/screen_top_bar.dart';
 import '../widgets/quick_converter.dart';
 import '../models/country.dart';
-import 'expense_detail_screen.dart';
 import 'expense_form_screen.dart';
 
 class SpendingOverviewScreen extends StatelessWidget {
@@ -145,28 +143,6 @@ class SpendingOverviewScreen extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
-                        ),
-                      ),
-                    const SizedBox(height: 24),
-                    Text(
-                      '상세 지출 ${trip.expenses.length}건',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    for (final e in trip.expensesNewestFirst)
-                      ExpenseTile(
-                        trip: trip,
-                        expense: e,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ExpenseDetailScreen(
-                              trip: trip,
-                              expenseId: e.id,
-                            ),
-                          ),
                         ),
                       ),
                     if (trip.expenses.isEmpty)

@@ -7,7 +7,7 @@ import test from 'node:test';
 
 const source = await readFile(new URL('../web/receipt.js', import.meta.url), 'utf8');
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
-function environment({ cameraError, noCamera = false, secure = true, mediaPromise, workerPromise, workerError, width = 100, height = 200 } = {}) {
+function environment({ cameraError, noCamera = false, secure = true, mediaPromise, workerPromise, workerError, width = 100, height = 200, llm = false, fetchReceipt } = {}) {
   const elements = new Map(); const callbacks = new Map(); const timers = new Map();
   let stopCount = 0, cameraCalls = 0, terminateCount = 0, workerOptions;
   const stream = { getTracks: () => [{ stop: () => stopCount++ }] };
@@ -27,10 +27,11 @@ function environment({ cameraError, noCamera = false, secure = true, mediaPromis
     addEventListener: (name, cb) => callbacks.set(name, cb), removeEventListener: (name) => callbacks.delete(name) };
   const window = { isSecureContext: secure, addEventListener: (name, cb) => callbacks.set(name, cb),
     removeEventListener: (name) => callbacks.delete(name) };
+  if (llm) window.mytripReceiptLLM = { csrf: 'test-csrf' };
   const navigator = noCamera ? {} : { mediaDevices: { getUserMedia: async () => {
     cameraCalls++; if (cameraError) throw cameraError; return mediaPromise ?? stream;
   } } };
-  const context = vm.createContext({ document, window, navigator, URL, console,
+  const context = vm.createContext({ document, window, navigator, URL, console, AbortController, fetch: fetchReceipt,
     setTimeout: (cb) => { timers.set(1, cb); return 1; }, clearTimeout: (id) => timers.delete(id),
     Tesseract: { createWorker: async (_language, _engine, options) => {
       workerOptions = options; if (workerError) throw workerError; return workerPromise ?? worker;
@@ -64,6 +65,17 @@ test('camera orientation changes resize the guide before capture', async () => {
   assert.equal(env.element('.frame').style.aspectRatio, '200 / 100');
   assert.equal(env.element('.guide').style.inset, '12% 6%');
   env.window.mytripReceipt.close(); assert.equal(await result, null);
+});
+test('receipt UI uses bundled app fonts and keeps device-language settings out of primary LLM controls', async () => {
+  for (const llm of [false, true]) {
+    const env = environment({ llm }); const result = env.window.mytripReceipt.open();
+    assert.equal((env.dialog.innerHTML.match(/id="receipt-language"/g) ?? []).length, 1);
+    assert.match(env.dialog.innerHTML, /https:\/\/test\.invalid\/mytrip\/assets\/assets\/fonts\/Pretendard-Regular\.otf/);
+    assert.doesNotMatch(env.dialog.innerHTML, /JPEG|정사각형|写真/);
+    const primary = env.dialog.innerHTML.split('id="receipt-recognition"')[1].split('id="receipt-llm"')[0];
+    assert.equal(primary.includes('id="receipt-language"'), !llm);
+    env.window.mytripReceipt.close(); assert.equal(await result, null);
+  }
 });
 test('permission is lazy, denial explains site permissions and manual fallback', async () => {
   const env = environment({ cameraError: { name: 'NotAllowedError' } });
@@ -134,4 +146,47 @@ test('close during OCR initialization cleans up the late worker', async () => {
   const { result } = await captured(env); const running = env.element('#receipt-ocr').onclick();
   env.window.mytripReceipt.close(); pending.resolve(env.worker); await running;
   assert.equal(await result, null); assert.equal(env.counters().terminateCount, 1);
+});
+
+test('local primary recognition sends current photo to LLM once and returns review data', async () => {
+  const pending = deferred(); let calls = 0, request;
+  const draft = { merchant: 'TEST CAFE', date: null, amount: 7600, currency: 'KRW', items: [], warnings: ['날짜 확인 필요'] };
+  const env = environment({ llm: true, fetchReceipt: async (url, options) => {
+    calls++; request = { url, options }; return pending.promise;
+  } });
+  const { result } = await captured(env);
+  const running = env.element('#receipt-ocr').onclick();
+  await env.element('#receipt-ocr').onclick(); assert.equal(calls, 1);
+  assert.equal(request.url, '/receipt/recognize');
+  assert.equal(request.options.headers['X-mytrip-csrf'], 'test-csrf');
+  assert.equal(JSON.parse(request.options.body).image, 'data:image/jpeg;base64,dGVzdA==');
+  assert.equal(env.options(), undefined); // no automatic device OCR
+  pending.resolve({ ok: true, json: async () => ({ draft }) }); await running;
+  const data = JSON.parse(await result); assert.deepEqual(data.draft, draft);
+  assert.equal(data.image, 'data:image/jpeg;base64,dGVzdA==');
+  assert.equal(data.text, undefined);
+});
+test('LLM failure retains photo, re-enables retry and never falls back silently', async () => {
+  let calls = 0;
+  const env = environment({ llm: true, fetchReceipt: async () => { calls++; return { ok: false, json: async () => ({ error: 'ChatGPT 로그인이 필요합니다' }) }; } });
+  const { result } = await captured(env);
+  await env.element('#receipt-ocr').onclick();
+  assert.match(env.element('.error').textContent, /로그인/);
+  assert.equal(env.element('img').hidden, false); assert.equal(env.element('#receipt-ocr').disabled, false);
+  await env.element('#receipt-ocr').onclick(); assert.equal(calls, 2); assert.equal(env.options(), undefined);
+  env.window.mytripReceipt.close(); assert.equal(await result, null);
+});
+test('LLM close and timeout abort network request without accepting late results', async () => {
+  for (const close of [true, false]) {
+    let signal;
+    const env = environment({ llm: true, fetchReceipt: async (_url, options) => {
+      signal = options.signal;
+      return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
+    } });
+    const { result } = await captured(env); const running = env.element('#receipt-ocr').onclick();
+    if (close) env.window.mytripReceipt.close(); else env.timers.get(1)();
+    await running; assert.equal(signal.aborted, true);
+    if (!close) { assert.match(env.element('.error').textContent, /시간이 초과/); env.window.mytripReceipt.close(); }
+    assert.equal(await result, null);
+  }
 });
