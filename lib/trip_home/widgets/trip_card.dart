@@ -7,6 +7,7 @@ import '../models/trip.dart';
 import '../screens/trip_home_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'swipe_actions.dart';
 
 class TripCard extends StatelessWidget {
   const TripCard({
@@ -14,11 +15,13 @@ class TripCard extends StatelessWidget {
     required this.trip,
     required this.onTap,
     required this.onLongPress,
+    required this.onDelete,
   });
 
   final Trip trip;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -27,105 +30,114 @@ class TripCard extends StatelessWidget {
         ? 0
         : trip.spentKrw * 100 ~/ trip.budgetKrw;
 
-    return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
+    return SwipeActions(
+      key: ValueKey('trip-swipe-${trip.id}'),
+      label: '${trip.name} 여행',
+      onEdit: onLongPress,
+      onDelete: onDelete,
+      child: Material(
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(trip.country.flag, style: const TextStyle(fontSize: 32)),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Text(
-                      trip.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      trip.country.flag,
+                      style: const TextStyle(fontSize: 32),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (trip.isCompleted)
-                    const CompletedStamp()
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                    const SizedBox(width: 10),
+                    Flexible(
                       child: Text(
-                        tripStatusLabel(trip, DateTime.now()),
+                        trip.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${formatDate(trip.start)} - ${formatDate(trip.end)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+                    const SizedBox(width: 8),
+                    if (trip.isCompleted)
+                      const CompletedStamp()
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySoft,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          tripStatusLabel(trip, DateTime.now()),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${formatWon(trip.budgetKrw)} · ${available ? '$percent% 사용' : '환율 없음'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                const SizedBox(height: 8),
+                Text(
+                  '${formatDate(trip.start)} - ${formatDate(trip.end)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${formatWon(trip.budgetKrw)} · ${available ? '$percent% 사용' : '환율 없음'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${trip.country.currency} · 지출 ${trip.expenses.length}건',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
+                    const SizedBox(width: 8),
+                    Text(
+                      '${trip.country.currency} · 지출 ${trip.expenses.length}건',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: CategoryBudgetBar(trip: trip),
-              ),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: CategoryBudgetBar(trip: trip),
+                ),
+              ],
+            ),
           ),
         ),
       ),

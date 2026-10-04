@@ -19,12 +19,14 @@ class RecentExpensesCard extends StatefulWidget {
     required this.trip,
     required this.now,
     required this.onOpenLedger,
+    required this.onOpenOverview,
     required this.onAddExpense,
   });
 
   final Trip trip;
   final DateTime now;
   final VoidCallback onOpenLedger;
+  final VoidCallback onOpenOverview;
   final VoidCallback onAddExpense;
 
   @override
@@ -73,31 +75,7 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
                   ),
                 ),
               const Spacer(),
-              InkWell(
-                onTap: widget.onOpenLedger,
-                borderRadius: BorderRadius.circular(8),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '지출보기',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _SummaryLink(label: '지출보기', onTap: widget.onOpenLedger),
             ],
           ),
           if (!hasAny)
@@ -113,7 +91,12 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
                 selected: _selected,
                 onSelect: (i) => setState(() => _selected = i),
               ),
-            const SizedBox(height: 12),
+          ],
+          Align(
+            alignment: Alignment.centerRight,
+            child: _SummaryLink(label: '한눈에 보기', onTap: widget.onOpenOverview),
+          ),
+          if (hasAny) ...[
             Container(height: 1, color: AppColors.border),
             for (final e in recent) ExpenseTile(trip: trip, expense: e),
           ],
@@ -121,6 +104,28 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
       ),
     );
   }
+}
+
+class _SummaryLink extends StatelessWidget {
+  const _SummaryLink({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => TextButton(
+    onPressed: onTap,
+    style: TextButton.styleFrom(
+      minimumSize: const Size(44, 44),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label),
+        const Icon(Icons.chevron_right_rounded, size: 16),
+      ],
+    ),
+  );
 }
 
 /// 오늘까지 7일치 (날짜, 원화 합계). 인덱스 6 이 오늘.

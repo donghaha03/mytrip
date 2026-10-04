@@ -182,7 +182,10 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               onPressed: () => _browse(-1),
-              icon: const Icon(Icons.chevron_left_rounded),
+              icon: const Icon(
+                Icons.chevron_left_rounded,
+                color: AppColors.textSecondary,
+              ),
             ),
             Expanded(
               child: TextButton(
@@ -195,6 +198,11 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
                 child: Text(
                   '${_month.year}년 ${_month.month}월',
                   semanticsLabel: '${_month.year}년 ${_month.month}월, 연도와 월 선택',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ),
@@ -205,12 +213,15 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               onPressed: () => _browse(1),
-              icon: const Icon(Icons.chevron_right_rounded),
+              icon: const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 12),
       Row(
         children: [
           for (final label in ['일', '월', '화', '수', '목', '금', '토'])
@@ -220,6 +231,7 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
                   label,
                   style: const TextStyle(
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -254,12 +266,6 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
           ),
         ),
       ),
-      const SizedBox(height: 6),
-      const Text(
-        '오늘은 테두리 · 선택한 날짜는 파란색',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-      ),
     ],
   );
   Widget _day(int day) {
@@ -282,33 +288,49 @@ class _CalendarRangePickerState extends State<CalendarRangePicker> {
           focusNode: _focus(date),
           onTap: () => _select(date),
           borderRadius: BorderRadius.circular(20),
-          child: Container(
+          child: Stack(
             alignment: Alignment.center,
-            color: selected ? AppColors.primaryLight : null,
-            child: Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: edge ? AppColors.primary : null,
-                border: today
-                    ? Border.all(
-                        color: edge ? Colors.white : AppColors.primary,
-                        width: 2,
-                      )
-                    : null,
-              ),
-              child: ExcludeSemantics(
-                child: Text(
-                  '$day',
-                  style: TextStyle(
-                    fontWeight: edge ? FontWeight.w700 : FontWeight.w500,
-                    color: edge ? Colors.white : AppColors.textPrimary,
+            children: [
+              if (selected)
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.horizontal(
+                          left: Radius.circular(date == _start ? 18 : 0),
+                          right: Radius.circular(date == _end ? 18 : 0),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: edge ? AppColors.primary : null,
+                  border: today
+                      ? Border.all(
+                          color: edge ? Colors.white : AppColors.primary,
+                          width: 2,
+                        )
+                      : null,
+                ),
+                child: ExcludeSemantics(
+                  child: Text(
+                    '$day',
+                    style: TextStyle(
+                      fontWeight: edge ? FontWeight.w700 : FontWeight.w500,
+                      color: edge ? Colors.white : AppColors.textPrimary,
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),

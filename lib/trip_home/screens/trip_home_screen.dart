@@ -3,12 +3,12 @@ import '../widgets/category_charts.dart';
 
 import '../data/trip_store.dart';
 import '../models/trip.dart';
+import '../models/spending_summary.dart';
 import '../../api/api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
 import '../widgets/quick_converter.dart';
-import '../widgets/rate_info_tooltip.dart';
 import '../widgets/recent_expenses_card.dart';
 import '../widgets/screen_top_bar.dart';
 import '../widgets/sheets.dart';
@@ -40,6 +40,9 @@ class TripHomeScreen extends StatelessWidget {
           budgetKrw: result.budgetKrw,
         );
       case TripEditAction.delete:
+        if (!await confirmTripDeletion(context, trip) || !context.mounted) {
+          return;
+        }
         // 지운 여행 화면에 남아 있으면 안 되니 리스트로 먼저 돌아간다
         Navigator.of(context).pop();
         tripStore.remove(trip.id);
@@ -56,30 +59,11 @@ class TripHomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ScreenTopBar(
-                title: '${trip.country.flag} ${trip.name}',
-                // 지출 합계와 별도로 현재 API 환율을 표시한다.
-                titleSuffix: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      currentRateLabel(trip.country),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    RateInfoButton(currency: trip.country.currency),
-                  ],
-                ),
-                trailing: _CircleIconButton(
-                  icon: Icons.menu_rounded,
-                  tooltip: '더보기',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => MoreScreen(trip: trip)),
-                  ),
-                ),
+              TripTopBar(
+                trip: trip,
+                onMore: () => Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const MoreScreen())),
               ),
               Expanded(
                 child: SingleChildScrollView(
@@ -100,7 +84,8 @@ class TripHomeScreen extends StatelessWidget {
                       RecentExpensesCard(
                         trip: trip,
                         now: DateTime.now(),
-                        onOpenLedger: () => Navigator.of(context).push(
+                        onOpenLedger: () => openLedger(context, trip),
+                        onOpenOverview: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => SpendingOverviewScreen(trip: trip),
                           ),
@@ -163,7 +148,7 @@ String _md(DateTime d) =>
 // ---------------------------------------------------------------------------
 
 /// 메인 카드: 사용한 금액이 가장 크게, 그 아래 예산 대비 진행 바와 남은 금액.
-class _SpendingCard extends StatelessWidget {
+class _SpendingCard extends StatefulWidget {
   const _SpendingCard({
     required this.trip,
     required this.onEdit,
@@ -175,8 +160,17 @@ class _SpendingCard extends StatelessWidget {
   final VoidCallback onToday;
 
   @override
+  State<_SpendingCard> createState() => _SpendingCardState();
+}
+
+class _SpendingCardState extends State<_SpendingCard> {
+  bool _showCategories = false;
+  Trip get trip => widget.trip;
+
+  @override
   Widget build(BuildContext context) {
     final c = trip.country;
+    final summary = SpendingSummary(trip);
     final available = trip.ratesAvailable(trip.expenses);
     final foreignAvailable = available && RateApi.quotedKrw(c.currency) > 0;
     final remain = trip.remainKrw;
@@ -188,7 +182,8 @@ class _SpendingCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 14, 20),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: AppColors.white,
+        border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -200,7 +195,7 @@ class _SpendingCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.18),
+                  color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -208,7 +203,7 @@ class _SpendingCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.white,
+                    color: AppColors.primary,
                   ),
                 ),
               ),
@@ -220,20 +215,20 @@ class _SpendingCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.onPrimaryMuted,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ),
               _CardIcon(
                 icon: Icons.today_rounded,
                 tooltip: '오늘 예산',
-                onTap: onToday,
+                onTap: widget.onToday,
               ),
               const SizedBox(width: 6),
               _CardIcon(
                 icon: Icons.edit_outlined,
                 tooltip: '여행 편집',
-                onTap: onEdit,
+                onTap: widget.onEdit,
               ),
             ],
           ),
@@ -245,17 +240,17 @@ class _SpendingCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppColors.onPrimaryMuted,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(right: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
+                FittedBox(
+                  fit: BoxFit.scaleDown,
                   child: Text(
                     available ? formatWon(trip.spentKrw) : '환율 없음',
                     overflow: TextOverflow.ellipsis,
@@ -263,10 +258,11 @@ class _SpendingCard extends StatelessWidget {
                       fontSize: 32,
                       height: 1.2,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.white,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   foreignAvailable
                       ? c.formatForeign(
@@ -276,7 +272,7 @@ class _SpendingCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.onPrimaryFaint,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -292,7 +288,7 @@ class _SpendingCard extends StatelessWidget {
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: CategoryBudgetBar(trip: trip, showLegend: true),
+                    child: CategoryBudgetBar(trip: trip),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -301,12 +297,61 @@ class _SpendingCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
           ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Semantics(
+              expanded: _showCategories,
+              child: TextButton.icon(
+                key: const ValueKey('spending-categories-toggle'),
+                onPressed: () =>
+                    setState(() => _showCategories = !_showCategories),
+                icon: Icon(
+                  _showCategories ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                ),
+                label: Text(_showCategories ? '접기' : '더보기'),
+              ),
+            ),
+          ),
+          if (_showCategories) ...[
+            if (!summary.available)
+              const Text('환율을 확인하면 카테고리 비율을 볼 수 있어요')
+            else if (summary.positiveKrw == 0)
+              const Text('비율을 표시할 양수 지출이 없어요')
+            else
+              Wrap(
+                spacing: 14,
+                runSpacing: 8,
+                children: [
+                  for (final entry in summary.sorted)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          size: 8,
+                          color: categoryColor(entry.key),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${entry.key} ${(summary.share(entry.key) * 100).toStringAsFixed(1)}% · ${formatWon(entry.value)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            const SizedBox(height: 10),
+          ],
           const SizedBox(height: 14),
 
           // 예산 / 남은 금액
@@ -342,7 +387,7 @@ class _SpendingCard extends StatelessWidget {
   }
 }
 
-/// 파란 카드 위의 작은 원형 아이콘 버튼 (오늘 예산, 편집)
+/// 요약 카드의 오늘 예산·편집 버튼.
 class _CardIcon extends StatelessWidget {
   const _CardIcon({
     required this.icon,
@@ -365,10 +410,10 @@ class _CardIcon extends StatelessWidget {
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: AppColors.white.withValues(alpha: 0.18),
+            color: AppColors.bg,
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, size: 16, color: AppColors.white),
+          child: Icon(icon, size: 16, color: AppColors.textSecondary),
         ),
       ),
     );
@@ -402,7 +447,7 @@ class _Figure extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: warn ? const Color(0xFFFFCACA) : AppColors.onPrimaryMuted,
+            color: warn ? AppColors.danger : AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 2),
@@ -411,7 +456,7 @@ class _Figure extends StatelessWidget {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: warn ? const Color(0xFFFFCACA) : AppColors.white,
+            color: warn ? AppColors.danger : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 1),
@@ -420,7 +465,7 @@ class _Figure extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: AppColors.onPrimaryFaint,
+            color: AppColors.textSecondary,
           ),
         ),
       ],
@@ -518,38 +563,6 @@ class _ActionButton extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: AppColors.white,
-        shape: const CircleBorder(side: BorderSide(color: AppColors.border)),
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Icon(icon, size: 20, color: AppColors.textPrimary),
           ),
         ),
       ),

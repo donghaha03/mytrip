@@ -265,7 +265,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('더보기 mytrip 로그인은 카드사 로그인과 별개이며 본인 저장소로 전환한다', (tester) async {
+  testWidgets('더보기 메뉴 제거 후에도 기존 인증 저장소의 연결·해제는 보존한다', (tester) async {
     final service = FirebaseAuthService(
       MockFirebaseAuth(
         mockUser: MockUser(uid: 'u1', email: 'test@example.invalid'),
@@ -279,21 +279,13 @@ void main() {
     );
     await tester.pumpWidget(wrap(const MoreScreen()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('mytrip 로그인'));
+    expect(find.text('mytrip 로그인'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
+    await service.signIn('test@example.invalid', 'test-mytrip-password');
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(const ValueKey('mytrip-login-email')),
-      'test@example.invalid',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('mytrip-login-password')),
-      'test-mytrip-password',
-    );
-    await tester.tap(find.widgetWithText(FilledButton, '로그인'));
-    await tester.pumpAndSettle();
-    expect(find.text('test@example.invalid'), findsOneWidget);
+    expect(find.text('test@example.invalid'), findsNothing);
     expect(tripStore.trips.single.id, 't1');
-    await tester.tap(find.text('로그아웃'));
+    await service.signOut();
     await tester.pumpAndSettle();
     expect(tripStore.isEmpty, isTrue);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -301,33 +293,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('여행 없는 첫 화면에서도 더보기에 접근하며 임시 모드에서는 실제 로그인을 막는다', (tester) async {
+  testWidgets('여행 없는 첫 화면의 더보기도 로그인·카드 없는 빈 화면이다', (tester) async {
     Backend.mode = BackendMode.local;
     tripStore.connect(null);
     await tester.pumpWidget(wrap(const EmptyHomeScreen()));
-    await tester.tap(find.text('더보기 · 로그인'));
+    await tester.tap(find.byTooltip('더보기'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('카드 연동'));
-    await tester.pumpAndSettle();
-    expect(find.byType(CardConnectionScreen), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('mytrip 로그인'));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<TextField>(
-            find.byKey(const ValueKey('mytrip-login-password')),
-          )
-          .enabled,
-      isFalse,
-    );
-    expect(
-      tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, '로그인'))
-          .onPressed,
-      isNull,
-    );
+    expect(find.byType(MoreScreen), findsOneWidget);
+    expect(find.byType(CardConnectionScreen), findsNothing);
+    expect(find.text('카드 연동'), findsNothing);
+    expect(find.text('mytrip 로그인'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

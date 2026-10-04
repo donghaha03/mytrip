@@ -35,7 +35,9 @@ class CountryChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: EdgeInsets.symmetric(
-              vertical: 10, horizontal: compact ? 4 : 8),
+            vertical: 10,
+            horizontal: compact ? 4 : 8,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -43,28 +45,35 @@ class CountryChip extends StatelessWidget {
               width: selected ? 2 : 1,
             ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // height 를 고정하지 않으면 이모지 폰트 메트릭 때문에
-              // 칸 높이를 살짝 넘겨서 overflow 가 난다.
-              Text(country.flag,
-                  style: TextStyle(
-                    fontSize: compact ? 18 : 20,
-                    height: 1.1,
-                  )),
-              const SizedBox(height: 2),
-              Text(
-                country.currency,
-                style: TextStyle(
-                  fontSize: compact ? 11 : 12,
-                  fontWeight: FontWeight.w600,
-                  color:
-                      selected ? AppColors.primary : AppColors.textSecondary,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // height 를 고정하지 않으면 이모지 폰트 메트릭 때문에
+                // 칸 높이를 살짝 넘겨서 overflow 가 난다.
+                Text(
+                  country.flag,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(fontSize: compact ? 18 : 20, height: 1.1),
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  country.currency,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                    fontSize: compact ? 11 : 12,
+                    fontWeight: FontWeight.w600,
+                    color: selected
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -74,11 +83,7 @@ class CountryChip extends StatelessWidget {
 
 /// 02 화면 국가 그리드 마지막 칸의 점선 "더보기" 칩.
 class MoreCountryChip extends StatelessWidget {
-  const MoreCountryChip({
-    super.key,
-    required this.onTap,
-    this.selectedCountry,
-  });
+  const MoreCountryChip({super.key, required this.onTap, this.selectedCountry});
 
   /// 더보기에서 국가를 고른 상태면 그 국기를 보여준다.
   final Country? selectedCountry;
@@ -101,31 +106,38 @@ class MoreCountryChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  picked?.flag ?? '···',
-                  style: TextStyle(
-                    fontSize: picked != null ? 20 : 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                    height: 1.1,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    picked?.flag ?? '···',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: picked != null ? 20 : 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                      height: 1.1,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  picked?.currency ?? '더보기',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: picked != null
-                        ? AppColors.primary
-                        : AppColors.textSecondary,
+                  const SizedBox(height: 2),
+                  Text(
+                    picked?.currency ?? '더보기',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: picked != null
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

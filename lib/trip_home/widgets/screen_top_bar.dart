@@ -1,6 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../models/trip.dart';
+import 'rate_info_tooltip.dart';
+
+/// The trip home and ledger keep the name, rate and menu in the same slots.
+class TripTopBar extends StatelessWidget {
+  const TripTopBar({super.key, required this.trip, required this.onMore});
+  final Trip trip;
+  final VoidCallback onMore;
+  @override
+  Widget build(BuildContext context) => ScreenTopBar(
+    title: '${trip.country.flag} ${trip.name}',
+    titleSuffix: CurrentRateBadge(country: trip.country),
+    trailing: IconButton(
+      tooltip: '더보기',
+      onPressed: onMore,
+      style: IconButton.styleFrom(
+        backgroundColor: AppColors.white,
+        side: const BorderSide(color: AppColors.border),
+      ),
+      icon: const Icon(Icons.menu_rounded, size: 20),
+    ),
+  );
+}
 
 /// 화면 상단의 "← 제목" 바.
 ///
