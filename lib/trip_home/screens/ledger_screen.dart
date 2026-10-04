@@ -10,11 +10,10 @@ import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
 import '../widgets/expense_tile.dart';
 import '../widgets/ledger_filters_sheet.dart';
-import '../widgets/quick_converter.dart';
-import '../widgets/rate_info_tooltip.dart';
 import '../widgets/screen_top_bar.dart';
 import 'expense_detail_screen.dart';
 import 'expense_form_screen.dart';
+import 'more_screen.dart';
 
 class LedgerScreen extends StatefulWidget {
   const LedgerScreen({super.key, required this.trip});
@@ -123,11 +122,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ScreenTopBar(
-                title: '여행 장부',
-                trailing: Text(
-                  '${trip.expenses.length}건',
-                  style: const TextStyle(color: AppColors.textSecondary),
+              TripTopBar(
+                trip: trip,
+                onMore: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const MoreScreen()),
                 ),
               ),
               Expanded(
@@ -138,27 +136,27 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            '${trip.country.flag} ${trip.name}',
+                            '여행 장부',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                         ),
                         Text(
-                          currentRateLabel(trip.country),
+                          '${trip.expenses.length}건',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: AppColors.textSecondary,
                           ),
                         ),
-                        RateInfoButton(currency: trip.country.currency),
                       ],
                     ),
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        color: AppColors.white,
+                        border: Border.all(color: AppColors.border),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
@@ -166,7 +164,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         children: [
                           const Text(
                             '사용한 금액',
-                            style: TextStyle(color: AppColors.onPrimaryMuted),
+                            style: TextStyle(color: AppColors.textSecondary),
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -174,7 +172,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             style: const TextStyle(
                               fontSize: 30,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.white,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -410,7 +408,7 @@ class _Figure extends StatelessWidget {
     children: [
       Text(
         label,
-        style: const TextStyle(fontSize: 12, color: AppColors.onPrimaryMuted),
+        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
       const SizedBox(height: 4),
       Text(
@@ -418,7 +416,7 @@ class _Figure extends StatelessWidget {
         style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
-          color: AppColors.white,
+          color: AppColors.textPrimary,
         ),
       ),
     ],

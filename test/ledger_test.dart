@@ -712,18 +712,15 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('더보기에서 카드 연동 화면으로 이동한다', (tester) async {
+  testWidgets('더보기는 로그인·카드 메뉴 없는 빈 페이지다', (tester) async {
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: trip)));
     await tester.tap(find.byTooltip('더보기'));
     await tester.pumpAndSettle();
     expect(find.byType(MoreScreen), findsOneWidget);
-    await tester.tap(find.text('카드 연동'));
-    await tester.pumpAndSettle();
-    expect(find.byType(CardConnectionScreen), findsOneWidget);
-    expect(find.text('실제 카드 미연결'), findsOneWidget);
-    expect(find.text('내 카드 사용내역 연결'), findsOneWidget);
-    expect(find.byKey(const ValueKey('card-login-password')), findsOneWidget);
-    expect(find.text('카드 정보 입력'), findsNothing);
+    expect(find.byType(CardConnectionScreen), findsNothing);
+    expect(find.text('카드 연동'), findsNothing);
+    expect(find.text('mytrip 로그인'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
   });
 
   testWidgets('카드 화면은 실연결이 없음을 알리고 금융정보나 가상 이벤트를 받지 않는다', (tester) async {

@@ -112,7 +112,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('국가 더보기'), findsOneWidget);
-    await tester.enterText(find.byKey(const ValueKey('country-search')), 'Singapore');
+    await tester.enterText(
+      find.byKey(const ValueKey('country-search')),
+      'Singapore',
+    );
     await tester.pump();
     await tester.tap(find.text('싱가포르'));
     await tester.pump();
@@ -240,7 +243,8 @@ void main() {
     await tester.tap(find.byTooltip('더보기'));
     await tester.pumpAndSettle();
     expect(find.byType(MoreScreen), findsOneWidget);
-    expect(find.text('mytrip 로그인'), findsOneWidget);
+    expect(find.text('mytrip 로그인'), findsNothing);
+    expect(find.text('카드 연동'), findsNothing);
     expect(find.textContaining('담당'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
@@ -427,6 +431,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('여행 삭제'));
     await tester.pumpAndSettle();
+    expect(find.text('이 여행을 삭제할까요?'), findsOneWidget);
+    await tester.tap(find.text('삭제'));
+    await tester.pumpAndSettle();
 
     expect(find.byType(TripHomeScreen), findsNothing);
     expect(find.text('내 여행'), findsOneWidget);
@@ -452,10 +459,16 @@ void main() {
 
     await tester.tap(find.text('지출보기'));
     await tester.pumpAndSettle();
-    expect(find.byType(SpendingOverviewScreen), findsOneWidget);
+    expect(find.byType(LedgerScreen), findsOneWidget);
+    expect(find.byType(SpendingOverviewScreen), findsNothing);
     await tester.scrollUntilVisible(find.text('신주쿠 호텔'), 200);
     await tester.pumpAndSettle();
     expect(find.text('신주쿠 호텔'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('한눈에 보기'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SpendingOverviewScreen), findsOneWidget);
   });
 
   testWidgets('여행 홈: 지출이 없으면 첫 기록을 권한다', (tester) async {
@@ -775,7 +788,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('국가 더보기'), findsOneWidget);
     expect(find.byKey(const ValueKey('country-list')), findsOneWidget);
-    expect(tester.getSize(find.byType(MoreCountrySheet)).width, lessThanOrEqualTo(kPhoneWidth));
+    expect(
+      tester.getSize(find.byType(MoreCountrySheet)).width,
+      lessThanOrEqualTo(kPhoneWidth),
+    );
     expect(tester.takeException(), isNull);
   });
 

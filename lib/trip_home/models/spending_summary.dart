@@ -4,13 +4,13 @@ import '../../api/api.dart';
 import 'trip.dart';
 
 const categoryColors = <String, Color>{
-  '식비': Color(0xFFF59E0B),
-  '교통': Color(0xFF2F6FED),
-  '숙박': Color(0xFF8B5CF6),
-  '쇼핑': Color(0xFFDB2777),
-  '관광': Color(0xFF059669),
+  '식비': Color(0xFFB7791F),
+  '교통': Color(0xFF356E9F),
+  '숙박': Color(0xFF7557A3),
+  '쇼핑': Color(0xFFA85177),
+  '관광': Color(0xFF397C69),
   '기타': Color(0xFF64748B),
-  '미분류': Color(0xFFA1A1AA),
+  '미분류': Color(0xFF858B94),
 };
 String normalizedCategory(String value) => value == '숙소'
     ? '숙박'

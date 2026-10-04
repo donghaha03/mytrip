@@ -216,6 +216,26 @@ class _DateRangeSheetState extends State<DateRangeSheet> {
 // ---------------------------------------------------------------------------
 enum TripEditAction { save, delete }
 
+Future<bool> confirmTripDeletion(BuildContext context, Trip trip) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('이 여행을 삭제할까요?'),
+        content: Text('${trip.name}\n여행과 이 여행의 지출 기록이 함께 삭제돼요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    ) ==
+    true;
+
 class TripEditResult {
   const TripEditResult.save({
     required String this.name,

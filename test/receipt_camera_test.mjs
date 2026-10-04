@@ -36,7 +36,7 @@ function environment({ cameraError, noCamera = false, secure = true, mediaPromis
       workerOptions = options; if (workerError) throw workerError; return workerPromise ?? worker;
     } } });
   vm.runInContext(source, context);
-  return { window, document, dialog, element, callbacks, timers, stream, worker,
+  return { window, document, dialog, element, callbacks, timers, stream, worker, canvas,
     counters: () => ({ stopCount, cameraCalls, terminateCount }), options: () => workerOptions };
 }
 async function captured(env) {
@@ -45,6 +45,15 @@ async function captured(env) {
   env.element('#receipt-shot').onclick();
   return { result };
 }
+
+test('receipt frame is portrait and capture preserves rectangular source proportions', async () => {
+  const env = environment(); const { result } = await captured(env);
+  assert.match(env.dialog.innerHTML, /aspect-ratio:2\/3/);
+  assert.match(env.dialog.innerHTML, /정사각형으로 자르지/);
+  assert.equal(env.canvas.width, 100);
+  assert.equal(env.canvas.height, 200);
+  env.window.mytripReceipt.close(); assert.equal(await result, null);
+});
 test('permission is lazy, denial explains site permissions and manual fallback', async () => {
   const env = environment({ cameraError: { name: 'NotAllowedError' } });
   const result = env.window.mytripReceipt.open();

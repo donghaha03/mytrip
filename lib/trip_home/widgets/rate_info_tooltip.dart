@@ -1,8 +1,30 @@
 import 'package:flutter/material.dart';
 
 import '../../api/api.dart';
+import '../models/country.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'quick_converter.dart';
+
+class CurrentRateBadge extends StatelessWidget {
+  const CurrentRateBadge({super.key, required this.country});
+  final Country country;
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        currentRateLabel(country),
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textSecondary,
+        ),
+      ),
+      RateInfoButton(currency: country.currency),
+    ],
+  );
+}
 
 /// 정기 갱신 일정과 실제 마지막 수집 시각을 구분해 안내한다.
 class RateInfoButton extends StatefulWidget {

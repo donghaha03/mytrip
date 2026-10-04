@@ -11,13 +11,11 @@ class CategoryBudgetBar extends StatelessWidget {
     super.key,
     required this.trip,
     this.height = 8,
-    this.track = AppColors.progressTrack,
-    this.showLegend = false,
+    this.track = AppColors.border,
   });
   final Trip trip;
   final double height;
   final Color track;
-  final bool showLegend;
   @override
   Widget build(BuildContext context) {
     final summary = SpendingSummary(trip);
@@ -59,31 +57,6 @@ class CategoryBudgetBar extends StatelessWidget {
             ),
           ),
         ),
-        if (showLegend && summary.available && summary.positiveKrw > 0) ...[
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            children: [
-              for (final category in summary.sorted)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.circle,
-                      size: 8,
-                      color: categoryColor(category.key),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${category.key} ${(summary.share(category.key) * 100).toStringAsFixed(1)}% · ${formatWon(category.value)}',
-                      style: const TextStyle(fontSize: 11, color: Colors.white),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ],
       ],
     );
   }

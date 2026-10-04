@@ -11,6 +11,7 @@ import '../widgets/trip_card.dart';
 import 'add_trip_screen.dart';
 import 'trip_home_screen.dart';
 import 'more_screen.dart';
+import 'empty_home_screen.dart';
 
 /// 01. 등록된 여행 목록.
 class TripListScreen extends StatelessWidget {
@@ -33,7 +34,13 @@ class TripListScreen extends StatelessWidget {
           budgetKrw: result.budgetKrw,
         );
       case TripEditAction.delete:
-        tripStore.remove(trip.id);
+        if (context.mounted) await _delete(context, trip);
+    }
+  }
+
+  Future<void> _delete(BuildContext context, Trip trip) async {
+    if (await confirmTripDeletion(context, trip) && context.mounted) {
+      tripStore.remove(trip.id);
     }
   }
 
@@ -84,15 +91,21 @@ class TripListScreen extends StatelessWidget {
                         ),
                       ),
                       IconButton(
+                        tooltip: '앱 사용방법',
+                        icon: const Icon(Icons.help_outline_rounded),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                const EmptyHomeScreen(guideOnly: true),
+                          ),
+                        ),
+                      ),
+                      IconButton(
                         tooltip: '더보기',
                         icon: const Icon(Icons.more_horiz_rounded),
                         onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => MoreScreen(
-                              trip:
-                                  featured ??
-                                  (trips.isEmpty ? null : trips.first),
-                            ),
+                            builder: (_) => const MoreScreen(),
                           ),
                         ),
                       ),
@@ -141,12 +154,13 @@ class TripListScreen extends StatelessWidget {
                         ),
                       ),
                       onLongPress: () => _openEditSheet(context, trip),
+                      onDelete: () => _delete(context, trip),
                     ),
                     const SizedBox(height: 16),
                   ],
                   const SizedBox(height: 4),
                   const Text(
-                    '여행을 길게 눌러 편집하세요',
+                    '오른쪽으로 밀어 삭제 · 왼쪽으로 밀어 수정\n길게 눌러도 편집할 수 있어요',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
