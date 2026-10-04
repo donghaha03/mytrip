@@ -40,36 +40,33 @@ class _BudgetProgressPanelState extends State<BudgetProgressPanel> {
                 color: AppColors.white,
               ),
             ),
+            const SizedBox(width: 8),
+            Semantics(
+              expanded: _expanded,
+              child: TextButton.icon(
+                key: const ValueKey('spending-categories-toggle'),
+                onPressed: () => setState(() => _expanded = !_expanded),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  foregroundColor: AppColors.white,
+                ),
+                icon: Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                ),
+                label: Text(
+                  _expanded ? '접기' : '더보기',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 10),
         CategoryBudgetBar(
           trip: widget.trip,
           height: 8,
           track: AppColors.progressTrackOnPrimary,
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Semantics(
-            expanded: _expanded,
-            child: TextButton.icon(
-              key: const ValueKey('spending-categories-toggle'),
-              onPressed: () => setState(() => _expanded = !_expanded),
-              style: TextButton.styleFrom(
-                minimumSize: const Size(48, 44),
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                foregroundColor: AppColors.white,
-              ),
-              icon: Icon(
-                _expanded ? Icons.expand_less : Icons.expand_more,
-                size: 18,
-              ),
-              label: Text(
-                _expanded ? '접기' : '더보기',
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-          ),
         ),
         if (_expanded)
           Padding(

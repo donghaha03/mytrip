@@ -66,6 +66,19 @@ test('camera orientation changes resize the guide before capture', async () => {
   assert.equal(env.element('.guide').style.inset, '12% 6%');
   env.window.mytripReceipt.close(); assert.equal(await result, null);
 });
+test('right swipe closes the receipt camera, while short, left and vertical drags do not', async () => {
+  const env = environment(); const result = env.window.mytripReceipt.open();
+  await env.element('#receipt-start').onclick();
+  const down = env.callbacks.get('pointerdown'), up = env.callbacks.get('pointerup');
+  for (const [dx, dy] of [[40, 0], [-180, 0], [180, 200]]) {
+    down({ pointerId: 1, isPrimary: true, clientX: 30, clientY: 200 });
+    up({ pointerId: 1, clientX: 30 + dx, clientY: 200 + dy });
+    assert.equal(env.dialog.removed, undefined);
+  }
+  down({ pointerId: 1, isPrimary: true, clientX: 30, clientY: 200 });
+  up({ pointerId: 1, clientX: 230, clientY: 210 });
+  assert.equal(await result, null); assert.equal(env.counters().stopCount, 1);
+});
 test('receipt UI uses bundled app fonts and keeps device-language settings out of primary LLM controls', async () => {
   for (const llm of [false, true]) {
     const env = environment({ llm }); const result = env.window.mytripReceipt.open();

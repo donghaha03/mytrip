@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../widgets/onboarding_example.dart';
@@ -27,14 +29,17 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
   static const _slides = [
     (title: '여행을 추가해요', description: '국가와 일정, 예산을 정하면 준비 끝.'),
     (title: '지출을 기록해요', description: '사용처와 금액, 현금·카드와 면세 여부를 기록해요.'),
-    (title: '왼쪽으로 밀어 관리해요', description: '여행과 지출을 밀면 수정·삭제가 나타나요.'),
+    (
+      title: '왼쪽으로 밀어 관리해요',
+      description: '왼쪽으로 밀면 수정·삭제, 오른쪽으로 밀면 이전 화면으로 돌아가요.',
+    ),
     (title: '영수증으로 간편하게', description: '촬영하거나 사진을 골라, 확인 후 기록해요.'),
     (title: '지출을 한눈에 봐요', description: '카테고리별 구성비를 보고, 빠른 환산으로 현지 금액을 확인해요.'),
   ];
   final _pages = PageController();
   late final _flight = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 650),
+    duration: const Duration(milliseconds: 2200),
   );
   late bool _showGuide = widget.guideOnly || widget.showGuide;
   bool _departing = false;
@@ -77,7 +82,7 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
     setState(() => _departing = true);
     _flight.duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : const Duration(milliseconds: 650);
+        : const Duration(milliseconds: 2200);
     try {
       await _flight.forward(from: 0).orCancel;
     } on TickerCanceled {
@@ -195,29 +200,82 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
                   color: AppColors.primarySoft,
                   child: AnimatedBuilder(
                     animation: _flight,
-                    builder: (context, _) => LayoutBuilder(
-                      builder: (context, size) => Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Text(
-                            '여행을 준비하러 출발해요',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
+                    builder: (context, _) => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              height: 180,
+                              child: LayoutBuilder(
+                                builder: (_, constraints) {
+                                  final size = Size(constraints.maxWidth, 180);
+                                  final path = _flightPath(
+                                    size,
+                                  ).computeMetrics().single;
+                                  final progress = const Interval(
+                                    .25,
+                                    .75,
+                                    curve: Curves.easeInOutCubic,
+                                  ).transform(_flight.value);
+                                  final point = path.getTangentForOffset(
+                                    path.length * progress,
+                                  )!;
+                                  return Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      const Positioned(
+                                        left: 24,
+                                        top: 16,
+                                        child: Icon(
+                                          Icons.cloud_outlined,
+                                          size: 44,
+                                          color: AppColors.white,
+                                        ),
+                                      ),
+                                      const Positioned(
+                                        right: 28,
+                                        bottom: 28,
+                                        child: Icon(
+                                          Icons.cloud_outlined,
+                                          size: 36,
+                                          color: AppColors.white,
+                                        ),
+                                      ),
+                                      Positioned.fill(
+                                        child: CustomPaint(
+                                          painter: _FlightPathPainter(),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        left: point.position.dx - 22,
+                                        top: point.position.dy - 22,
+                                        child: Transform.rotate(
+                                          angle: point.angle + math.pi / 2,
+                                          child: const Icon(
+                                            Icons.flight_rounded,
+                                            size: 44,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                          Transform.translate(
-                            offset: Offset(
-                              _flight.value * size.maxWidth,
-                              -80 - _flight.value * size.maxHeight * .4,
+                            const SizedBox(height: 24),
+                            const Text(
+                              '여행을 준비하러 출발해요',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.flight_takeoff_rounded,
-                              size: 72,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -433,6 +491,15 @@ class _FlightProgress extends StatelessWidget {
   );
 }
 
+Path _flightPath(Size size) => Path()
+  ..moveTo(size.width * 0.02, size.height * 0.86)
+  ..quadraticBezierTo(
+    size.width * 0.35,
+    size.height * 0.05,
+    size.width * 0.98,
+    size.height * 0.16,
+  );
+
 class _FlightPathPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -442,14 +509,7 @@ class _FlightPathPainter extends CustomPainter {
       ..strokeWidth = 1.6
       ..strokeCap = StrokeCap.round;
 
-    final path = Path()
-      ..moveTo(size.width * 0.02, size.height * 0.86)
-      ..quadraticBezierTo(
-        size.width * 0.35,
-        size.height * 0.05,
-        size.width * 0.98,
-        size.height * 0.16,
-      );
+    final path = _flightPath(size);
 
     // 점선으로 끊어 그리기
     for (final metric in path.computeMetrics()) {

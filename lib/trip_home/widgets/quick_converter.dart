@@ -71,7 +71,7 @@ class _QuickConverterState extends State<QuickConverter> {
         : _c.formatForeign(RateApi.fromKrw(value, _c.currency));
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+      padding: const EdgeInsets.fromLTRB(16, 6, 12, 10),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
@@ -108,35 +108,9 @@ class _QuickConverterState extends State<QuickConverter> {
                   ],
                 ),
               ),
-              Tooltip(
-                message: '방향 바꾸기',
-                child: InkResponse(
-                  onTap: available ? _swap : null,
-                  radius: 18,
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Center(
-                      child: Container(
-                        width: 28,
-                        height: 28,
-                        decoration: const BoxDecoration(
-                          color: AppColors.primarySoft,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.swap_vert_rounded,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Row(
             children: [
               Expanded(
@@ -218,6 +192,16 @@ class _QuickConverterState extends State<QuickConverter> {
                 ),
               ),
               const SizedBox(width: 4),
+              IconButton(
+                tooltip: '방향 바꾸기',
+                onPressed: available ? _swap : null,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  backgroundColor: AppColors.primarySoft,
+                  foregroundColor: AppColors.primary,
+                ),
+                icon: const Icon(Icons.swap_vert_rounded, size: 18),
+              ),
             ],
           ),
         ],

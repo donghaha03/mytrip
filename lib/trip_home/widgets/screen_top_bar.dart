@@ -16,11 +16,7 @@ class TripTopBar extends StatelessWidget {
     trailing: IconButton(
       tooltip: '더보기',
       onPressed: onMore,
-      style: IconButton.styleFrom(
-        backgroundColor: AppColors.white,
-        side: const BorderSide(color: AppColors.border),
-      ),
-      icon: const Icon(Icons.menu_rounded, size: 20),
+      icon: const Icon(Icons.more_horiz_rounded),
     ),
   );
 }

@@ -7,7 +7,7 @@ import 'expense_tile.dart';
 
 /// 여행 홈의 "최근 지출" 카드.
 ///
-/// 최근 7일 막대 + 마지막 지출 3건만 보여주는 **요약**이다. 전체 목록과 기록
+/// 최근 7일 막대 + 마지막 지출 1건만 보여주는 **요약**이다. 전체 목록과 기록
 /// 입력은 장부 몫이라, 더 보려면 [onOpenLedger] 로 장부에 넘긴다.
 ///
 /// 막대는 한 가지 색만 쓰는 단일 계열이라 범례가 필요 없다. 고른 막대만 진한
@@ -42,10 +42,10 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
     final trip = widget.trip;
     final days = dailySpending(trip, widget.now);
     final hasAny = trip.expenses.isNotEmpty;
-    final recent = trip.expensesNewestFirst.take(3).toList();
+    final recent = trip.expensesNewestFirst.take(1);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
@@ -56,32 +56,38 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
         children: [
           Row(
             children: [
-              const Text(
-                '최근 지출',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      '최근 지출',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    if (hasAny)
+                      Text(
+                        '${trip.expenses.length}건',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
-              if (hasAny)
-                Text(
-                  '${trip.expenses.length}건',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              const Spacer(),
               _SummaryLink(label: '지출보기', onTap: widget.onOpenLedger),
             ],
           ),
           if (!hasAny)
             _Empty(onAdd: widget.onAddExpense)
           else ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
             if (!trip.ratesAvailable(trip.expenses))
               const Text('환율 없음')
             else
@@ -99,7 +105,12 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
           if (hasAny) ...[
             Container(height: 1, color: AppColors.border),
             for (final e in recent)
-              ExpenseTile(trip: trip, expense: e, interactive: false),
+              ExpenseTile(
+                trip: trip,
+                expense: e,
+                interactive: false,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
           ],
         ],
       ),
@@ -173,23 +184,28 @@ class _WeekBars extends StatelessWidget {
         // 고른 날만 값을 쓴다 (모든 막대에 숫자를 붙이지 않는다)
         Row(
           children: [
-            Text(
-              formatShortDateWithWeekday(picked.day),
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+            Expanded(
+              child: Text(
+                formatShortDateWithWeekday(picked.day),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
-            const Spacer(),
-            Text(
-              picked.krw == 0 ? '지출 없음' : formatWon(picked.krw),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: picked.krw == 0
-                    ? AppColors.textTertiary
-                    : AppColors.textPrimary,
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                picked.krw == 0 ? '지출 없음' : formatWon(picked.krw),
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: picked.krw == 0
+                      ? AppColors.textTertiary
+                      : AppColors.textPrimary,
+                ),
               ),
             ),
           ],

@@ -164,7 +164,7 @@ class _OnboardingExampleState extends State<OnboardingExample> {
                     TripCard(
                       key: ValueKey('guide-preview-$_previewRun'),
                       trip: _trip,
-                      previewSwipe: true,
+                      previewSwipe: _previewRun > 0,
                       onTap: () {},
                       onLongPress: () => setState(() {
                         _trip.name = '도쿄 여행';
@@ -184,7 +184,7 @@ class _OnboardingExampleState extends State<OnboardingExample> {
                         SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            '위 카드를 왼쪽으로 밀어보세요',
+                            '카드 위에서 왼쪽으로 천천히 밀고,\n나타난 수정·삭제 버튼을 눌러보세요.',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
@@ -203,7 +203,7 @@ class _OnboardingExampleState extends State<OnboardingExample> {
                       _previewRun++;
                     }),
                     child: Text(
-                      _deleted || _edited ? '처음부터 해보기' : '밀기 동작 다시 보기',
+                      _deleted || _edited ? '처음부터 해보기' : '스와이프 예시 보기',
                     ),
                   ),
                 ],

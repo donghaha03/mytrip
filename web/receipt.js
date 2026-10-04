@@ -67,6 +67,18 @@
       document.addEventListener('visibilitychange', onVisibility);
       dialog.addEventListener('cancel', (event) => { event.preventDefault(); finish(null); });
       $('#receipt-close').onclick = () => finish(null);
+      let swipeStart;
+      dialog.addEventListener('pointerdown', (event) => {
+        swipeStart = event.isPrimary === false || event.target?.closest?.('input,select,textarea')
+          ? undefined : { id: event.pointerId, x: event.clientX, y: event.clientY };
+      });
+      dialog.addEventListener('pointercancel', () => { swipeStart = undefined; });
+      dialog.addEventListener('pointerup', (event) => {
+        const start = swipeStart; swipeStart = undefined;
+        if (!start || start.id !== event.pointerId) return;
+        const dx = event.clientX - start.x, dy = event.clientY - start.y;
+        if (dx >= 96 && Math.abs(dy) < dx / 2) finish(null);
+      });
       const fitFrame = (width, height) => {
         if (!width || !height) return;
         $('.frame').style.aspectRatio = `${width} / ${height}`;

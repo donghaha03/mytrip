@@ -66,7 +66,7 @@ class TripHomeScreen extends StatelessWidget {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -79,7 +79,7 @@ class TripHomeScreen extends StatelessWidget {
                               TodayBudgetSheet(trip: trip, now: DateTime.now()),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       RecentExpensesCard(
                         trip: trip,
                         now: DateTime.now(),
@@ -95,7 +95,7 @@ class TripHomeScreen extends StatelessWidget {
                           start: LedgerStart.addExpense,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       QuickConverter(country: trip.country),
                     ],
                   ),
@@ -163,7 +163,7 @@ class _SpendingCard extends StatelessWidget {
         available && RateApi.quotedKrw(trip.country.currency) > 0;
     final remain = trip.remainKrw;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
@@ -211,40 +211,57 @@ class _SpendingCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 4),
           const Text(
             '사용한 금액',
-            style: TextStyle(fontSize: 14, color: AppColors.onPrimaryMuted),
-          ),
-          const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              available ? formatWon(trip.spentKrw) : '환율 없음',
-              style: const TextStyle(
-                fontSize: 32,
-                height: 1.2,
-                fontWeight: FontWeight.w700,
-                color: AppColors.white,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            foreignAvailable
-                ? trip.country.formatForeign(
-                    RateApi.fromKrw(trip.spentKrw, trip.country.currency),
-                  )
-                : '통화별 표시',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.2,
               color: AppColors.onPrimaryMuted,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                flex: 3,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    available ? formatWon(trip.spentKrw) : '환율 없음',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                flex: 2,
+                child: Text(
+                  foreignAvailable
+                      ? trip.country.formatForeign(
+                          RateApi.fromKrw(trip.spentKrw, trip.country.currency),
+                        )
+                      : '통화별 표시',
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onPrimaryMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
           BudgetProgressPanel(trip: trip),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -326,6 +343,7 @@ class _Figure extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
+            height: 1.2,
             fontWeight: FontWeight.w600,
             color: AppColors.onPrimaryMuted,
           ),
@@ -337,6 +355,7 @@ class _Figure extends StatelessWidget {
             value,
             style: TextStyle(
               fontSize: 16,
+              height: 1.2,
               fontWeight: FontWeight.w700,
               color: AppColors.white,
             ),
@@ -347,6 +366,7 @@ class _Figure extends StatelessWidget {
           sub,
           style: const TextStyle(
             fontSize: 12,
+            height: 1.2,
             fontWeight: FontWeight.w500,
             color: AppColors.onPrimaryMuted,
           ),
@@ -373,7 +393,7 @@ class _BottomBar extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
           child: Row(
             children: [
               Expanded(
@@ -435,7 +455,8 @@ class _ActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          height: 64,
+          constraints: const BoxConstraints(minHeight: 64),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: filled
               ? null
               : BoxDecoration(
@@ -443,12 +464,14 @@ class _ActionButton extends StatelessWidget {
                   border: Border.all(color: AppColors.border),
                 ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 20, color: fg),
               const SizedBox(height: 5),
               Text(
                 label,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,

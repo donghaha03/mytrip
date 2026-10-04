@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripapp/api/api.dart';
+import 'package:tripapp/trip_home/app.dart';
 import 'package:tripapp/trip_home/data/trip_repository.dart';
 import 'package:tripapp/trip_home/data/trip_store.dart';
 import 'package:tripapp/trip_home/models/country.dart';
@@ -33,6 +34,7 @@ import 'package:tripapp/trip_home/widgets/swipe_actions.dart';
 import 'package:tripapp/trip_home/widgets/onboarding_example.dart';
 import 'package:tripapp/trip_home/widgets/rate_info_tooltip.dart';
 import 'package:tripapp/trip_home/widgets/screen_top_bar.dart';
+import 'package:tripapp/trip_home/widgets/quick_converter.dart';
 import 'package:tripapp/trip_home/theme/app_colors.dart';
 
 Widget wrap(Widget child) => MaterialApp(
@@ -718,6 +720,79 @@ void main() {
     },
   );
 
+  for (final size in [const Size(390, 844), const Size(375, 812)]) {
+    testWidgets('home summaries fit without scrolling at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final t = trip([
+        for (var i = 0; i < 4; i++) expense('$i', 10000, code: 'JPY'),
+      ]);
+      tripStore.add(t);
+      await tester.pumpWidget(wrap(TripHomeScreen(trip: t)));
+      await tester.pumpAndSettle();
+      final scroll = tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byType(SingleChildScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      expect(scroll.position.maxScrollExtent, 0);
+      expect(find.byType(ExpenseTile), findsOneWidget);
+      expect(t.expenses.length, 4);
+      expect(find.text('빠른 환산'), findsOneWidget);
+      expect(
+        tester.getRect(find.byType(QuickConverter)).bottom,
+        lessThan(tester.getRect(find.text('영수증 촬영')).top),
+      );
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey('spending-categories-toggle')))
+            .height,
+        greaterThanOrEqualTo(44),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('spending-categories-toggle')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('식비 100.0%'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('small screens and large text keep all home content reachable', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 667);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final t = trip([expense('a', 10000)]);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildAppTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(1.5)),
+          child: child!,
+        ),
+        home: TripHomeScreen(trip: t),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byType(QuickConverter));
+    await tester.pumpAndSettle();
+    expect(find.text('빠른 환산'), findsOneWidget);
+    expect(find.text('영수증 촬영'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'swipe demo reveals actions then resets without mutating records',
     (tester) async {
@@ -738,6 +813,8 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 800));
+      expect(find.byTooltip('예시 수정'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1000));
       expect(find.byTooltip('예시 수정'), findsOneWidget);
       expect(find.byTooltip('예시 삭제'), findsOneWidget);
       expect(edits + deletes, 0);
@@ -747,6 +824,135 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'right swipe goes back; left, short, vertical and root gestures are safe',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final now = DateTime.now();
+      final t = trip([])
+        ..start = now
+        ..end = now.add(const Duration(days: 2));
+      tripStore.add(t);
+      await tester.pumpWidget(const TripApp());
+      await tester.pumpAndSettle();
+      expect(find.byType(TripHomeScreen), findsOneWidget);
+      for (final offset in [
+        const Offset(-180, 0),
+        const Offset(40, 0),
+        const Offset(0, -100),
+      ]) {
+        await tester.dragFrom(const Offset(80, 160), offset);
+        await tester.pumpAndSettle();
+        expect(find.byType(TripHomeScreen), findsOneWidget);
+      }
+      await tester.dragFrom(const Offset(40, 160), const Offset(220, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(TripListScreen), findsOneWidget);
+      expect(find.byType(TripHomeScreen), findsNothing);
+      await tester.tap(find.byTooltip('더보기'));
+      await tester.pumpAndSettle();
+      expect(find.byType(MoreScreen), findsOneWidget);
+      await tester.dragFrom(const Offset(40, 200), const Offset(220, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(MoreScreen), findsNothing);
+      await tester.dragFrom(const Offset(40, 90), const Offset(220, 0));
+      await tester.pumpAndSettle();
+      expect(find.byType(TripListScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'an open expense closes first, then a right swipe navigates back',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final now = DateTime.now();
+      final t = trip([expense('a', 1000)])
+        ..start = now
+        ..end = now.add(const Duration(days: 2));
+      tripStore.add(t);
+      await tester.pumpWidget(const TripApp());
+      await tester.pumpAndSettle();
+      final menu = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.more_horiz_rounded),
+      );
+      expect((menu.icon as Icon).icon, Icons.more_horiz_rounded);
+      await tester.tap(find.text('장부 보기'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byType(ExpenseTile).first);
+      await tester.pumpAndSettle();
+      final row = find.byType(ExpenseTile).first;
+      await tester.drag(row, const Offset(-180, 0));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('테스트 카페 지출 삭제'), findsOneWidget);
+      await tester.dragFrom(
+        tester.getTopLeft(row) + const Offset(15, 30),
+        const Offset(230, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(LedgerScreen), findsOneWidget);
+      expect(find.byTooltip('테스트 카페 지출 삭제'), findsNothing);
+      await tester.dragFrom(
+        tester.getTopLeft(row) + const Offset(15, 30),
+        const Offset(230, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(LedgerScreen), findsNothing);
+      expect(find.byType(TripHomeScreen), findsOneWidget);
+      expect(t.expenses.length, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'tutorial demonstration starts explicitly and waits before swiping',
+    (tester) async {
+      await tester.pumpWidget(
+        wrap(SingleChildScrollView(child: const OnboardingExample(step: 2))),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.touch_app_outlined), findsNothing);
+      expect(find.text('밀기 동작 다시 보기'), findsNothing);
+      await tester.ensureVisible(find.text('스와이프 예시 보기'));
+      await tester.tap(find.text('스와이프 예시 보기'));
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.byTooltip('일본 여행 여행 삭제'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(find.byTooltip('일본 여행 여행 삭제'), findsOneWidget);
+      expect(find.byIcon(Icons.touch_app_outlined), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(tripStore.isEmpty, isTrue);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('departure holds its message before arriving at welcome', (
+    tester,
+  ) async {
+    await tester.pumpWidget(wrap(const EmptyHomeScreen()));
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byTooltip('다음 안내'));
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.byTooltip('출발하기'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 1000));
+    expect(find.text('여행을 준비하러 출발해요'), findsOneWidget);
+    expect(find.byIcon(Icons.flight_rounded), findsOneWidget);
+    expect(find.text('첫 여행을 추가해 보세요'), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'receipt guide shows capture, recognition and review without saving',

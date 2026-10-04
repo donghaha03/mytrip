@@ -182,7 +182,7 @@ void main() {
     expect(find.text('남은 금액'), findsOneWidget);
     expect(find.text('743,050원'), findsOneWidget);
 
-    // 최근 3건 요약은 여기 있고(아래 최근 지출 카드 테스트 참고),
+    // 최근 1건 요약은 여기 있고(아래 최근 지출 카드 테스트 참고),
     // 전체 목록과 기록 입력은 장부 몫이다
     expect(find.text('이치란 라멘'), findsOneWidget);
     expect(find.text('신주쿠 호텔'), findsNothing); // 4번째라 요약에는 없다
@@ -443,7 +443,7 @@ void main() {
     expect(tripStore.byId('t1'), isNull);
   });
 
-  testWidgets('여행 홈: 최근 지출 카드 (7일 막대 + 마지막 3건)', (tester) async {
+  testWidgets('여행 홈: 최근 지출 카드 (7일 막대 + 마지막 1건)', (tester) async {
     final japan = tripStore.trips.firstWhere((t) => t.id == 't2');
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: japan)));
 
@@ -451,10 +451,10 @@ void main() {
     expect(find.text('4건'), findsOneWidget);
     expect(find.text('지출보기'), findsOneWidget);
 
-    // 최신 3건만 (신주쿠 호텔은 4번째라 안 보인다)
+    // 최신 1건만, 나머지는 전체 장부에서 확인한다.
     expect(find.text('이치란 라멘'), findsOneWidget);
-    expect(find.text('JR 패스'), findsOneWidget);
-    expect(find.text('돈키호테'), findsOneWidget);
+    expect(find.text('JR 패스'), findsNothing);
+    expect(find.text('돈키호테'), findsNothing);
     expect(find.text('신주쿠 호텔'), findsNothing);
     expect(find.text('11,400원'), findsWidgets); // ¥1,200
     expect(find.text('¥1,200 JPY'), findsOneWidget);

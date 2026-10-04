@@ -28,27 +28,30 @@ class _SwipeActionsState extends State<SwipeActions>
     with SingleTickerProviderStateMixin {
   static const _width = 144.0;
   double _offset = 0;
+  double _dragDistance = 0;
+  bool _startedOpen = false, _draggedLeft = false;
   bool _dragging = false;
   final _focus = FocusNode();
   late final _preview = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1800),
+    duration: const Duration(milliseconds: 4000),
   );
   late final _previewOffset = TweenSequence<double>([
+    TweenSequenceItem(tween: ConstantTween(0.0), weight: 25),
     TweenSequenceItem(
       tween: Tween<double>(
         begin: 0,
         end: -_width,
       ).chain(CurveTween(curve: Curves.easeOutCubic)),
-      weight: 40,
+      weight: 20,
     ),
-    TweenSequenceItem(tween: ConstantTween(-_width), weight: 30),
+    TweenSequenceItem(tween: ConstantTween(-_width), weight: 35),
     TweenSequenceItem(
       tween: Tween<double>(
         begin: -_width,
         end: 0,
       ).chain(CurveTween(curve: Curves.easeOutCubic)),
-      weight: 30,
+      weight: 20,
     ),
   ]).animate(_preview);
   @override
@@ -125,17 +128,29 @@ class _SwipeActionsState extends State<SwipeActions>
           onTapDown: (_) => _focus.requestFocus(),
           onHorizontalDragStart: (_) {
             _preview.stop();
+            _startedOpen = _offset != 0;
+            _draggedLeft = false;
+            _dragDistance = 0;
             setState(() => _dragging = true);
           },
-          onHorizontalDragUpdate: (d) => setState(
-            () => _offset = (_offset + d.delta.dx).clamp(-_width, 0),
-          ),
+          onHorizontalDragUpdate: (d) {
+            _dragDistance += d.delta.dx;
+            _draggedLeft |= d.delta.dx < 0;
+            setState(() => _offset = (_offset + d.delta.dx).clamp(-_width, 0));
+          },
           onHorizontalDragEnd: (_) {
             setState(() {
               _dragging = false;
               _offset = _offset.abs() < 30 ? 0 : _offset.sign * _width;
             });
             if (_offset != 0) _focus.requestFocus();
+            // An open row closes first; a closed row can navigate back.
+            if (!_startedOpen &&
+                !_draggedLeft &&
+                _dragDistance >= 96 &&
+                !widget.previewSwipe) {
+              Navigator.of(context).maybePop();
+            }
           },
           onHorizontalDragCancel: () {
             if (!_dragging) return;
@@ -190,6 +205,24 @@ class _SwipeActionsState extends State<SwipeActions>
                     ],
                   ),
                 ),
+                if (widget.previewSwipe && _preview.isAnimating)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: ExcludeSemantics(
+                        child: Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Transform.translate(
+                            offset: Offset(_offset, -8),
+                            child: const Icon(
+                              Icons.touch_app_outlined,
+                              size: 28,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

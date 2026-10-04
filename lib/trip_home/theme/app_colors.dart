@@ -14,7 +14,7 @@ class AppColors {
   static const primarySoft = Color(0xFFEAF0FD); // 칩/배지 배경
   static const primaryLight = Color(0xFFD4E0F9); // 달력 range 배경
   static const progressTrack = Color(0xFFC8D8F9);
-  static const progressTrackOnPrimary = Color(0xFF2454B2);
+  static const progressTrackOnPrimary = Color(0xFF80ACF4);
 
   static const textPrimary = Color(0xFF16181D);
   static const textSecondary = Color(0xFF6B7280);

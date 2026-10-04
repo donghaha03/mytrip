@@ -44,12 +44,21 @@ Future<void> main() async {
   AppLifecycleListener(onResume: () => unawaited(RateApi.load()));
 }
 
-class TripApp extends StatelessWidget {
+class TripApp extends StatefulWidget {
   const TripApp({super.key});
+
+  @override
+  State<TripApp> createState() => _TripAppState();
+}
+
+class _TripAppState extends State<TripApp> {
+  final _navigator = GlobalKey<NavigatorState>();
+  double _backSwipe = 0;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigator,
       title: '여행 장부',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
@@ -61,7 +70,19 @@ class TripApp extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: kPhoneWidth),
-            child: child,
+            child: GestureDetector(
+              key: const ValueKey('app-swipe-back'),
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragStart: (_) => _backSwipe = 0,
+              onHorizontalDragUpdate: (details) =>
+                  _backSwipe += details.delta.dx,
+              onHorizontalDragCancel: () => _backSwipe = 0,
+              onHorizontalDragEnd: (_) {
+                if (_backSwipe >= 96) _navigator.currentState?.maybePop();
+                _backSwipe = 0;
+              },
+              child: child,
+            ),
           ),
         ),
       ),
