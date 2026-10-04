@@ -160,7 +160,7 @@ class TripListScreen extends StatelessWidget {
                   ],
                   const SizedBox(height: 4),
                   const Text(
-                    '오른쪽으로 밀어 삭제 · 왼쪽으로 밀어 수정\n길게 눌러도 편집할 수 있어요',
+                    '여행을 왼쪽으로 밀어 수정·삭제할 수 있어요',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,

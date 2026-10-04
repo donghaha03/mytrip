@@ -31,10 +31,14 @@ import 'package:tripapp/trip_home/widgets/today_budget_sheet.dart';
 Widget _wrap(Widget child) => MaterialApp(theme: buildAppTheme(), home: child);
 
 Future<void> _openFilters(WidgetTester tester) async {
-  await tester.scrollUntilVisible(
-    find.byKey(const ValueKey('ledger-filter-menu')),
-    -150,
-  );
+  if (find.byKey(const ValueKey('ledger-filter-menu')).evaluate().isEmpty) {
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('ledger-filter-menu')),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+  }
+  await tester.ensureVisible(find.byKey(const ValueKey('ledger-filter-menu')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('ledger-filter-menu')));
   await tester.pumpAndSettle();

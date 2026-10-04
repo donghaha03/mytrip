@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
 /// 04/05/06 모달이 공유하는 바텀시트 껍데기.
 /// 그래버 핸들 + (제목 / ✕ 닫기) 헤더 + 본문 구조를 강제해서
@@ -115,7 +116,11 @@ class SheetPrimaryButton extends StatelessWidget {
       backgroundColor: AppColors.primary,
       minimumSize: const Size.fromHeight(54),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      textStyle: const TextStyle(
+        fontFamily: kFontFamily,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+      ),
     ),
     child: Text(label),
   );

@@ -16,10 +16,16 @@ import '../widgets/screen_top_bar.dart';
 import '../widgets/won_input_formatter.dart';
 
 class ExpenseFormScreen extends StatefulWidget {
-  const ExpenseFormScreen({super.key, required this.trip, this.expense});
+  const ExpenseFormScreen({
+    super.key,
+    required this.trip,
+    this.expense,
+    this.startWithReceipt = false,
+  });
 
   final Trip trip;
   final Expense? expense;
+  final bool startWithReceipt;
 
   @override
   State<ExpenseFormScreen> createState() => _ExpenseFormScreenState();
@@ -37,32 +43,44 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   bool _isTaxFree = false;
   late DateTime _date;
   bool _busy = false;
+  bool _scanning = false;
   String? _error;
   ReceiptDraft? _receipt;
 
   Future<void> _scanReceipt() async {
-    if (_busy) return;
+    if (_busy || _scanning) return;
+    _scanning = true;
     final draft = await Navigator.of(context).push<ReceiptDraft>(
       MaterialPageRoute(builder: (_) => const ReceiptScreen()),
     );
+    _scanning = false;
     if (draft == null || !mounted) return;
-    final replace = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('영수증 내용으로 바꿀까요?'),
-        content: const Text('입력 중인 사용처·금액·통화·날짜·카테고리가 바뀌어요. 결제수단·면세·메모는 유지해요.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('기존 입력 유지'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('영수증 내용 적용'),
-          ),
-        ],
-      ),
-    );
+    final hasInput =
+        _place.text.trim().isNotEmpty ||
+        _amount.text.trim().isNotEmpty ||
+        widget.expense != null;
+    final replace =
+        !hasInput ||
+        await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('영수증 내용으로 바꿀까요?'),
+                content: const Text(
+                  '입력 중인 사용처·금액·통화·날짜·카테고리가 바뀌어요. 결제수단·면세·메모는 유지해요.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('기존 입력 유지'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('영수증 내용 적용'),
+                  ),
+                ],
+              ),
+            ) ==
+            true;
     if (replace != true || !mounted) return;
     setState(() {
       _receipt = draft;
@@ -96,6 +114,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     _date = e?.date ?? DateTime.now();
     _paymentMethod = e?.paymentMethod;
     _isTaxFree = e?.isTaxFree ?? false;
+    if (widget.startWithReceipt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scanReceipt();
+      });
+    }
   }
 
   @override
@@ -235,6 +258,8 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           status: widget.expense?.status ?? ExpenseStatus.approved,
           originalAmount: widget.expense?.originalAmount,
           receiptFingerprint: fingerprint,
+          receiptItems:
+              _receipt?.items ?? widget.expense?.receiptItems ?? const [],
         ),
       );
       if (mounted) Navigator.of(context).pop();
@@ -421,7 +446,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${currentRateLabel(_currency)} · 소수점은 버려요',
+                                currentRateLabel(_currency),
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: AppColors.textSecondary,

@@ -155,8 +155,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppColors.white,
-                        border: Border.all(color: AppColors.border),
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
@@ -164,22 +163,22 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         children: [
                           const Text(
                             '사용한 금액',
-                            style: TextStyle(color: AppColors.textSecondary),
+                            style: TextStyle(color: AppColors.onPrimaryMuted),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            available ? formatWon(trip.spentKrw) : '환율 없음',
-                            style: const TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              available ? formatWon(trip.spentKrw) : '환율 없음',
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.white,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 16),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: CategoryBudgetBar(trip: trip),
-                          ),
+                          BudgetProgressPanel(trip: trip),
                           const SizedBox(height: 16),
                           Wrap(
                             spacing: 24,
@@ -408,7 +407,7 @@ class _Figure extends StatelessWidget {
     children: [
       Text(
         label,
-        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        style: const TextStyle(fontSize: 12, color: AppColors.onPrimaryMuted),
       ),
       const SizedBox(height: 4),
       Text(
@@ -416,7 +415,7 @@ class _Figure extends StatelessWidget {
         style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
-          color: AppColors.textPrimary,
+          color: AppColors.white,
         ),
       ),
     ],

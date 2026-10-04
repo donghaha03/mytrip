@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/trip_store.dart';
 import 'screens/empty_home_screen.dart';
@@ -13,8 +14,17 @@ import 'services/session.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 
+bool _guideSeen = false;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    _guideSeen =
+        (await SharedPreferences.getInstance()).getBool('trip_guide_seen') ??
+        false;
+  } catch (_) {
+    /* Guidance also works without storage. */
+  }
 
   // 기본은 DB 없이 샘플 데이터로 화면을 확인한다.
   if (await Backend.init() == BackendMode.firebase) {
@@ -111,7 +121,17 @@ class _HomeRouterState extends State<HomeRouter> {
         if (tripStore.isLoading) return const _Loading();
         _openOngoingTripOnce();
         return tripStore.isEmpty
-            ? const EmptyHomeScreen()
+            ? EmptyHomeScreen(
+                showGuide: !_guideSeen,
+                onGuideFinished: () {
+                  _guideSeen = true;
+                  unawaited(
+                    SharedPreferences.getInstance()
+                        .then((prefs) => prefs.setBool('trip_guide_seen', true))
+                        .catchError((_) => false),
+                  );
+                },
+              )
             : const TripListScreen();
       },
     );

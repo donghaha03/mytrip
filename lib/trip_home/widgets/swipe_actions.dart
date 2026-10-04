@@ -4,7 +4,7 @@ import 'package:flutter/semantics.dart';
 
 import '../theme/app_colors.dart';
 
-/// Right reveals delete; left reveals edit. Swiping never deletes a record.
+/// Swipe left to reveal both actions. Swiping never changes a record.
 class SwipeActions extends StatefulWidget {
   const SwipeActions({
     super.key,
@@ -21,7 +21,7 @@ class SwipeActions extends StatefulWidget {
 }
 
 class _SwipeActionsState extends State<SwipeActions> {
-  static const _width = 80.0;
+  static const _width = 144.0;
   double _offset = 0;
   bool _dragging = false;
   final _focus = FocusNode();
@@ -42,16 +42,18 @@ class _SwipeActionsState extends State<SwipeActions> {
     (delete ? widget.onDelete : widget.onEdit)();
   }
 
-  KeyEventResult _key(FocusNode _, KeyEvent event) {
+  KeyEventResult _key(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     if (event.logicalKey == LogicalKeyboardKey.escape && _offset != 0) {
       _close();
     } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      _reveal(_width);
+      _close();
     } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
       _reveal(-_width);
-    } else if (_offset != 0 && event.logicalKey == LogicalKeyboardKey.enter) {
-      _run(_offset > 0);
+    } else if (_offset != 0 &&
+        node.hasPrimaryFocus &&
+        event.logicalKey == LogicalKeyboardKey.enter) {
+      _run(false);
     } else {
       return KeyEventResult.ignored;
     }
@@ -75,7 +77,7 @@ class _SwipeActionsState extends State<SwipeActions> {
           onTapDown: (_) => _focus.requestFocus(),
           onHorizontalDragStart: (_) => setState(() => _dragging = true),
           onHorizontalDragUpdate: (d) => setState(
-            () => _offset = (_offset + d.delta.dx).clamp(-_width, _width),
+            () => _offset = (_offset + d.delta.dx).clamp(-_width, 0),
           ),
           onHorizontalDragEnd: (_) {
             setState(() {
@@ -96,31 +98,17 @@ class _SwipeActionsState extends State<SwipeActions> {
             child: Stack(
               children: [
                 if (_offset != 0)
+                  const Positioned.fill(
+                    child: ColoredBox(color: AppColors.primarySoft),
+                  ),
+                if (_offset != 0)
                   Positioned.fill(
-                    child: ColoredBox(
-                      color: _offset > 0
-                          ? AppColors.dangerSoft
-                          : AppColors.primarySoft,
-                      child: Align(
-                        alignment: _offset > 0
-                            ? Alignment.centerLeft
-                            : Alignment.centerRight,
-                        child: SizedBox(
-                          width: _width,
-                          child: IconButton(
-                            tooltip:
-                                '${widget.label} ${_offset > 0 ? '삭제' : '수정'}',
-                            color: _offset > 0
-                                ? AppColors.danger
-                                : AppColors.primary,
-                            onPressed: () => _run(_offset > 0),
-                            icon: Icon(
-                              _offset > 0
-                                  ? Icons.delete_outline_rounded
-                                  : Icons.edit_outlined,
-                            ),
-                          ),
-                        ),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox(
+                        width: _width,
+                        height: double.infinity,
+                        child: Row(children: [_action(false), _action(true)]),
                       ),
                     ),
                   ),
@@ -131,7 +119,16 @@ class _SwipeActionsState extends State<SwipeActions> {
                   transform: Matrix4.translationValues(_offset, 0, 0),
                   child: Stack(
                     children: [
-                      ColoredBox(color: AppColors.white, child: widget.child),
+                      ExcludeFocus(
+                        excluding: _offset != 0,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: ColoredBox(
+                            color: AppColors.white,
+                            child: widget.child,
+                          ),
+                        ),
+                      ),
                       if (_offset != 0)
                         Positioned.fill(
                           child: GestureDetector(
@@ -145,6 +142,39 @@ class _SwipeActionsState extends State<SwipeActions> {
               ],
             ),
           ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _action(bool delete) => Expanded(
+    child: Tooltip(
+      message: '${widget.label} ${delete ? '삭제' : '수정'}',
+      child: TextButton(
+        style: TextButton.styleFrom(
+          backgroundColor: delete
+              ? AppColors.dangerSoft
+              : AppColors.primarySoft,
+          foregroundColor: delete ? AppColors.danger : AppColors.primary,
+          shape: const RoundedRectangleBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          minimumSize: const Size(72, double.infinity),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: () => _run(delete),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              delete ? Icons.delete_outline_rounded : Icons.edit_outlined,
+              size: 22,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              delete ? '삭제' : '수정',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
         ),
       ),
     ),

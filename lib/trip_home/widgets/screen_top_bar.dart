@@ -49,24 +49,21 @@ class ScreenTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 20, 16),
+      padding: const EdgeInsets.fromLTRB(12, 8, 16, 12),
       child: Row(
         children: [
           if (Navigator.of(context).canPop()) ...[
-            Semantics(
-              button: true,
-              label: '뒤로가기',
-              child: InkResponse(
-                onTap: () => Navigator.of(context).pop(),
-                radius: 22,
-                child: const Icon(
-                  Icons.arrow_back_rounded,
-                  size: 24,
-                  color: AppColors.textPrimary,
-                ),
+            IconButton(
+              tooltip: '뒤로가기',
+              onPressed: () => Navigator.of(context).pop(),
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                size: 24,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 4),
           ],
           Expanded(
             child: Row(

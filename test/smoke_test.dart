@@ -82,6 +82,8 @@ void main() {
 
   testWidgets('00 빈 화면이 그려진다', (tester) async {
     await tester.pumpWidget(const TripApp());
+    await tester.tap(find.text('건너뛰기'));
+    await tester.pumpAndSettle();
     expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
     expect(find.text('여행 일정과 지출을 한곳에서 관리해요'), findsOneWidget);
     expect(find.text('여행 추가하기'), findsOneWidget);
@@ -206,7 +208,7 @@ void main() {
     );
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: trip)));
     // ¥2,000 = 19,000원, 예산 10,000원 -> 9,000원 초과
-    expect(find.text('초과'), findsOneWidget);
+    expect(find.text('예산 초과'), findsOneWidget);
     expect(find.text('9,000원'), findsOneWidget);
     expect(find.text('190%'), findsOneWidget);
     expect(find.text('남은 금액'), findsNothing);
@@ -546,7 +548,7 @@ void main() {
         _wrap(Scaffold(body: QuickConverter(country: countryByCode('JPY')!))),
       );
       expect(find.text('환율 없음'), findsOneWidget);
-      expect(find.text('소수점은 버려요'), findsOneWidget);
+      expect(find.text('소수점은 버려요'), findsNothing);
       expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
     });
 
@@ -875,7 +877,7 @@ void main() {
     await tester.pump();
     expect(find.text('¥100 = ₩862'), findsOneWidget);
     expect(find.textContaining('적용 환율:'), findsNothing);
-    expect(find.text('소수점은 버려요'), findsOneWidget);
+    expect(find.text('소수점은 버려요'), findsNothing);
     expect(find.text('상단 정수 환율 기준 · 소수점 버림'), findsNothing);
     expect(find.text('샘플 지출 · 고정 환율 기준'), findsNothing);
     expect(japan.spentKrw, 414622);

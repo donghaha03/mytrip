@@ -51,7 +51,7 @@ class SpendingOverviewScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      '집계: 이 여행에 기록한 전체 기간',
+                      '여행 전체 지출',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 16),
@@ -84,19 +84,18 @@ class SpendingOverviewScreen extends StatelessWidget {
                           '양수 지출 ${formatWon(summary.positiveKrw)} · 환불 조정 −${formatWon(summary.refundsKrw)}',
                         ),
                       if (summary.cancellationsKrw > 0)
-                        Text(
-                          '취소·부분취소 ${formatWon(summary.cancellationsKrw)} (순지출에서 이미 제외)',
-                        ),
+                        Text('취소 ${formatWon(summary.cancellationsKrw)}'),
                       const SizedBox(height: 12),
                       if (summary.positiveKrw > 0) ...[
                         CategoryPie(summary: summary),
-                        const Text(
-                          '구성비는 취소 후 남은 양수 지출 기준이에요. 음수 환불은 차트에 넣지 않아요.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+                        if (summary.refundsKrw > 0)
+                          const Text(
+                            '구성비는 환불을 제외한 지출 기준이에요.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
                         for (final entry in summary.sorted)
                           ListTile(
                             contentPadding: EdgeInsets.zero,
@@ -128,7 +127,7 @@ class SpendingOverviewScreen extends StatelessWidget {
                     ],
                     const SizedBox(height: 12),
                     Text(
-                      '원화 환산: 상단과 같은 현재 환율 · 입력·결과 소수점 버림${RateApi.updatedAt == null ? '' : ' · 기준일 ${formatDate(RateApi.updatedAt!)}'}',
+                      '현재 환율 기준${RateApi.updatedAt == null ? '' : ' · ${formatDate(RateApi.updatedAt!)}'}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,

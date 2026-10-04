@@ -17,7 +17,7 @@ class AppColors {
 
   static const textPrimary = Color(0xFF16181D);
   static const textSecondary = Color(0xFF6B7280);
-  static const textTertiary = Color(0xFF9EA6B3);
+  static const textTertiary = Color(0xFF6B7280);
 
   static const border = Color(0xFFE5E7EB);
   static const divider = Color(0xFFDEE0E6);
@@ -30,6 +30,8 @@ class AppColors {
   static const tooltipBg = Color(0xFF212630);
 
   /// 파란 예산 카드 위에 얹는 보조 텍스트
-  static const onPrimaryMuted = Color(0xD9FFFFFF); // white 85%
+  static const onPrimaryMuted = Color(
+    0xFFFFFFFF,
+  ); // readable small text on blue
   static const onPrimaryFaint = Color(0x8CFFFFFF); // white 55%
 }

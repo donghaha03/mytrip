@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/country.dart';
 import '../models/trip.dart';
+import '../models/receipt_item.dart';
 import 'trip_repository.dart';
 
 bool _invalidDates(DateTime start, DateTime end) => DateTime.utc(
@@ -105,6 +106,10 @@ class TripStore extends ChangeNotifier {
                 ? expense.amount <= 0
                 : expense.amount.truncate() <= 0)) ||
         expense.memo.length > 300 ||
+        expense.receiptItems.length > 100 ||
+        expense.receiptItems.any(
+          (item) => ReceiptItem.fromJson(item.toJson()) == null,
+        ) ||
         (expense.currency != null &&
             countryByCode(expense.currency!) == null)) {
       throw ArgumentError('사용처와 금액을 확인해주세요');

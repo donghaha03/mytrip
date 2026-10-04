@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 
-import '../data/trip_store.dart';
+import '../widgets/onboarding_example.dart';
+import '../widgets/screen_top_bar.dart';
 import '../theme/app_colors.dart';
 import '../widgets/add_trip_cta.dart';
 import 'add_trip_screen.dart';
 import 'more_screen.dart';
 
-/// 00. 여행이 하나도 없을 때 보이는 첫 화면.
+/// The tutorial finishes at the welcome screen, never in a form.
 class EmptyHomeScreen extends StatefulWidget {
-  const EmptyHomeScreen({super.key, this.guideOnly = false});
+  const EmptyHomeScreen({
+    super.key,
+    this.guideOnly = false,
+    this.showGuide = true,
+    this.onGuideFinished,
+  });
   final bool guideOnly;
+  final bool showGuide;
+  final VoidCallback? onGuideFinished;
   @override
   State<EmptyHomeScreen> createState() => _EmptyHomeScreenState();
 }
@@ -17,46 +25,19 @@ class EmptyHomeScreen extends StatefulWidget {
 class _EmptyHomeScreenState extends State<EmptyHomeScreen>
     with SingleTickerProviderStateMixin {
   static const _slides = [
-    (
-      title: '첫 여행을 추가해 보세요',
-      description: '여행 일정과 지출을 한곳에서 관리해요',
-      icon: Icons.send_rounded,
-    ),
-    (
-      title: '일정과 예산부터 정해요',
-      description: '국가·여행 기간·원화 예산을 정해요.\n달력의 연·월 제목을 누르면 먼 날짜로 바로 이동할 수 있어요.',
-      icon: Icons.calendar_month_rounded,
-    ),
-    (
-      title: '지출을 간편하게 기록해요',
-      description: '현금·카드와 면세 여부를 구분해요.\n영수증 촬영으로 자동 입력하고, 내용을 확인·수정한 뒤 저장해요.',
-      icon: Icons.receipt_long_rounded,
-    ),
-    (
-      title: '밀어서 수정하고 삭제해요',
-      description:
-          '여행 카드와 지출을 오른쪽으로 밀면 삭제, 왼쪽으로 밀면 수정 아이콘이 나와요.\n길게 눌러도 편집할 수 있어요. 삭제 전에는 다시 확인해요.',
-      icon: Icons.swipe_rounded,
-    ),
-    (
-      title: '지출을 한눈에 확인해요',
-      description:
-          '지출보기는 전체 목록, 한눈에 보기는 카테고리별 차트예요.\n현재 표시 환율로 정수 환산하고, 환율이 없으면 통화별로 구분해요.',
-      icon: Icons.pie_chart_outline_rounded,
-    ),
-    (
-      title: '이제 여행을 떠나볼까요?',
-      description: '한 번 더 오른쪽으로 넘겨주세요.\n새 여행의 일정과 예산을 준비하러 출발해요.',
-      icon: Icons.flight_takeoff_rounded,
-    ),
+    (title: '여행을 추가해요', description: '국가와 일정, 예산을 정하면 준비 끝.'),
+    (title: '지출을 기록해요', description: '사용처와 금액을 적고 현금·카드를 구분해요.'),
+    (title: '왼쪽으로 밀어 관리해요', description: '여행과 지출을 밀면 수정·삭제가 나타나요.'),
+    (title: '영수증으로 간편하게', description: '촬영하거나 사진을 골라, 확인 후 기록해요.'),
   ];
-  late final _pages = PageController(initialPage: widget.guideOnly ? 1 : 0);
+  final _pages = PageController();
   late final _flight = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 650),
   );
-  late int _page = widget.guideOnly ? 1 : 0;
+  late bool _showGuide = widget.guideOnly || widget.showGuide;
   bool _departing = false;
+  int _page = 0;
   @override
   void dispose() {
     _pages.dispose();
@@ -78,6 +59,18 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
     }
   }
 
+  void _finish() {
+    widget.onGuideFinished?.call();
+    if (widget.guideOnly && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _showGuide = false;
+        _departing = false;
+      });
+    }
+  }
+
   Future<void> _depart() async {
     if (_departing || !mounted) return;
     setState(() => _departing = true);
@@ -85,205 +78,253 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
         ? Duration.zero
         : const Duration(milliseconds: 650);
     try {
-      await _flight.forward().orCancel;
+      await _flight.forward(from: 0).orCancel;
     } on TickerCanceled {
       return;
     }
-    if (!mounted) return;
-    final count = tripStore.trips.length;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AddTripScreen()));
-    if (!mounted) return;
-    if (widget.guideOnly && tripStore.trips.length > count) {
-      Navigator.of(context).pop();
-      return;
-    }
-    _pages.jumpToPage(_slides.length - 1);
-    _flight.reset();
-    setState(() => _departing = false);
+    if (mounted) _finish();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_showGuide) return _welcome();
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFEFF4FE), Color(0xFFF9FAFC), AppColors.bg],
-            stops: [0, 0.55, 1],
-          ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 16, 0),
-                    child: Row(
-                      children: [
-                        if (widget.guideOnly)
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                ScreenTopBar(
+                  title: '앱 사용방법',
+                  trailing: TextButton(
+                    onPressed: _departing ? null : _finish,
+                    child: const Text('건너뛰기'),
+                  ),
+                ),
+                Expanded(
+                  child: PageView.builder(
+                    key: const ValueKey('welcome-pages'),
+                    controller: _pages,
+                    itemCount: _slides.length + 1,
+                    onPageChanged: (i) {
+                      if (i == _slides.length) {
+                        _depart();
+                      } else {
+                        setState(() => _page = i);
+                      }
+                    },
+                    itemBuilder: (context, i) => i == _slides.length
+                        ? const SizedBox.expand()
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _slides[i].title,
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    height: 1.3,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _slides[i].description,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    height: 1.6,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 28),
+                                OnboardingExample(step: i),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                  child: Column(
+                    children: [
+                      _FlightProgress(progress: _page / (_slides.length - 1)),
+                      Row(
+                        children: [
                           IconButton(
-                            tooltip: '안내 닫기',
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.arrow_back_rounded),
+                            tooltip: '이전 안내',
+                            onPressed: _page == 0 || _departing
+                                ? null
+                                : () => _move(-1),
+                            icon: const Icon(Icons.chevron_left_rounded),
                           ),
-                        const Expanded(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: _BrandBadge(),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: '더보기',
-                          icon: const Icon(Icons.more_horiz_rounded),
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const MoreScreen(),
+                          Expanded(
+                            child: Text(
+                              '${_page + 1} / ${_slides.length}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ),
+                          IconButton(
+                            tooltip: _page == _slides.length - 1
+                                ? '출발하기'
+                                : '다음 안내',
+                            onPressed: _departing ? null : () => _move(1),
+                            icon: const Icon(Icons.chevron_right_rounded),
+                          ),
+                        ],
+                      ),
+                      const Text(
+                        '왼쪽으로 넘겨보세요',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  Expanded(
-                    child: PageView.builder(
-                      key: const ValueKey('welcome-pages'),
-                      controller: _pages,
-                      reverse: true,
-                      itemCount: _slides.length + 1,
-                      onPageChanged: (i) {
-                        if (i == _slides.length) {
-                          _depart();
-                        } else {
-                          setState(() => _page = i);
-                        }
-                      },
-                      itemBuilder: (context, i) => i == _slides.length
-                          ? const SizedBox.expand()
-                          : Center(
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 16,
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _PlaneMark(icon: _slides[i].icon),
-                                    const SizedBox(height: 26),
-                                    Text(
-                                      i == 0 && widget.guideOnly
-                                          ? '여행을 준비해 보세요'
-                                          : _slides[i].title,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        height: 1.4,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.textPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      _slides[i].description,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        height: 1.7,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                    if (i == 0) ...[
-                                      const SizedBox(height: 24),
-                                      const _FeatureRow(),
-                                    ],
-                                  ],
-                                ),
-                              ),
+                ),
+              ],
+            ),
+            if (_departing)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: AppColors.primarySoft,
+                  child: AnimatedBuilder(
+                    animation: _flight,
+                    builder: (context, _) => LayoutBuilder(
+                      builder: (context, size) => Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          const Text(
+                            '여행을 준비하러 출발해요',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
                             ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-                    child: Column(
-                      children: [
-                        _FlightProgress(progress: _page / (_slides.length - 1)),
-                        Row(
-                          children: [
-                            IconButton(
-                              tooltip: '이전 안내',
-                              onPressed: _page == 0 ? null : () => _move(-1),
-                              icon: const Icon(Icons.chevron_left_rounded),
+                          ),
+                          Transform.translate(
+                            offset: Offset(
+                              _flight.value * size.maxWidth,
+                              -80 - _flight.value * size.maxHeight * .4,
                             ),
-                            Expanded(
-                              child: Text(
-                                '${_page + 1} / ${_slides.length} · 오른쪽으로 넘겨보세요',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
+                            child: const Icon(
+                              Icons.send_rounded,
+                              size: 72,
+                              color: AppColors.primary,
                             ),
-                            IconButton(
-                              tooltip: _page == _slides.length - 1
-                                  ? '출발하기'
-                                  : '다음 안내',
-                              onPressed: () => _move(1),
-                              icon: const Icon(Icons.chevron_right_rounded),
-                            ),
-                          ],
-                        ),
-                        AddTripCta(label: '여행 추가하기', onTap: _depart),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (_departing)
-                Positioned.fill(
-                  child: ColoredBox(
-                    color: AppColors.primarySoft,
-                    child: AnimatedBuilder(
-                      animation: _flight,
-                      builder: (context, _) => LayoutBuilder(
-                        builder: (context, size) => Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            const Text(
-                              '여행을 준비하러 출발해요',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Transform.translate(
-                              offset: Offset(
-                                _flight.value * size.maxWidth,
-                                -80 - _flight.value * size.maxHeight * .4,
-                              ),
-                              child: const Icon(
-                                Icons.send_rounded,
-                                size: 72,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _welcome() => Scaffold(
+    body: Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFEFF4FE), Color(0xFFF9FAFC), AppColors.bg],
+          stops: [0, .55, 1],
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 16, 0),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _BrandBadge(),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '더보기',
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const MoreScreen(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _PlaneMark(icon: Icons.send_rounded),
+                      SizedBox(height: 28),
+                      Text(
+                        '첫 여행을 추가해 보세요',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          height: 1.4,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        '여행 일정과 지출을 한곳에서 관리해요',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.7,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      SizedBox(height: 24),
+                      _FeatureRow(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+              child: Column(
+                children: [
+                  AddTripCta(
+                    label: '여행 추가하기',
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AddTripScreen(),
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _showGuide = true;
+                      _page = 0;
+                    }),
+                    child: const Text('사용방법 다시 보기'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _BrandBadge extends StatelessWidget {
