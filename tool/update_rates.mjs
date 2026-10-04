@@ -22,6 +22,12 @@ function normalize(data, fetchedAt) {
       Number.isFinite(1 / value), `${currency} 환율이 올바르지 않습니다`);
     rates[currency] = value;
   }
+  // Optional additional ISO currencies: preserve absent rates as absent.
+  for (const [code, value] of Object.entries(data.krw ?? {})) {
+    if (/^[a-z]{3}$/.test(code) && Number.isFinite(value) && value > 0 && Number.isFinite(1 / value)) {
+      rates[code.toUpperCase()] = value;
+    }
+  }
   return { result: 'success', base_code: 'KRW', rate_date: data.date,
     fetched_at: fetchedAt.toISOString(), rates };
 }

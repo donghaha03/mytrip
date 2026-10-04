@@ -6,6 +6,12 @@ import '../models/country.dart';
 import '../models/trip.dart';
 import 'trip_repository.dart';
 
+bool _invalidDates(DateTime start, DateTime end) => DateTime.utc(
+  end.year,
+  end.month,
+  end.day,
+).isBefore(DateTime.utc(start.year, start.month, start.day));
+
 /// 화면이 보는 여행 목록.
 ///
 /// 화면 쪽은 모드를 몰라도 된다 — add/remove/rename/addExpense 를 부르고
@@ -39,6 +45,9 @@ class TripStore extends ChangeNotifier {
   }
 
   void add(Trip trip) {
+    if (_invalidDates(trip.start, trip.end)) {
+      throw ArgumentError('종료일은 시작일보다 빠를 수 없어요');
+    }
     _trips.add(trip);
     notifyListeners();
     _push(_repo?.saveTrip(trip));
@@ -69,6 +78,9 @@ class TripStore extends ChangeNotifier {
   }) {
     final trip = byId(id);
     if (trip == null) return;
+    if (_invalidDates(start ?? trip.start, end ?? trip.end)) {
+      throw ArgumentError('종료일은 시작일보다 빠를 수 없어요');
+    }
     if (name != null) trip.name = name;
     if (start != null) trip.start = start;
     if (end != null) trip.end = end;

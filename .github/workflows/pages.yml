@@ -38,6 +38,7 @@ jobs:
       - run: flutter analyze --fatal-infos --fatal-warnings
       - run: flutter test
       - run: node tool/update_rates.mjs --check
+      - run: node --test test/receipt_camera_test.mjs
 
       # <계정>.github.io/<repo>/ 처럼 하위 경로에 뜨므로 base-href 를 repo 이름으로.
       # repo 이름이 <계정>.github.io 이면 루트(/)에 뜬다.

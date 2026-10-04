@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../widgets/category_charts.dart';
 
-import '../../api/api.dart';
 import '../models/trip.dart';
 import '../screens/trip_home_screen.dart';
 import '../theme/app_colors.dart';
@@ -22,7 +22,7 @@ class TripCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final available = RateApi.quotedKrw(trip.country.currency) > 0;
+    final available = trip.ratesAvailable(trip.expenses);
     final percent = trip.budgetKrw == 0
         ? 0
         : trip.spentKrw * 100 ~/ trip.budgetKrw;
@@ -123,12 +123,7 @@ class TripCard extends StatelessWidget {
               const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: trip.spentRatio,
-                  minHeight: 6,
-                  backgroundColor: AppColors.progressTrack,
-                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-                ),
+                child: CategoryBudgetBar(trip: trip),
               ),
             ],
           ),

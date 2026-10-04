@@ -14,6 +14,7 @@ import 'package:tripapp/trip_home/screens/trip_list_screen.dart';
 import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/screens/ledger_screen.dart';
 import 'package:tripapp/trip_home/screens/expense_form_screen.dart';
+import 'package:tripapp/trip_home/screens/spending_overview_screen.dart';
 import 'package:tripapp/trip_home/models/country.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
 import 'package:tripapp/trip_home/services/backend.dart';
@@ -81,7 +82,8 @@ void main() {
 
   testWidgets('00 빈 화면이 그려진다', (tester) async {
     await tester.pumpWidget(const TripApp());
-    expect(find.text('아직 떠날 준비가 남았어요'), findsOneWidget);
+    expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
+    expect(find.text('여행 일정과 지출을 한곳에서 관리해요'), findsOneWidget);
     expect(find.text('여행 추가하기'), findsOneWidget);
     expect(find.text('자동 환산'), findsOneWidget);
   });
@@ -110,9 +112,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('국가 더보기'), findsOneWidget);
-    expect(find.text('HKD'), findsOneWidget);
-
-    await tester.tap(find.text('SGD'));
+    await tester.enterText(find.byKey(const ValueKey('country-search')), 'Singapore');
+    await tester.pump();
+    await tester.tap(find.text('싱가포르'));
     await tester.pump();
     await tester.tap(find.text('선택 완료'));
     await tester.pumpAndSettle();
@@ -126,7 +128,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('여행 기간 선택'), findsOneWidget);
-    expect(find.text('날짜를 드래그해 기간을 정해 주세요'), findsOneWidget);
+    expect(find.text('시작일과 종료일을 선택해주세요'), findsOneWidget);
 
     // 1일에서 5일까지 드래그
     await tester.drag(find.text('1'), const Offset(160, 40));
@@ -438,7 +440,7 @@ void main() {
 
     expect(find.text('최근 지출'), findsOneWidget);
     expect(find.text('4건'), findsOneWidget);
-    expect(find.text('전체 보기'), findsOneWidget);
+    expect(find.text('지출보기'), findsOneWidget);
 
     // 최신 3건만 (신주쿠 호텔은 4번째라 안 보인다)
     expect(find.text('이치란 라멘'), findsOneWidget);
@@ -448,9 +450,9 @@ void main() {
     expect(find.text('11,400원'), findsWidgets); // ¥1,200
     expect(find.text('¥1,200 JPY'), findsOneWidget);
 
-    await tester.tap(find.text('전체 보기'));
+    await tester.tap(find.text('지출보기'));
     await tester.pumpAndSettle();
-    expect(find.byType(LedgerScreen), findsOneWidget);
+    expect(find.byType(SpendingOverviewScreen), findsOneWidget);
     await tester.scrollUntilVisible(find.text('신주쿠 호텔'), 200);
     await tester.pumpAndSettle();
     expect(find.text('신주쿠 호텔'), findsOneWidget);
@@ -772,12 +774,9 @@ void main() {
     await tester.tap(find.text('더보기'));
     await tester.pumpAndSettle();
     expect(find.text('국가 더보기'), findsOneWidget);
-    final sheetChips = find.descendant(
-      of: find.byType(MoreCountrySheet),
-      matching: find.byType(CountryChip),
-    );
-    expect(sheetChips, findsNWidgets(kMoreCountries.length));
-    expect(tester.getSize(sheetChips.first).height, kCountryChipHeight);
+    expect(find.byKey(const ValueKey('country-list')), findsOneWidget);
+    expect(tester.getSize(find.byType(MoreCountrySheet)).width, lessThanOrEqualTo(kPhoneWidth));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('02 예산 입력에 콤마가 즉시 찍힌다', (tester) async {

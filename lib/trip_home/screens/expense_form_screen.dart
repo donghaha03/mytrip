@@ -5,6 +5,8 @@ import '../../api/api.dart';
 import '../data/trip_store.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
+import '../receipts/receipt_draft.dart';
+import '../receipts/receipt_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
@@ -36,6 +38,47 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   late DateTime _date;
   bool _busy = false;
   String? _error;
+  ReceiptDraft? _receipt;
+
+  Future<void> _scanReceipt() async {
+    if (_busy) return;
+    final draft = await Navigator.of(context).push<ReceiptDraft>(
+      MaterialPageRoute(builder: (_) => const ReceiptScreen()),
+    );
+    if (draft == null || !mounted) return;
+    final replace = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('영수증 내용으로 바꿀까요?'),
+        content: const Text('입력 중인 사용처·금액·통화·날짜·카테고리가 바뀌어요. 결제수단·면세·메모는 유지해요.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('기존 입력 유지'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('영수증 내용 적용'),
+          ),
+        ],
+      ),
+    );
+    if (replace != true || !mounted) return;
+    setState(() {
+      _receipt = draft;
+      _place.text = draft.merchant;
+      _amount.text = formatNumber(draft.amount!.truncate());
+      _currency = countryByCode(draft.currency!)!;
+      _date = DateTime(
+        draft.date!.year,
+        draft.date!.month,
+        draft.date!.day,
+        _date.hour,
+        _date.minute,
+      );
+      _category = draft.category;
+    });
+  }
 
   @override
   void initState() {
@@ -141,6 +184,33 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
       _error = null;
     });
     try {
+      final fingerprint =
+          _receipt?.fingerprint ?? widget.expense?.receiptFingerprint;
+      if (fingerprint != null &&
+          widget.trip.expenses.any(
+            (e) => e.id != _id && e.receiptFingerprint == fingerprint,
+          )) {
+        final duplicate = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('같은 영수증일 수 있어요'),
+            content: const Text(
+              '상호명·결제일·통화·금액이 같은 영수증 기록이 있어요. 기존 기록을 확인하거나 별개의 정상 지출이면 계속 저장할 수 있어요.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('돌아가서 확인'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('별개 지출로 저장'),
+              ),
+            ],
+          ),
+        );
+        if (duplicate != true || !mounted) return;
+      }
       await tripStore.saveExpense(
         widget.trip.id,
         Expense(
@@ -164,6 +234,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           source: widget.expense?.source,
           status: widget.expense?.status ?? ExpenseStatus.approved,
           originalAmount: widget.expense?.originalAmount,
+          receiptFingerprint: fingerprint,
         ),
       );
       if (mounted) Navigator.of(context).pop();
@@ -249,6 +320,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        if (!imported) ...[
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _scanReceipt,
+                            icon: const Icon(Icons.document_scanner_outlined),
+                            label: const Text('영수증 촬영'),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         if (imported) ...[
                           const Text(
                             '자동 기록의 금액·통화·사용처·일시는 바꿀 수 없어요. 분류·면세·메모는 수정할 수 있어요.',
@@ -256,7 +335,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                           const SizedBox(height: 16),
                         ],
                         DropdownButtonFormField<String>(
-                          key: const ValueKey('expense-currency'),
+                          key: ValueKey(
+                            'expense-currency-${_currency.currency}',
+                          ),
                           initialValue: _currency.currency,
                           isExpanded: true,
                           menuMaxHeight: 320,

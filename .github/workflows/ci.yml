@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node tool/update_rates.mjs --check
+      - run: node --test test/receipt_camera_test.mjs
 
       - uses: actions/setup-node@v4
         with:

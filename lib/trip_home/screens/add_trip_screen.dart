@@ -33,7 +33,7 @@ class _AddTripScreenState extends State<AddTripScreen> {
   }
 
   bool get _canSubmit =>
-      _selected != null && _range != null && _budgetValue > 0;
+      _selected != null && _range?.isValid == true && _budgetValue > 0;
 
   int get _budgetValue =>
       int.tryParse(_budgetController.text.replaceAll(',', '')) ?? 0;
@@ -41,7 +41,7 @@ class _AddTripScreenState extends State<AddTripScreen> {
   Future<void> _openMoreCountries() async {
     final picked = await showAppSheet<Country>(
       context: context,
-      builder: (_) => MoreCountrySheet(initialSelected: _fromMoreSheet),
+      builder: (_) => MoreCountrySheet(initialSelected: _selected),
     );
     if (picked == null) return;
     setState(() {
@@ -61,14 +61,16 @@ class _AddTripScreenState extends State<AddTripScreen> {
 
   void _submit() {
     if (!_canSubmit) return;
-    tripStore.add(Trip(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      name: '${_selected!.name} 여행',
-      country: _selected!,
-      start: _range!.start,
-      end: _range!.end,
-      budgetKrw: _budgetValue,
-    ));
+    tripStore.add(
+      Trip(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        name: '${_selected!.name} 여행',
+        country: _selected!,
+        start: _range!.start,
+        end: _range!.end,
+        budgetKrw: _budgetValue,
+      ),
+    );
     Navigator.of(context).pop();
   }
 
@@ -112,13 +114,13 @@ class _AddTripScreenState extends State<AddTripScreen> {
   }
 
   Widget _sectionLabel(String text) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textSecondary,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textSecondary,
+    ),
+  );
 
   Widget _countryGrid() {
     // 기본 7개국 + 마지막 칸은 "더보기"
@@ -126,7 +128,7 @@ class _AddTripScreenState extends State<AddTripScreen> {
       for (final c in kPrimaryCountries)
         CountryChip(
           country: c,
-          selected: _selected?.currency == c.currency,
+          selected: _selected?.code == c.code,
           onTap: () => setState(() {
             _selected = c;
             _fromMoreSheet = null;
@@ -241,8 +243,10 @@ class _AddTripScreenState extends State<AddTripScreen> {
         ),
         filled: true,
         fillColor: AppColors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 16,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.border),
