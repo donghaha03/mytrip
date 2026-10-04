@@ -95,10 +95,8 @@ class TripListScreen extends StatelessWidget {
                         icon: const Icon(Icons.help_outline_rounded),
                         onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => EmptyHomeScreen(
-                              guideOnly: true,
-                              destination: featured?.country,
-                            ),
+                            builder: (_) =>
+                                const EmptyHomeScreen(guideOnly: true),
                           ),
                         ),
                       ),

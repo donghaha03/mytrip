@@ -987,27 +987,23 @@ void main() {
     },
   );
 
-  testWidgets(
-    'departure shows only a moving plane before arriving at welcome',
-    (tester) async {
-      await tester.pumpWidget(wrap(const EmptyHomeScreen()));
-      for (var i = 0; i < 4; i++) {
-        await tester.tap(find.byTooltip('다음 안내'));
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 400));
-        await tester.pump();
-      }
-      await tester.tap(find.byTooltip('출발하기'));
+  testWidgets('last guide leads directly to welcome with no departure screen', (
+    tester,
+  ) async {
+    await tester.pumpWidget(wrap(const EmptyHomeScreen()));
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byTooltip('다음 안내'));
+      await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump(const Duration(milliseconds: 1000));
-      expect(find.byType(Text), findsNothing);
-      expect(find.byIcon(Icons.flight_rounded), findsOneWidget);
-      expect(find.text('첫 여행을 추가해 보세요'), findsNothing);
-      await tester.pumpAndSettle();
-      expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+      await tester.pump();
+    }
+    await tester.tap(find.byTooltip('시작하기'));
+    await tester.pump(const Duration(milliseconds: 220));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.flight_rounded), findsNothing);
+    expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'receipt guide shows capture, recognition and review without saving',
@@ -1271,21 +1267,22 @@ void main() {
     },
   );
 
-  testWidgets('leaving during departure does not navigate or leak a ticker', (
-    tester,
-  ) async {
-    await tester.pumpWidget(wrap(const EmptyHomeScreen()));
-    for (var i = 0; i < 4; i++) {
-      await tester.tap(find.byTooltip('다음 안내'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump();
-    }
-    await tester.tap(find.byTooltip('출발하기'));
-    await tester.pump(const Duration(milliseconds: 320));
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
-    expect(find.byType(AddTripScreen), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'leaving during guide completion does not navigate or leak a ticker',
+    (tester) async {
+      await tester.pumpWidget(wrap(const EmptyHomeScreen()));
+      for (var i = 0; i < 4; i++) {
+        await tester.tap(find.byTooltip('다음 안내'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pump();
+      }
+      await tester.tap(find.byTooltip('시작하기'));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(find.byType(AddTripScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

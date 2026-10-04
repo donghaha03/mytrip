@@ -186,30 +186,31 @@ class _HomeRouterState extends State<HomeRouter> {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: tripStore,
-      builder: (context, _) {
-        if (_guideSeen == null) return const _Loading();
-        if (!_guideSeen!) {
-          final now = DateTime.now();
-          final today = DateTime(now.year, now.month, now.day);
-          final upcoming =
-              tripStore.trips
-                  .where((trip) => !trip.start.isBefore(today))
-                  .toList()
-                ..sort((a, b) => a.start.compareTo(b.start));
-          return EmptyHomeScreen(
-            destination:
-                (ongoingTrip(tripStore.trips, now) ?? upcoming.firstOrNull)
-                    ?.country,
-            onGuideFinished: _completeGuide,
-          );
-        }
-        if (tripStore.isLoading) return const _Loading();
-        _openOngoingTripOnce();
-        return tripStore.isEmpty
-            ? const EmptyHomeScreen(showGuide: false)
-            : const TripListScreen();
-      },
+      builder: (context, _) => AnimatedSwitcher(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 200),
+        child: _screen(),
+      ),
     );
+  }
+
+  Widget _screen() {
+    if (_guideSeen == null) return const _Loading();
+    if (!_guideSeen!) {
+      return EmptyHomeScreen(
+        key: const ValueKey('first-run-guide'),
+        onGuideFinished: _completeGuide,
+      );
+    }
+    if (tripStore.isLoading) return const _Loading();
+    _openOngoingTripOnce();
+    return tripStore.isEmpty
+        ? const EmptyHomeScreen(
+            key: ValueKey('empty-welcome'),
+            showGuide: false,
+          )
+        : const TripListScreen();
   }
 }
 

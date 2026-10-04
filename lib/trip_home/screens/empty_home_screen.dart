@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../models/country.dart';
-import '../widgets/departure_map.dart';
 import '../widgets/onboarding_example.dart';
 import '../widgets/screen_top_bar.dart';
 import '../theme/app_colors.dart';
@@ -16,18 +14,15 @@ class EmptyHomeScreen extends StatefulWidget {
     this.guideOnly = false,
     this.showGuide = true,
     this.onGuideFinished,
-    this.destination,
   });
   final bool guideOnly;
   final bool showGuide;
   final VoidCallback? onGuideFinished;
-  final Country? destination;
   @override
   State<EmptyHomeScreen> createState() => _EmptyHomeScreenState();
 }
 
-class _EmptyHomeScreenState extends State<EmptyHomeScreen>
-    with SingleTickerProviderStateMixin {
+class _EmptyHomeScreenState extends State<EmptyHomeScreen> {
   static const _slides = [
     (title: '여행을 추가해요', description: '국가와 일정, 예산을 정하면 준비 끝.'),
     (title: '지출을 기록해요', description: '사용처와 금액, 현금·카드와 면세 여부를 기록해요.'),
@@ -39,23 +34,23 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
     (title: '지출을 한눈에 봐요', description: '카테고리별 구성비를 보고, 빠른 환산으로 현지 금액을 확인해요.'),
   ];
   final _pages = PageController();
-  late final _flight = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 3200),
-  );
   late bool _showGuide = widget.guideOnly || widget.showGuide;
-  bool _departing = false;
+  bool _finishing = false;
+  double _endSwipe = 0;
   int _page = 0;
   @override
   void dispose() {
     _pages.dispose();
-    _flight.dispose();
     super.dispose();
   }
 
   void _move(int offset) {
-    if (_departing) return;
-    final target = (_page + offset).clamp(0, _slides.length);
+    if (_finishing) return;
+    if (offset > 0 && _page == _slides.length - 1) {
+      _finish();
+      return;
+    }
+    final target = (_page + offset).clamp(0, _slides.length - 1);
     if (MediaQuery.disableAnimationsOf(context)) {
       _pages.jumpToPage(target);
     } else {
@@ -68,145 +63,140 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
   }
 
   void _finish() {
+    if (_finishing) return;
+    _finishing = true;
+    Tooltip.dismissAllToolTips();
     widget.onGuideFinished?.call();
     if (widget.guideOnly && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     } else {
       setState(() {
         _showGuide = false;
-        _departing = false;
       });
     }
   }
 
-  Future<void> _depart() async {
-    if (_departing || !mounted) return;
-    Tooltip.dismissAllToolTips();
-    setState(() => _departing = true);
-    _flight.duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 3200);
-    try {
-      await _flight.forward(from: 0).orCancel;
-    } on TickerCanceled {
-      return;
+  bool _handleEndSwipe(ScrollNotification notification) {
+    if (notification.depth != 0 ||
+        notification.metrics.axis != Axis.horizontal) {
+      return false;
     }
-    if (mounted) _finish();
+    if (notification is ScrollStartNotification) _endSwipe = 0;
+    if (_page != _slides.length - 1 || _finishing) return false;
+    if (notification is OverscrollNotification && notification.overscroll > 0) {
+      _endSwipe += notification.overscroll;
+    }
+    if (_endSwipe >= 64 ||
+        notification.metrics.pixels >
+            notification.metrics.maxScrollExtent + 64) {
+      _finish();
+    }
+    return false;
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (!_showGuide) return _welcome();
-    if (_departing) {
-      return Scaffold(
-        body: DepartureMap(
-          destination: widget.destination ?? kPrimaryCountries[1],
-          animation: _flight,
-        ),
-      );
-    }
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 200),
+    child: _showGuide ? _guide() : _welcome(),
+  );
+
+  Widget _guide() {
     return Scaffold(
+      key: const ValueKey('usage-guide'),
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-              children: [
-                ScreenTopBar(
-                  title: '앱 사용방법',
-                  trailing: TextButton(
-                    onPressed: _departing ? null : _finish,
-                    child: const Text('건너뛰기'),
-                  ),
-                ),
-                Expanded(
-                  child: PageView.builder(
-                    key: const ValueKey('welcome-pages'),
-                    controller: _pages,
-                    itemCount: _slides.length + 1,
-                    onPageChanged: (i) {
-                      if (i == _slides.length) {
-                        _depart();
-                      } else {
-                        setState(() => _page = i);
-                      }
-                    },
-                    itemBuilder: (context, i) => i == _slides.length
-                        ? const SizedBox.expand()
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _slides[i].title,
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    height: 1.3,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  _slides[i].description,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    height: 1.6,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 28),
-                                OnboardingExample(
-                                  step: i,
-                                  active: i == _page && !_departing,
-                                ),
-                              ],
-                            ),
+            ScreenTopBar(
+              title: '앱 사용방법',
+              trailing: TextButton(
+                onPressed: _finish,
+                child: const Text('건너뛰기'),
+              ),
+            ),
+            Expanded(
+              child: NotificationListener<ScrollNotification>(
+                onNotification: _handleEndSwipe,
+                child: PageView.builder(
+                  key: const ValueKey('welcome-pages'),
+                  controller: _pages,
+                  itemCount: _slides.length,
+                  onPageChanged: (i) {
+                    setState(() => _page = i);
+                  },
+                  itemBuilder: (context, i) => SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _slides[i].title,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            height: 1.3,
+                            fontWeight: FontWeight.w700,
                           ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                  child: Column(
-                    children: [
-                      _FlightProgress(progress: _page / (_slides.length - 1)),
-                      Row(
-                        children: [
-                          IconButton(
-                            tooltip: '이전 안내',
-                            onPressed: _page == 0 || _departing
-                                ? null
-                                : () => _move(-1),
-                            icon: const Icon(Icons.chevron_left_rounded),
-                          ),
-                          Expanded(
-                            child: Text(
-                              '${_page + 1} / ${_slides.length}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: _page == _slides.length - 1
-                                ? '출발하기'
-                                : '다음 안내',
-                            onPressed: _departing ? null : () => _move(1),
-                            icon: const Icon(Icons.chevron_right_rounded),
-                          ),
-                        ],
-                      ),
-                      const Text(
-                        '왼쪽으로 넘겨보세요',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
                         ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _slides[i].description,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.6,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        OnboardingExample(
+                          step: i,
+                          active: i == _page && !_finishing,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: Column(
+                children: [
+                  _FlightProgress(progress: _page / (_slides.length - 1)),
+                  Row(
+                    children: [
+                      IconButton(
+                        tooltip: '이전 안내',
+                        onPressed: _page == 0 || _finishing
+                            ? null
+                            : () => _move(-1),
+                        icon: const Icon(Icons.chevron_left_rounded),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '${_page + 1} / ${_slides.length}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: _page == _slides.length - 1 ? '시작하기' : '다음 안내',
+                        onPressed: _finishing ? null : () => _move(1),
+                        icon: const Icon(Icons.chevron_right_rounded),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const Text(
+                    '왼쪽으로 넘겨보세요',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -215,6 +205,7 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
   }
 
   Widget _welcome() => Scaffold(
+    key: const ValueKey('trip-welcome'),
     body: Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -299,6 +290,8 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
                   TextButton(
                     onPressed: () => setState(() {
                       _showGuide = true;
+                      _finishing = false;
+                      _endSwipe = 0;
                       _page = 0;
                     }),
                     child: const Text('사용방법 다시 보기'),
