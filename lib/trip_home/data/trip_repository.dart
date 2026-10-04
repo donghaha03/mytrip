@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/country.dart';
 import '../models/trip.dart';
+import '../models/receipt_item.dart';
 
 /// 원격 저장소. TripStore 가 로그인한 사용자 기준으로 하나 만들어 붙인다.
 /// (로컬 임시 모드에서는 아예 안 쓰고 메모리만 쓴다)
@@ -111,6 +112,7 @@ class FirestoreTripRepository implements TripRepository {
         'status': e.status.name,
         'originalAmount': e.originalAmount,
         'receiptFingerprint': e.receiptFingerprint,
+        'receiptItems': e.receiptItems.map((item) => item.toJson()).toList(),
       }, SetOptions(merge: true));
 
   @override
@@ -166,6 +168,11 @@ class FirestoreTripRepository implements TripRepository {
           ExpenseStatus.approved,
       originalAmount: (m['originalAmount'] as num?)?.toDouble(),
       receiptFingerprint: m['receiptFingerprint'] as String?,
+      receiptItems:
+          (m['receiptItems'] is List ? m['receiptItems'] as List : const [])
+              .map(ReceiptItem.fromJson)
+              .nonNulls
+              .toList(),
     );
   }
 }

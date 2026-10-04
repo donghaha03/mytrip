@@ -206,11 +206,6 @@ class _QuickConverterState extends State<QuickConverter> {
               const SizedBox(width: 4),
             ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            '소수점은 버려요',
-            style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
-          ),
         ],
       ),
     );

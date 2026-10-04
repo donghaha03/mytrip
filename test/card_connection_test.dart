@@ -297,6 +297,8 @@ void main() {
     Backend.mode = BackendMode.local;
     tripStore.connect(null);
     await tester.pumpWidget(wrap(const EmptyHomeScreen()));
+    await tester.tap(find.text('건너뛰기'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('더보기'));
     await tester.pumpAndSettle();
     expect(find.byType(MoreScreen), findsOneWidget);

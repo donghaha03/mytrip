@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../widgets/screen_top_bar.dart';
+import '../widgets/receipt_items.dart';
+import '../models/receipt_item.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
 import 'receipt_draft.dart';
@@ -124,6 +126,8 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
   late String? _currency = widget.draft.currency;
   late String _category = widget.draft.category;
   bool _confirmed = false;
+  String? _itemError;
+  late var _items = [...widget.draft.items];
   DateTime? get _parsedDate {
     final input = _date.text.trim();
     if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(input)) return null;
@@ -141,6 +145,10 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
 
   void _apply() {
     if (!_confirmed || !_form.currentState!.validate()) return;
+    if (_items.any((item) => ReceiptItem.fromJson(item.toJson()) == null)) {
+      setState(() => _itemError = '품목 내용을 확인하거나 제외해주세요.');
+      return;
+    }
     Navigator.of(context).pop(
       ReceiptDraft(
         merchant: _merchant.text.trim(),
@@ -149,6 +157,7 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
         currency: _currency,
         category: _category,
         warnings: [],
+        items: _items,
       ),
     );
   }
@@ -172,7 +181,7 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                     semanticLabel: '인식한 영수증 원본',
                   ),
                   const SizedBox(height: 16),
-                  const Text('자동으로 저장하지 않아요. 원본과 비교해 수정한 뒤 지출 양식에 적용해주세요.'),
+                  const Text('사진과 비교해 내용을 확인해주세요.'),
                   for (final warning in widget.draft.warnings)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
@@ -192,9 +201,7 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                   TextFormField(
                     controller: _amount,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '최종 결제금액 (정수)',
-                    ),
+                    decoration: const InputDecoration(labelText: '결제금액'),
                     validator: (s) =>
                         RegExp(r'^\d+$').hasMatch(s ?? '') &&
                             (double.tryParse(s ?? '') ?? 0) > 0 &&
@@ -207,9 +214,7 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                     initialValue: _currency,
                     isExpanded: true,
                     menuMaxHeight: 300,
-                    decoration: const InputDecoration(
-                      labelText: '결제 통화 (확인 필요)',
-                    ),
+                    decoration: const InputDecoration(labelText: '결제 통화'),
                     items: [
                       for (final c in kExpenseCurrencies.where(
                         (c) => c.currency != 'XXX',
@@ -232,7 +237,7 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                         _parsedDate == null ? '올바른 결제일을 확인해주세요' : null,
                   ),
                   const SizedBox(height: 16),
-                  const Text('카테고리 추천 · 변경할 수 있어요'),
+                  const Text('추천 카테고리'),
                   Wrap(
                     spacing: 8,
                     children: [
@@ -249,6 +254,12 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                     title: const Text('인식한 원문 보기'),
                     children: [SelectableText(widget.text)],
                   ),
+                  if (_items.isNotEmpty)
+                    ReceiptItems(
+                      items: _items,
+                      currency: _currency ?? '',
+                      onChanged: (items) => setState(() => _items = items),
+                    ),
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: _confirmed,
@@ -256,6 +267,11 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                     onChanged: (value) =>
                         setState(() => _confirmed = value ?? false),
                   ),
+                  if (_itemError != null)
+                    Text(
+                      _itemError!,
+                      style: const TextStyle(color: AppColors.danger),
+                    ),
                 ],
               ),
             ),

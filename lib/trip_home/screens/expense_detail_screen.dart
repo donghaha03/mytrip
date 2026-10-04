@@ -8,6 +8,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/quick_converter.dart';
 import '../widgets/screen_top_bar.dart';
+import '../widgets/receipt_items.dart';
 import 'expense_form_screen.dart';
 
 class ExpenseDetailScreen extends StatefulWidget {
@@ -136,6 +137,8 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    if (e.receiptItems.isNotEmpty)
+                      ReceiptItems(items: e.receiptItems, currency: code),
                     _Info(
                       '날짜 · 시각',
                       '${formatDate(e.date)} ${e.date.hour.toString().padLeft(2, '0')}:${e.date.minute.toString().padLeft(2, '0')}',

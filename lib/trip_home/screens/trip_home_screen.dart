@@ -3,7 +3,6 @@ import '../widgets/category_charts.dart';
 
 import '../data/trip_store.dart';
 import '../models/trip.dart';
-import '../models/spending_summary.dart';
 import '../../api/api.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -148,238 +147,128 @@ String _md(DateTime d) =>
 // ---------------------------------------------------------------------------
 
 /// 메인 카드: 사용한 금액이 가장 크게, 그 아래 예산 대비 진행 바와 남은 금액.
-class _SpendingCard extends StatefulWidget {
+class _SpendingCard extends StatelessWidget {
   const _SpendingCard({
     required this.trip,
     required this.onEdit,
     required this.onToday,
   });
-
   final Trip trip;
-  final VoidCallback onEdit;
-  final VoidCallback onToday;
-
-  @override
-  State<_SpendingCard> createState() => _SpendingCardState();
-}
-
-class _SpendingCardState extends State<_SpendingCard> {
-  bool _showCategories = false;
-  Trip get trip => widget.trip;
+  final VoidCallback onEdit, onToday;
 
   @override
   Widget build(BuildContext context) {
-    final c = trip.country;
-    final summary = SpendingSummary(trip);
     final available = trip.ratesAvailable(trip.expenses);
-    final foreignAvailable = available && RateApi.quotedKrw(c.currency) > 0;
+    final foreignAvailable =
+        available && RateApi.quotedKrw(trip.country.currency) > 0;
     final remain = trip.remainKrw;
-    final over = remain < 0;
-    final percent = trip.budgetKrw == 0
-        ? 0
-        : trip.spentKrw * 100 ~/ trip.budgetKrw;
-
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 14, 20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 상태 · 기간 · 편집
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  tripStatusLabel(trip, DateTime.now()),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  '${_md(trip.start)} – ${_md(trip.end)} · ${trip.durationLabel}',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textSecondary,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tripStatusLabel(trip, DateTime.now()),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_md(trip.start)} – ${_md(trip.end)} · ${trip.durationLabel}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.onPrimaryMuted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               _CardIcon(
                 icon: Icons.today_rounded,
                 tooltip: '오늘 예산',
-                onTap: widget.onToday,
+                onTap: onToday,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               _CardIcon(
                 icon: Icons.edit_outlined,
                 tooltip: '여행 편집',
-                onTap: widget.onEdit,
+                onTap: onEdit,
               ),
             ],
           ),
-          const SizedBox(height: 18),
-
-          // 사용한 금액
+          const SizedBox(height: 20),
           const Text(
             '사용한 금액',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textSecondary,
+            style: TextStyle(fontSize: 14, color: AppColors.onPrimaryMuted),
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              available ? formatWon(trip.spentKrw) : '환율 없음',
+              style: const TextStyle(
+                fontSize: 32,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+                color: AppColors.white,
+              ),
             ),
           ),
           const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    available ? formatWon(trip.spentKrw) : '환율 없음',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 32,
-                      height: 1.2,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  foreignAvailable
-                      ? c.formatForeign(
-                          RateApi.fromKrw(trip.spentKrw, c.currency),
-                        )
-                      : '통화별 표시',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
+          Text(
+            foreignAvailable
+                ? trip.country.formatForeign(
+                    RateApi.fromKrw(trip.spentKrw, trip.country.currency),
+                  )
+                : '통화별 표시',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: AppColors.onPrimaryMuted,
             ),
           ),
-          const SizedBox(height: 16),
-
-          // 예산 대비 진행
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: CategoryBudgetBar(trip: trip),
-                  ),
+          const SizedBox(height: 20),
+          BudgetProgressPanel(trip: trip),
+          const SizedBox(height: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _Figure(
+                  label: '예산',
+                  value: formatWon(trip.budgetKrw),
+                  sub: '하루 ${formatWon(trip.budgetKrw ~/ _tripDays(trip))}',
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  available ? '$percent%' : '—',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Semantics(
-              expanded: _showCategories,
-              child: TextButton.icon(
-                key: const ValueKey('spending-categories-toggle'),
-                onPressed: () =>
-                    setState(() => _showCategories = !_showCategories),
-                icon: Icon(
-                  _showCategories ? Icons.expand_less : Icons.expand_more,
-                  size: 18,
-                ),
-                label: Text(_showCategories ? '접기' : '더보기'),
               ),
-            ),
-          ),
-          if (_showCategories) ...[
-            if (!summary.available)
-              const Text('환율을 확인하면 카테고리 비율을 볼 수 있어요')
-            else if (summary.positiveKrw == 0)
-              const Text('비율을 표시할 양수 지출이 없어요')
-            else
-              Wrap(
-                spacing: 14,
-                runSpacing: 8,
-                children: [
-                  for (final entry in summary.sorted)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.circle,
-                          size: 8,
-                          color: categoryColor(entry.key),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          '${entry.key} ${(summary.share(entry.key) * 100).toStringAsFixed(1)}% · ${formatWon(entry.value)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            const SizedBox(height: 10),
-          ],
-          const SizedBox(height: 14),
-
-          // 예산 / 남은 금액
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _Figure(
-                    label: '예산',
-                    value: formatWon(trip.budgetKrw),
-                    sub: '하루 ${formatWon(trip.budgetKrw ~/ _tripDays(trip))}',
-                  ),
-                ),
-                _Figure(
-                  label: over ? '초과' : '남은 금액',
+              const SizedBox(width: 12),
+              Expanded(
+                child: _Figure(
+                  label: remain < 0 ? '예산 초과' : '남은 금액',
                   value: available ? formatWon(remain.abs()) : '환율 없음',
-                  sub: !foreignAvailable
-                      ? '환율 없음'
-                      : c.formatForeign(
-                          RateApi.fromKrw(remain.abs(), c.currency),
-                        ),
+                  sub: foreignAvailable
+                      ? trip.country.formatForeign(
+                          RateApi.fromKrw(remain.abs(), trip.country.currency),
+                        )
+                      : '환율 없음',
                   alignEnd: true,
-                  warn: over,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -401,21 +290,14 @@ class _CardIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 22,
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: AppColors.bg,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 16, color: AppColors.textSecondary),
-        ),
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      style: IconButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: .14),
+        minimumSize: const Size(44, 44),
       ),
+      icon: Icon(icon, size: 18, color: AppColors.white),
     );
   }
 }
@@ -426,14 +308,12 @@ class _Figure extends StatelessWidget {
     required this.value,
     required this.sub,
     this.alignEnd = false,
-    this.warn = false,
   });
 
   final String label;
   final String value;
   final String sub;
   final bool alignEnd;
-  final bool warn;
 
   @override
   Widget build(BuildContext context) {
@@ -447,16 +327,19 @@ class _Figure extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: warn ? AppColors.danger : AppColors.textSecondary,
+            color: AppColors.onPrimaryMuted,
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: warn ? AppColors.danger : AppColors.textPrimary,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.white,
+            ),
           ),
         ),
         const SizedBox(height: 1),
@@ -465,7 +348,7 @@ class _Figure extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
+            color: AppColors.onPrimaryMuted,
           ),
         ),
       ],
@@ -505,9 +388,19 @@ class _BottomBar extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: _ActionButton(
+                  icon: Icons.document_scanner_outlined,
+                  label: '영수증 촬영',
+                  filled: true,
+                  onTap: () =>
+                      openLedger(context, trip, start: LedgerStart.receipt),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ActionButton(
                   icon: Icons.receipt_long_rounded,
                   label: '장부 보기',
-                  filled: true,
+                  filled: false,
                   onTap: () => openLedger(context, trip),
                 ),
               ),
@@ -542,22 +435,22 @@ class _ActionButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          height: 54,
+          height: 64,
           decoration: filled
               ? null
               : BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppColors.border),
                 ),
-          child: Row(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 20, color: fg),
-              const SizedBox(width: 6),
+              const SizedBox(height: 5),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: fg,
                 ),

@@ -7,7 +7,7 @@ import test from 'node:test';
 
 const source = await readFile(new URL('../web/receipt.js', import.meta.url), 'utf8');
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
-function environment({ cameraError, noCamera = false, secure = true, mediaPromise, workerPromise, workerError } = {}) {
+function environment({ cameraError, noCamera = false, secure = true, mediaPromise, workerPromise, workerError, width = 100, height = 200 } = {}) {
   const elements = new Map(); const callbacks = new Map(); const timers = new Map();
   let stopCount = 0, cameraCalls = 0, terminateCount = 0, workerOptions;
   const stream = { getTracks: () => [{ stop: () => stopCount++ }] };
@@ -15,7 +15,7 @@ function environment({ cameraError, noCamera = false, secure = true, mediaPromis
     recognize: async () => { throw new Error('failure'); } };
   const element = (key) => {
     if (!elements.has(key)) elements.set(key, { hidden: false, disabled: false, value: key === '#receipt-language' ? 'eng' : '',
-      textContent: '', focus() {}, setAttribute() {}, play: async () => {}, videoWidth: 100, videoHeight: 200 });
+      textContent: '', style: {}, focus() {}, setAttribute() {}, play: async () => {}, videoWidth: width, videoHeight: height });
     return elements.get(key);
   };
   const dialog = { setAttribute() {}, showModal() {}, close() {}, remove() { dialog.removed = true; },
@@ -46,12 +46,23 @@ async function captured(env) {
   return { result };
 }
 
-test('receipt frame is portrait and capture preserves rectangular source proportions', async () => {
-  const env = environment(); const { result } = await captured(env);
-  assert.match(env.dialog.innerHTML, /aspect-ratio:2\/3/);
-  assert.match(env.dialog.innerHTML, /정사각형으로 자르지/);
-  assert.equal(env.canvas.width, 100);
-  assert.equal(env.canvas.height, 200);
+test('portrait and landscape captures keep the full image without a fixed frame or letterboxing', async () => {
+  for (const [width, height] of [[100, 200], [1600, 900]]) {
+    const env = environment({ width, height }); const { result } = await captured(env);
+    assert.equal(env.element('.frame').style.aspectRatio, `${width} / ${height}`);
+    assert.equal(env.canvas.width, width);
+    assert.equal(env.canvas.height, height);
+    assert.doesNotMatch(env.dialog.innerHTML, /写真|정사각형으로 자르지|초점·화질 자동 검사/);
+    env.window.mytripReceipt.close(); assert.equal(await result, null);
+  }
+});
+test('camera orientation changes resize the guide before capture', async () => {
+  const env = environment(); const result = env.window.mytripReceipt.open();
+  await env.element('#receipt-start').onclick();
+  env.element('video').videoWidth = 200; env.element('video').videoHeight = 100;
+  env.element('video').onresize();
+  assert.equal(env.element('.frame').style.aspectRatio, '200 / 100');
+  assert.equal(env.element('.guide').style.inset, '12% 6%');
   env.window.mytripReceipt.close(); assert.equal(await result, null);
 });
 test('permission is lazy, denial explains site permissions and manual fallback', async () => {

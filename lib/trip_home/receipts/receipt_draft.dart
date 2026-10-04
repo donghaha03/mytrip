@@ -1,4 +1,5 @@
 import '../models/country.dart';
+import '../models/receipt_item.dart';
 
 /// Suggestions only: review is mandatory. Never add subtotal/tax to total.
 class ReceiptDraft {
@@ -9,6 +10,7 @@ class ReceiptDraft {
     required this.currency,
     required this.category,
     required this.warnings,
+    this.items = const [],
   });
   final String merchant;
   final DateTime? date;
@@ -16,6 +18,7 @@ class ReceiptDraft {
   final String? currency;
   final String category;
   final List<String> warnings;
+  final List<ReceiptItem> items;
 
   factory ReceiptDraft.parse(String text, {double confidence = 100}) {
     final lines = text
@@ -83,17 +86,26 @@ class ReceiptDraft {
     }
     final date = dates.length == 1 ? dates.single : null;
     if (date == null) warnings.add('날짜 확인 필요: 원본의 결제일을 직접 확인해주세요.');
+    final merchantLines = lines
+        .where(
+          (line) =>
+              !RegExp(
+                r'(receipt|영수증|領収|total|합계|결제|\d{4}[-/.]|tax|세금|이용\s*가이드|주문\s*번호|상품명|수량|단가|금액|TEL)',
+                caseSensitive: false,
+              ).hasMatch(line) &&
+              RegExp(r'[a-zA-Z가-힣ぁ-んァ-ン一-龯]').hasMatch(line),
+        )
+        .toList();
     final merchant =
-        lines
+        merchantLines
             .where(
-              (line) =>
-                  !RegExp(
-                    r'(receipt|영수증|領収|total|합계|결제|\d{4}[-/.]|tax|세금)',
-                    caseSensitive: false,
-                  ).hasMatch(line) &&
-                  RegExp(r'[a-zA-Z가-힣ぁ-んァ-ン一-龯]').hasMatch(line),
+              (line) => RegExp(
+                r'(카페|식당|호텔|cafe|coffee|restaurant|hotel|カフェ)',
+                caseSensitive: false,
+              ).hasMatch(line),
             )
             .firstOrNull ??
+        merchantLines.firstOrNull ??
         '';
     if (merchant.isEmpty) warnings.add('상호명 확인 필요');
     if (confidence < 65) warnings.add('인식 신뢰도가 낮아요. 모든 항목을 원본과 비교해주세요.');
@@ -118,7 +130,47 @@ class ReceiptDraft {
       currency: currency,
       category: category,
       warnings: warnings,
+      items: _parseItems(lines),
     );
+  }
+
+  static List<ReceiptItem> _parseItems(List<String> lines) {
+    final items = <ReceiptItem>[];
+    // Only explicit quantity/line-total rows qualify; headers and tax totals do not.
+    final row = RegExp(
+      r'^(.+?)\s+(?:(\d[\d,]*(?:\.\d{1,2})?)\s+)?(\d{1,3})\s+(\d[\d,]*(?:\.\d{1,2})?)\s*(?:원|KRW|JPY|USD|円)?$',
+      caseSensitive: false,
+    );
+    for (final line in lines) {
+      if (RegExp(
+        r'(합계|소계|총액|세금|부가|공급|결제|승인|카드|total|tax|change)',
+        caseSensitive: false,
+      ).hasMatch(line)) {
+        continue;
+      }
+      final match = row.firstMatch(line);
+      if (match == null ||
+          !RegExp(r'[A-Za-z가-힣ぁ-んァ-ン一-龯]').hasMatch(match[1]!)) {
+        continue;
+      }
+      final quantity = int.parse(match[3]!);
+      final amount = double.tryParse(match[4]!.replaceAll(',', ''));
+      final unit = double.tryParse((match[2] ?? '').replaceAll(',', ''));
+      if (quantity < 1 ||
+          amount == null ||
+          !amount.isFinite ||
+          amount < 0 ||
+          (unit != null && (unit * quantity - amount).abs() > .01)) {
+        continue;
+      }
+      final item = ReceiptItem.fromJson({
+        'name': match[1]!.trim(),
+        'quantity': quantity,
+        'amount': amount,
+      });
+      if (item != null) items.add(item);
+    }
+    return items;
   }
 
   String get fingerprint =>

@@ -116,7 +116,11 @@ class _SummaryLink extends StatelessWidget {
     style: TextButton.styleFrom(
       minimumSize: const Size(44, 44),
       padding: const EdgeInsets.symmetric(horizontal: 6),
-      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      textStyle: const TextStyle(
+        fontFamily: kFontFamily,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,

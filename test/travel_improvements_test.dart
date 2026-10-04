@@ -16,6 +16,7 @@ import 'package:tripapp/trip_home/models/trip.dart';
 import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
 import 'package:tripapp/trip_home/receipts/receipt_screen.dart';
 import 'package:tripapp/trip_home/screens/expense_form_screen.dart';
+import 'package:tripapp/trip_home/screens/expense_detail_screen.dart';
 import 'package:tripapp/trip_home/screens/spending_overview_screen.dart';
 import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/screens/trip_list_screen.dart';
@@ -31,7 +32,6 @@ import 'package:tripapp/trip_home/widgets/sheets.dart';
 import 'package:tripapp/trip_home/widgets/swipe_actions.dart';
 import 'package:tripapp/trip_home/widgets/rate_info_tooltip.dart';
 import 'package:tripapp/trip_home/widgets/screen_top_bar.dart';
-import 'package:tripapp/trip_home/widgets/add_trip_cta.dart';
 import 'package:tripapp/trip_home/theme/app_colors.dart';
 
 Widget wrap(Widget child) => MaterialApp(
@@ -548,6 +548,55 @@ void main() {
     },
   );
   testWidgets(
+    'receipt line items survive storage and appear in expandable expense details',
+    (tester) async {
+      // Transcription fixture tests parsing/storage/UI, not image-recognition accuracy.
+      final draft = ReceiptDraft.parse(
+        '페이히어 이용 가이드\n주문번호 #1\n카드결제승인\n페이히어 카페\n2024-08-21\n상품명 단가 수량 금액\nAmericano 5,000 1 5,000\n합계 5,000원\n공급가액 4,545원\n부가세 455원\n결제금액 5,000원',
+      );
+      expect(draft.merchant, '페이히어 카페');
+      expect(draft.amount, 5000);
+      expect(draft.currency, 'KRW');
+      expect(draft.items.single.name, 'Americano');
+      expect(draft.items.single.quantity, 1);
+      expect(draft.items.single.amount, 5000);
+      expect(
+        ReceiptDraft.parse('카페\nAmericano 5,000 2 5,000\n결제금액 5,000원').items,
+        isEmpty,
+      );
+      final db = FakeFirebaseFirestore();
+      final repo = FirestoreTripRepository(uid: 'receipt-test', db: db);
+      final t = trip([]);
+      await repo.saveTrip(t);
+      final e = Expense(
+        id: 'receipt',
+        icon: '🍜',
+        place: draft.merchant,
+        amount: draft.amount!,
+        currency: draft.currency,
+        date: draft.date!,
+        receiptItems: draft.items,
+      );
+      await repo.saveExpense(t.id, e);
+      t.expenses.addAll(await repo.watchExpenses(t.id).first);
+      expect(
+        t.spentKrw,
+        5000,
+      ); // Items are not added again to the expense amount.
+      expect(t.expenses.single.receiptItems.single.quantity, 1);
+      await tester.pumpWidget(
+        wrap(ExpenseDetailScreen(trip: t, expenseId: e.id)),
+      );
+      expect(find.text('Americano'), findsNothing);
+      await tester.tap(find.text('품목 상세 (1)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Americano'), findsOneWidget);
+      expect(find.text('수량 1'), findsOneWidget);
+      expect(find.text('5,000 KRW'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
     'duplicate receipt prompts allow legitimate separate expenses; cancel and double click are safe',
     (tester) async {
       final t = trip([
@@ -587,22 +636,22 @@ void main() {
       final t = trip([expense('a', 1000)]);
       tripStore.add(t);
       await tester.pumpWidget(wrap(TripHomeScreen(trip: t)));
-      expect(find.text('식비 100.0% · 1,000원'), findsNothing);
+      expect(find.text('식비 100.0%'), findsNothing);
       final amount = tester.widget<Text>(find.text('1,000원').first);
-      expect(amount.style!.color, AppColors.textPrimary);
+      expect(amount.style!.color, AppColors.white);
       await tester.tap(
         find.byKey(const ValueKey('spending-categories-toggle')),
       );
       await tester.pumpAndSettle();
-      expect(find.text('식비 100.0% · 1,000원'), findsOneWidget);
+      expect(find.text('식비 100.0%'), findsOneWidget);
       await tripStore.saveExpense(t.id, expense('b', 1000, category: '교통'));
       await tester.pump();
-      expect(find.text('식비 50.0% · 1,000원'), findsOneWidget);
+      expect(find.text('식비 50.0%'), findsOneWidget);
       await tester.tap(
         find.byKey(const ValueKey('spending-categories-toggle')),
       );
       await tester.pumpAndSettle();
-      expect(find.text('식비 50.0% · 1,000원'), findsNothing);
+      expect(find.text('식비 50.0%'), findsNothing);
       await tester.ensureVisible(find.text('지출보기'));
       await tester.tap(find.text('지출보기'));
       await tester.pumpAndSettle();
@@ -642,7 +691,7 @@ void main() {
   });
 
   testWidgets(
-    'travel cards reveal delete to the right and edit to the left without accidental deletion',
+    'travel cards reveal both actions to the left without accidental deletion',
     (tester) async {
       final t = trip([])
         ..start = DateTime(2027, 1, 1)
@@ -650,7 +699,7 @@ void main() {
       tripStore.add(t);
       await tester.pumpWidget(wrap(const TripListScreen()));
       final card = find.byKey(ValueKey('trip-swipe-${t.id}'));
-      await tester.drag(card, const Offset(120, 0));
+      await tester.drag(card, const Offset(-180, 0));
       await tester.pumpAndSettle();
       expect(find.byTooltip('${t.name} 여행 삭제'), findsOneWidget);
       expect(tripStore.trips.length, 1);
@@ -660,14 +709,14 @@ void main() {
       await tester.tap(find.text('취소'));
       await tester.pumpAndSettle();
       expect(tripStore.trips.length, 1);
-      await tester.drag(card, const Offset(-120, 0));
+      await tester.drag(card, const Offset(-180, 0));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('${t.name} 여행 수정'));
       await tester.pumpAndSettle();
       expect(find.byType(TripEditSheet), findsOneWidget);
       await tester.tap(find.byTooltip('닫기'));
       await tester.pumpAndSettle();
-      await tester.drag(card, const Offset(120, 0));
+      await tester.drag(card, const Offset(-180, 0));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('${t.name} 여행 삭제'));
       await tester.pumpAndSettle();
@@ -702,7 +751,7 @@ void main() {
         );
         final tile = find.byType(ExpenseTile).first;
         await tester.pumpAndSettle();
-        await tester.drag(tile, const Offset(-120, 0));
+        await tester.drag(tile, const Offset(-180, 0));
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('테스트 카페 지출 수정'));
         await tester.pumpAndSettle();
@@ -718,7 +767,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.ensureVisible(tile);
         await tester.pumpAndSettle();
-        await tester.drag(tile, const Offset(120, 0));
+        await tester.drag(tile, const Offset(-180, 0));
         await tester.pumpAndSettle();
         expect(t.expenses.length, 1);
         await tester.tap(find.byTooltip('테스트 카페 지출 삭제'));
@@ -726,7 +775,7 @@ void main() {
         await tester.tap(find.text('취소'));
         await tester.pumpAndSettle();
         expect(t.expenses.length, 1);
-        await tester.drag(tile, const Offset(120, 0));
+        await tester.drag(tile, const Offset(-180, 0));
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('테스트 카페 지출 삭제'));
         await tester.pumpAndSettle();
@@ -762,9 +811,12 @@ void main() {
       );
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
       await tester.pumpAndSettle();
       expect(find.byTooltip('항목0 삭제'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       expect(deletes, 1);
@@ -788,37 +840,43 @@ void main() {
   );
 
   testWidgets(
-    'onboarding advances with physical right swipes and one extra swipe departs once',
+    'left-swiped tutorial finishes at a separate welcome, then opens the trip form',
     (tester) async {
       tester.view.physicalSize = const Size(320, 640);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(wrap(const EmptyHomeScreen()));
-      expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
+      expect(find.text('여행을 추가해요'), findsOneWidget);
+      expect(find.text('첫 여행을 추가해 보세요'), findsNothing);
       final pages = find.byKey(const ValueKey('welcome-pages'));
-      for (var i = 1; i <= 5; i++) {
-        await tester.drag(pages, const Offset(300, 0));
+      for (var i = 1; i <= 4; i++) {
+        // Swipe the heading, outside the interactive example card.
+        await tester.dragFrom(
+          tester.getTopLeft(pages) + const Offset(280, 36),
+          const Offset(-280, 0),
+        );
         await tester.pumpAndSettle();
-        expect(find.text('$i / 6 · 오른쪽으로 넘겨보세요'), findsNothing);
-        expect(find.text('${i + 1} / 6 · 오른쪽으로 넘겨보세요'), findsOneWidget);
+        if (i < 4) expect(find.text('${i + 1} / 4'), findsOneWidget);
       }
-      expect(find.text('이제 여행을 떠나볼까요?'), findsOneWidget);
-      await tester.drag(pages, const Offset(300, 0));
-      await tester.pump(const Duration(milliseconds: 200));
-      expect(find.text('여행을 준비하러 출발해요'), findsOneWidget);
+      expect(find.byType(PageView), findsNothing);
+      expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
+      expect(find.byType(AddTripScreen), findsNothing);
+      await tester.tap(find.text('여행 추가하기'));
       await tester.pumpAndSettle();
       expect(find.byType(AddTripScreen), findsOneWidget);
-      await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+      await tester.tap(find.byTooltip('뒤로가기'));
       await tester.pumpAndSettle();
-      expect(find.text('이제 여행을 떠나볼까요?'), findsOneWidget);
-      expect(find.byType(AddTripScreen), findsNothing);
+      expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
+      await tester.tap(find.text('사용방법 다시 보기'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 / 4'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
 
   testWidgets(
-    'tutorial buttons support reduced motion, double taps and short large-text screens',
+    'tutorial buttons support reduced motion and small large-text screens',
     (tester) async {
       tester.view.physicalSize = const Size(320, 480);
       tester.view.devicePixelRatio = 1;
@@ -837,33 +895,38 @@ void main() {
           home: const EmptyHomeScreen(guideOnly: true),
         ),
       );
-      await tester.pumpAndSettle();
-      expect(find.text('일정과 예산부터 정해요'), findsOneWidget);
-      await tester.tap(find.byTooltip('다음 안내'));
-      await tester.pumpAndSettle();
-      expect(find.text('지출을 간편하게 기록해요'), findsOneWidget);
-      await tester.tap(find.byTooltip('이전 안내'));
-      await tester.pumpAndSettle();
-      expect(find.text('일정과 예산부터 정해요'), findsOneWidget);
-      final start = tester.widget<AddTripCta>(find.byType(AddTripCta)).onTap;
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.byTooltip('다음 안내'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      }
+      expect(find.text('영수증으로 간편하게'), findsOneWidget);
+      final start = tester
+          .widget<IconButton>(
+            find.widgetWithIcon(IconButton, Icons.chevron_right_rounded),
+          )
+          .onPressed!;
       start();
       start();
       await tester.pumpAndSettle();
-      expect(find.byType(AddTripScreen), findsOneWidget);
+      expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets(
-    'leaving while departure animation runs does not navigate or leak a ticker',
-    (tester) async {
-      await tester.pumpWidget(wrap(const EmptyHomeScreen()));
-      await tester.tap(find.text('여행 추가하기'));
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.pumpWidget(const SizedBox.shrink());
+  testWidgets('leaving during departure does not navigate or leak a ticker', (
+    tester,
+  ) async {
+    await tester.pumpWidget(wrap(const EmptyHomeScreen()));
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.byTooltip('다음 안내'));
       await tester.pumpAndSettle();
-      expect(find.byType(AddTripScreen), findsNothing);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    }
+    await tester.tap(find.byTooltip('출발하기'));
+    await tester.pump(const Duration(milliseconds: 320));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    expect(find.byType(AddTripScreen), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

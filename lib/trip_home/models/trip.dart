@@ -1,5 +1,6 @@
 import '../../api/api.dart';
 import 'country.dart';
+import 'receipt_item.dart';
 
 const expenseCategoryIcons = {
   '식비': '🍜',
@@ -46,6 +47,7 @@ class Expense {
     this.status = ExpenseStatus.approved,
     this.originalAmount,
     this.receiptFingerprint,
+    this.receiptItems = const [],
   });
 
   final String id;
@@ -63,6 +65,7 @@ class Expense {
   final ExpenseStatus status;
   final double? originalAmount;
   final String? receiptFingerprint;
+  final List<ReceiptItem> receiptItems;
 
   bool get isImported => source != null;
   String currencyOf(Trip trip) => currency ?? trip.country.currency;
