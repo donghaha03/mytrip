@@ -43,11 +43,11 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: '',
-    appId: '',
-    messagingSenderId: '',
-    projectId: '',
-    storageBucket: '',
-    iosBundleId: 'com.example.tripapp',
+    apiKey: 'AIzaSyDVFs3JxCGSzRXMwi5rpA63ye-4fzcsAOY',
+    appId: '1:930702318741:ios:5379bf4c4ad90391784f9c',
+    messagingSenderId: '930702318741',
+    projectId: 'mytrip-fddfb',
+    storageBucket: 'mytrip-fddfb.firebasestorage.app',
+    iosBundleId: 'io.github.donghaha03.mytrip',
   );
 }

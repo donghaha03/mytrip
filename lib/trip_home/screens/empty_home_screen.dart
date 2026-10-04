@@ -97,6 +97,14 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
   @override
   Widget build(BuildContext context) {
     if (!_showGuide) return _welcome();
+    if (_departing) {
+      return Scaffold(
+        body: DepartureMap(
+          destination: widget.destination ?? kPrimaryCountries[1],
+          animation: _flight,
+        ),
+      );
+    }
     return Scaffold(
       body: SafeArea(
         child: Stack(
@@ -200,47 +208,6 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
                 ),
               ],
             ),
-            if (_departing)
-              Positioned.fill(
-                child: ColoredBox(
-                  color: AppColors.primarySoft,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DepartureMap(
-                            destination:
-                                widget.destination ?? kPrimaryCountries[1],
-                            animation: _flight,
-                          ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            '여행을 준비하러 출발해요',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            widget.destination?.code == 'KR'
-                                ? '대한민국 여행'
-                                : '한국 → ${widget.destination?.name ?? '일본'}${widget.destination == null ? ' · 여행 예시' : ''}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

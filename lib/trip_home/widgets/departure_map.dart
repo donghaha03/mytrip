@@ -61,48 +61,12 @@ class DepartureMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Semantics(
-    label: '한국에서 ${destination.name}으로 출발하는 지도',
-    child: SizedBox(
-      height: 240,
+    label: '여행지로 이동하는 지도',
+    child: ColoredBox(
+      color: const Color(0xFFF0F6FB),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final route = DepartureRoute(
-            Size(constraints.maxWidth, 240),
-            destination.code,
-          );
-          Widget label(String name, Offset point, {required bool above}) =>
-              Positioned(
-                left: (point.dx - 45).clamp(
-                  0,
-                  math.max(0, constraints.maxWidth - 90),
-                ),
-                top: (point.dy + (above ? -38 : 14)).clamp(4, 204),
-                width: 90,
-                child: Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              );
-          Widget pin(Offset point) => Positioned(
-            left: point.dx - 5,
-            top: point.dy - 5,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.white, width: 2),
-              ),
-            ),
-          );
+          final route = DepartureRoute(constraints.biggest, destination.code);
           return ClipRect(
             child: Stack(
               children: [
@@ -117,8 +81,8 @@ class DepartureMap extends StatelessWidget {
                       animation: animation,
                       builder: (context, _) {
                         final progress = const Interval(
-                          .25,
-                          .75,
+                          .15,
+                          .85,
                           curve: Curves.easeInOutCubic,
                         ).transform(animation.value);
                         final metric = route.path.computeMetrics().single;
@@ -127,11 +91,6 @@ class DepartureMap extends StatelessWidget {
                         )!;
                         return Stack(
                           children: [
-                            Positioned.fill(
-                              child: CustomPaint(
-                                painter: _RoutePainter(route.path, progress),
-                              ),
-                            ),
                             Positioned(
                               left: tangent.position.dx - 16,
                               top: tangent.position.dy - 16,
@@ -149,12 +108,6 @@ class DepartureMap extends StatelessWidget {
                       },
                     ),
                   ),
-                pin(route.start),
-                label('한국', route.start, above: true),
-                if (route.hasFlight) ...[
-                  pin(route.end),
-                  label(destination.name, route.end, above: false),
-                ],
               ],
             ),
           );
@@ -178,11 +131,11 @@ class _LandPainter extends CustomPainter {
   final _land = Path();
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawPath(_land, Paint()..color = const Color(0xFFD5E3F6));
+    canvas.drawPath(_land, Paint()..color = const Color(0xFFD6E8E4));
     canvas.drawPath(
       _land,
       Paint()
-        ..color = const Color(0xFFB2C9E9)
+        ..color = const Color(0xFFB3CCC8)
         ..style = PaintingStyle.stroke
         ..strokeWidth = .8,
     );
@@ -190,27 +143,4 @@ class _LandPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_LandPainter oldDelegate) => oldDelegate._land != _land;
-}
-
-class _RoutePainter extends CustomPainter {
-  _RoutePainter(this.path, this.progress);
-  final Path path;
-  final double progress;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-    canvas.drawPath(path, paint..color = AppColors.border);
-    final metric = path.computeMetrics().single;
-    canvas.drawPath(
-      metric.extractPath(0, metric.length * progress),
-      paint..color = AppColors.primary,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RoutePainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.path != path;
 }

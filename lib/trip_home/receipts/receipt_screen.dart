@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 import '../widgets/screen_top_bar.dart';
@@ -32,6 +32,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   }
 
   Future<void> _capture() async {
+    setState(() => _error = null);
     try {
       final raw = await openReceiptCamera();
       if (!mounted) return;
@@ -55,11 +56,12 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         ),
       );
       if (mounted) Navigator.of(context).pop(result);
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(
-          () => _error =
-              '이 환경에서는 영수증 인식을 시작하지 못했어요. HTTPS 웹 주소·최신 브라우저에서 다시 시도하거나 수동으로 입력해주세요.',
+          () => _error = error is PlatformException
+              ? error.message ?? '인식하지 못했어요. 다시 시도하거나 수동으로 입력해주세요.'
+              : '영수증 인식을 시작하지 못했어요. 카메라 권한을 확인하거나 수동으로 입력해주세요.',
         );
       }
     }

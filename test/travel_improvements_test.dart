@@ -987,26 +987,27 @@ void main() {
     },
   );
 
-  testWidgets('departure holds its message before arriving at welcome', (
-    tester,
-  ) async {
-    await tester.pumpWidget(wrap(const EmptyHomeScreen()));
-    for (var i = 0; i < 4; i++) {
-      await tester.tap(find.byTooltip('다음 안내'));
-      await tester.pump();
+  testWidgets(
+    'departure shows only a moving plane before arriving at welcome',
+    (tester) async {
+      await tester.pumpWidget(wrap(const EmptyHomeScreen()));
+      for (var i = 0; i < 4; i++) {
+        await tester.tap(find.byTooltip('다음 안내'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pump();
+      }
+      await tester.tap(find.byTooltip('출발하기'));
       await tester.pump(const Duration(milliseconds: 400));
-      await tester.pump();
-    }
-    await tester.tap(find.byTooltip('출발하기'));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pump(const Duration(milliseconds: 1000));
-    expect(find.text('여행을 준비하러 출발해요'), findsOneWidget);
-    expect(find.byIcon(Icons.flight_rounded), findsOneWidget);
-    expect(find.text('첫 여행을 추가해 보세요'), findsNothing);
-    await tester.pumpAndSettle();
-    expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(find.byType(Text), findsNothing);
+      expect(find.byIcon(Icons.flight_rounded), findsOneWidget);
+      expect(find.text('첫 여행을 추가해 보세요'), findsNothing);
+      await tester.pumpAndSettle();
+      expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'receipt guide shows capture, recognition and review without saving',

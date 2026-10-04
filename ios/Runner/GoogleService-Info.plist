@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>API_KEY</key>
+  <string>AIzaSyDVFs3JxCGSzRXMwi5rpA63ye-4fzcsAOY</string>
+  <key>GCM_SENDER_ID</key>
+  <string>930702318741</string>
+  <key>PLIST_VERSION</key>
+  <string>1</string>
+  <key>BUNDLE_ID</key>
+  <string>io.github.donghaha03.mytrip</string>
+  <key>PROJECT_ID</key>
+  <string>mytrip-fddfb</string>
+  <key>STORAGE_BUCKET</key>
+  <string>mytrip-fddfb.firebasestorage.app</string>
+  <key>IS_ADS_ENABLED</key>
+  <false/>
+  <key>IS_ANALYTICS_ENABLED</key>
+  <false/>
+  <key>IS_APPINVITE_ENABLED</key>
+  <true/>
+  <key>IS_GCM_ENABLED</key>
+  <true/>
+  <key>IS_SIGNIN_ENABLED</key>
+  <true/>
+  <key>GOOGLE_APP_ID</key>
+  <string>1:930702318741:ios:5379bf4c4ad90391784f9c</string>
+</dict>
+</plist>

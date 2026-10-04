@@ -155,7 +155,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        gradient: AppColors.budgetGradient,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(

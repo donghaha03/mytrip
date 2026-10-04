@@ -6,7 +6,7 @@ import 'trip.dart';
 const categoryColors = <String, Color>{
   '식비': Color(0xFFFFE292),
   '교통': Color(0xFF96E0CF),
-  '숙박': Color(0xFFD6C0FA),
+  '숙박': Color(0xFFA4DDF4),
   '쇼핑': Color(0xFFFFB9C4),
   '관광': Color(0xFFFFCCA0),
   '기타': Color(0xFFBECFE3),

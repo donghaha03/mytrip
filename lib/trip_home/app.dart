@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data/trip_store.dart';
+import 'data/device_trip_repository.dart';
 import 'screens/empty_home_screen.dart';
 import 'screens/trip_home_screen.dart';
 import 'screens/trip_list_screen.dart';
@@ -22,9 +24,32 @@ Future<void> main() async {
     // Firebase를 명시적으로 켠 경우 로그인한 사용자의 저장소에 연결한다.
     authService = FirebaseAuthService();
     bindTripStoreToAuth(authService, tripStore);
-  } else {
+  } else if (kIsWeb) {
     // 이전 여행·지출이 있다고 가정한 예시 3건.
     tripStore.seedMockTrips();
+  } else {
+    try {
+      tripStore.connect(await DeviceTripRepository.open(), remote: false);
+    } catch (_) {
+      runApp(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: const Scaffold(
+            body: SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    '저장된 여행을 열지 못했어요. 앱을 다시 실행해주세요. 기존 데이터는 삭제하지 않았어요.',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
   }
 
   runApp(const TripApp());
@@ -60,7 +85,11 @@ class _TripAppState extends State<TripApp> {
         color: AppColors.frame,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: kPhoneWidth),
+            constraints: BoxConstraints(
+              maxWidth: !kIsWeb && MediaQuery.sizeOf(context).shortestSide < 600
+                  ? double.infinity
+                  : kPhoneWidth,
+            ),
             child: GestureDetector(
               key: const ValueKey('app-swipe-back'),
               behavior: HitTestBehavior.translucent,

@@ -95,36 +95,33 @@ void main() {
     },
   );
 
-  test(
-    'all destinations have bounded coordinates; labels use mainland US and France',
-    () {
-      for (final country in [...kCountries, kPrimaryCountries[2]]) {
-        final coordinate = departureCoordinates[country.code];
-        expect(coordinate, isNotNull, reason: country.code);
-        expect(coordinate!.$1, inInclusiveRange(-180, 180));
-        expect(coordinate.$2, inInclusiveRange(-90, 90));
-        for (final size in [const Size(272, 240), const Size(392, 240)]) {
-          final route = DepartureRoute(size, country.code);
-          for (final point in [route.start, route.end]) {
-            expect(point.dx, inInclusiveRange(16, size.width - 16));
-            expect(point.dy, inInclusiveRange(16, size.height - 16));
-          }
+  test('all destinations have bounded coordinates and shortest routes', () {
+    for (final country in [...kCountries, kPrimaryCountries[2]]) {
+      final coordinate = departureCoordinates[country.code];
+      expect(coordinate, isNotNull, reason: country.code);
+      expect(coordinate!.$1, inInclusiveRange(-180, 180));
+      expect(coordinate.$2, inInclusiveRange(-90, 90));
+      for (final size in [const Size(320, 480), const Size(812, 375)]) {
+        final route = DepartureRoute(size, country.code);
+        for (final point in [route.start, route.end]) {
+          expect(point.dx, inInclusiveRange(16, size.width - 16));
+          expect(point.dy, inInclusiveRange(16, size.height - 16));
         }
       }
-      expect(departureCoordinates['US']!.$1, inInclusiveRange(-125, -65));
-      expect(departureCoordinates['FR']!.$1, inInclusiveRange(-5, 10));
-      expect(
-        DepartureRoute(const Size(340, 240), 'US').end.dx,
-        greaterThan(DepartureRoute(const Size(340, 240), 'US').start.dx),
-      );
-      expect(DepartureRoute(const Size(340, 240), 'KR').hasFlight, isFalse);
-      expect(DepartureRoute(const Size(340, 240), 'XX').hasFlight, isFalse);
-      for (final ring in departureLand) {
-        expect(ring.length.isEven, isTrue);
-        expect(ring.every((v) => v.isFinite), isTrue);
-      }
-    },
-  );
+    }
+    expect(departureCoordinates['US']!.$1, inInclusiveRange(-125, -65));
+    expect(departureCoordinates['FR']!.$1, inInclusiveRange(-5, 10));
+    expect(
+      DepartureRoute(const Size(340, 240), 'US').end.dx,
+      greaterThan(DepartureRoute(const Size(340, 240), 'US').start.dx),
+    );
+    expect(DepartureRoute(const Size(340, 240), 'KR').hasFlight, isFalse);
+    expect(DepartureRoute(const Size(340, 240), 'XX').hasFlight, isFalse);
+    for (final ring in departureLand) {
+      expect(ring.length.isEven, isTrue);
+      expect(ring.every((v) => v.isFinite), isTrue);
+    }
+  });
 
   for (final size in [const Size(320, 480), const Size(812, 375)]) {
     testWidgets('destination map departure fits $size with large text', (
@@ -156,11 +153,18 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.byType(DepartureMap), findsOneWidget);
-      expect(find.text('한국 → 미국'), findsOneWidget);
+      expect(tester.getSize(find.byType(DepartureMap)), size);
+      expect(find.byType(Text), findsNothing);
+      expect(find.byType(SafeArea), findsNothing);
+      final planeStart = tester.getCenter(find.byIcon(Icons.flight_rounded));
       expect(find.byIcon(Icons.cloud_outlined), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pump(const Duration(milliseconds: 1600));
       expect(find.byType(DepartureMap), findsOneWidget);
+      expect(
+        tester.getCenter(find.byIcon(Icons.flight_rounded)),
+        isNot(planeStart),
+      );
       await tester.pumpAndSettle();
       expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
       expect(tester.takeException(), isNull);

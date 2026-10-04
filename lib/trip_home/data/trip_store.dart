@@ -18,7 +18,7 @@ bool _invalidDates(DateTime start, DateTime end) => DateTime.utc(
 /// 화면 쪽은 모드를 몰라도 된다 — add/remove/rename/addExpense 를 부르고
 /// trips 를 읽기만 하면 된다.
 ///
-///  - 로컬 임시 모드: 메모리에만 있다. 앱을 끄면 사라진다.
+///  - 웹 미리보기: 메모리 샘플. 모바일 기본 실행: 기기 저장소.
 ///  - Firebase 모드: [connect] 로 Firestore 에 붙는다. 쓰기는 메모리에 먼저
 ///    반영하고(화면이 바로 바뀌게) Firestore 로 보낸다. 다른 기기에서 바뀐
 ///    내용은 스냅샷으로 들어와 합쳐진다.
@@ -29,6 +29,7 @@ class TripStore extends ChangeNotifier {
   StreamSubscription<List<Trip>>? _tripsSub;
   final Map<String, StreamSubscription<List<Expense>>> _expenseSubs = {};
   bool _loading = false;
+  bool _remote = false;
 
   List<Trip> get trips => List.unmodifiable(_trips);
   bool get isEmpty => _trips.isEmpty;
@@ -36,7 +37,7 @@ class TripStore extends ChangeNotifier {
   /// Firestore 에서 첫 스냅샷을 기다리는 중. 이때 빈 화면(00)을 띄우면
   /// 여행이 있는 사용자한테도 "아직 떠날 준비가..." 가 번쩍 보인다.
   bool get isLoading => _loading;
-  bool get isRemote => _repo != null;
+  bool get isRemote => _remote;
 
   Trip? byId(String id) {
     for (final t in _trips) {
@@ -145,7 +146,7 @@ class TripStore extends ChangeNotifier {
   // -------------------------------------------------------------------------
 
   /// 로그인한 사용자의 저장소에 붙는다. null 이면 떼고 목록을 비운다 (로그아웃).
-  void connect(TripRepository? repo) {
+  void connect(TripRepository? repo, {bool remote = true}) {
     _tripsSub?.cancel();
     _tripsSub = null;
     for (final s in _expenseSubs.values) {
@@ -155,6 +156,7 @@ class TripStore extends ChangeNotifier {
     _trips.clear();
 
     _repo = repo;
+    _remote = repo != null && remote;
     _loading = repo != null;
     notifyListeners();
 

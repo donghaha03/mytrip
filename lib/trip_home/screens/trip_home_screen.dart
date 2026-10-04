@@ -162,7 +162,7 @@ class _SpendingCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        gradient: AppColors.budgetGradient,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
