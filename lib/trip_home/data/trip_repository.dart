@@ -61,6 +61,7 @@ class FirestoreTripRepository implements TripRepository {
   Future<void> saveTrip(Trip t) => _trips.doc(t.id).set({
     'name': t.name,
     'currency': t.country.currency,
+    'countryCode': t.country.code,
     'start': Timestamp.fromDate(t.start),
     'end': Timestamp.fromDate(t.end),
     'budgetKrw': t.budgetKrw,
@@ -109,6 +110,7 @@ class FirestoreTripRepository implements TripRepository {
         'source': e.source,
         'status': e.status.name,
         'originalAmount': e.originalAmount,
+        'receiptFingerprint': e.receiptFingerprint,
       }, SetOptions(merge: true));
 
   @override
@@ -125,7 +127,9 @@ class FirestoreTripRepository implements TripRepository {
   /// 통화 코드를 모르는 문서(앱에서 국가를 뺀 경우 등)는 건너뛴다.
   static Trip? _tripFrom(QueryDocumentSnapshot<Map<String, dynamic>> d) {
     final m = d.data();
-    final country = countryByCode(m['currency'] as String? ?? '');
+    final country =
+        countryByIso(m['countryCode'] as String? ?? '') ??
+        countryByCode(m['currency'] as String? ?? '');
     if (country == null) return null;
     return Trip(
       id: d.id,
@@ -161,6 +165,7 @@ class FirestoreTripRepository implements TripRepository {
               .firstOrNull ??
           ExpenseStatus.approved,
       originalAmount: (m['originalAmount'] as num?)?.toDouble(),
+      receiptFingerprint: m['receiptFingerprint'] as String?,
     );
   }
 }

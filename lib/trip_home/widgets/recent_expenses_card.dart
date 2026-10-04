@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../api/api.dart';
 import '../models/trip.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -83,7 +82,7 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '전체 보기',
+                        '지출보기',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -105,7 +104,7 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
             _Empty(onAdd: widget.onAddExpense)
           else ...[
             const SizedBox(height: 10),
-            if (RateApi.quotedKrw(trip.country.currency) <= 0)
+            if (!trip.ratesAvailable(trip.expenses))
               const Text('환율 없음')
             else
               _WeekBars(
@@ -194,7 +193,7 @@ class _WeekBars extends StatelessWidget {
             for (var i = 0; i < days.length; i++)
               Expanded(
                 child: _Bar(
-                  ratio: max == 0 ? 0 : days[i].krw / max,
+                  ratio: max == 0 ? 0 : (days[i].krw / max).clamp(0.0, 1.0),
                   day: days[i].day,
                   isSelected: i == selected,
                   onTap: () => onSelect(i),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 
@@ -6,13 +7,17 @@ class DateRange {
   const DateRange(this.start, this.end);
   final DateTime start;
   final DateTime end;
-
-  int get nights => end.difference(start).inDays;
+  bool get isValid =>
+      !DateUtils.dateOnly(end).isBefore(DateUtils.dateOnly(start));
+  int get nights => DateTime.utc(
+    end.year,
+    end.month,
+    end.day,
+  ).difference(DateTime.utc(start.year, start.month, start.day)).inDays;
   String get durationLabel => '$nights박 ${nights + 1}일';
 }
 
-/// 월 단위 달력. 탭해서 시작일을 잡고 드래그하면 종료일까지 이어서 칠해진다.
-/// 선택 구간은 연한 파랑으로 연결되고, 양 끝만 진한 원으로 강조된다.
+/// Six rows keep navigation stationary. Browsing never changes the selection.
 class CalendarRangePicker extends StatefulWidget {
   const CalendarRangePicker({
     super.key,
@@ -21,255 +26,368 @@ class CalendarRangePicker extends StatefulWidget {
     this.initialRange,
     this.singleDay = false,
   });
-
   final DateTime initialMonth;
   final DateRange? initialRange;
   final ValueChanged<DateRange?> onChanged;
   final bool singleDay;
-
   @override
   State<CalendarRangePicker> createState() => _CalendarRangePickerState();
 }
 
 class _CalendarRangePickerState extends State<CalendarRangePicker> {
   late DateTime _month;
-  DateTime? _anchor; // 드래그 시작점
-  DateTime? _start;
-  DateTime? _end;
-
+  DateTime? _start, _end, _anchor;
+  bool _awaitingEnd = false;
   final _gridKey = GlobalKey();
-
+  final _titleFocus = FocusNode();
+  final _daysFocus = <DateTime, FocusNode>{};
+  static const _cellHeight = 44.0;
   @override
   void initState() {
     super.initState();
     _month = DateTime(widget.initialMonth.year, widget.initialMonth.month);
-    _start = widget.initialRange?.start;
-    _end = widget.initialRange?.end;
-  }
-
-  int get _daysInMonth => DateTime(_month.year, _month.month + 1, 0).day;
-
-  /// 일요일 시작 기준으로 1일 앞에 비워야 하는 칸 수
-  int get _leadingBlanks => DateTime(_month.year, _month.month, 1).weekday % 7;
-
-  int get _rowCount => ((_leadingBlanks + _daysInMonth) / 7).ceil();
-
-  void _emit() {
-    if (_start != null && _end != null) {
-      widget.onChanged(DateRange(_start!, _end!));
-    } else {
-      widget.onChanged(null);
+    if (widget.initialRange?.isValid == true) {
+      _start = DateUtils.dateOnly(widget.initialRange!.start);
+      _end = DateUtils.dateOnly(widget.initialRange!.end);
     }
   }
 
-  /// 터치 좌표 -> 날짜. 드래그 중 손가락 위치를 날짜로 환산한다.
-  DateTime? _dateAt(Offset localPosition, Size size) {
-    final cellW = size.width / 7;
-    const cellH = 40.0;
-    final col = (localPosition.dx / cellW).floor();
-    final row = (localPosition.dy / cellH).floor();
-    if (col < 0 || col > 6 || row < 0 || row >= _rowCount) return null;
-    final dayNum = row * 7 + col - _leadingBlanks + 1;
-    if (dayNum < 1 || dayNum > _daysInMonth) return null;
-    return DateTime(_month.year, _month.month, dayNum);
+  @override
+  void dispose() {
+    _titleFocus.dispose();
+    for (final node in _daysFocus.values) {
+      node.dispose();
+    }
+    super.dispose();
   }
 
-  void _handleDrag(Offset localPosition) {
+  int get _daysInMonth => DateTime(_month.year, _month.month + 1, 0).day;
+  int get _leading => _month.weekday % 7;
+  void _emit() => widget.onChanged(
+    _start == null || _end == null ? null : DateRange(_start!, _end!),
+  );
+  void _select(DateTime date) {
+    setState(() {
+      if (widget.singleDay || !_awaitingEnd) {
+        _anchor = _start = _end = date;
+        _awaitingEnd = !widget.singleDay;
+      } else {
+        _setRange(date);
+        _awaitingEnd = false;
+      }
+    });
+    _focus(date).requestFocus();
+    _emit();
+  }
+
+  void _setRange(DateTime date) {
+    final anchor = _anchor ?? date;
+    _start = date.isBefore(anchor) ? date : anchor;
+    _end = date.isBefore(anchor) ? anchor : date;
+  }
+
+  void _drag(Offset position, {bool start = false}) {
     final box = _gridKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
-    final date = _dateAt(localPosition, box.size);
-    if (date == null) return;
-
+    final col = (position.dx / (box.size.width / 7)).floor();
+    final row = (position.dy / _cellHeight).floor();
+    final day = row * 7 + col - _leading + 1;
+    if (col < 0 ||
+        col > 6 ||
+        row < 0 ||
+        row > 5 ||
+        day < 1 ||
+        day > _daysInMonth) {
+      return;
+    }
+    final date = DateTime(_month.year, _month.month, day);
     setState(() {
-      if (widget.singleDay) {
-        _start = date;
-        _end = date;
-        return;
-      }
-      _anchor ??= date;
-      if (date.isBefore(_anchor!)) {
-        _start = date;
-        _end = _anchor;
-      } else {
-        _start = _anchor;
-        _end = date;
-      }
+      if (start || widget.singleDay) _anchor = date;
+      _setRange(date);
     });
   }
 
-  bool _inRange(DateTime d) {
-    if (_start == null || _end == null) return false;
-    return !d.isBefore(_start!) && !d.isAfter(_end!);
+  void _browse(int offset) {
+    final next = DateTime(_month.year, _month.month + offset);
+    if (next.year < 1 || next.year > 9999) return;
+    setState(() => _month = next);
   }
 
-  bool _isEdge(DateTime d) =>
-      (_start != null && _isSameDay(d, _start!)) ||
-      (_end != null && _isSameDay(d, _end!));
+  Future<void> _chooseMonth() async {
+    final result = await showDialog<DateTime>(
+      context: context,
+      builder: (_) => _MonthDialog(initial: _month),
+    );
+    if (!mounted) return;
+    if (result != null) setState(() => _month = result);
+    _titleFocus.requestFocus();
+  }
 
-  static bool _isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
+  FocusNode _focus(DateTime date) =>
+      _daysFocus.putIfAbsent(date, FocusNode.new);
+  KeyEventResult _key(DateTime date, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    DateTime? next;
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      next = date.subtract(const Duration(days: 1));
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      next = date.add(const Duration(days: 1));
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      next = date.subtract(const Duration(days: 7));
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      next = date.add(const Duration(days: 7));
+    }
+    if (key == LogicalKeyboardKey.home) {
+      next = date.subtract(Duration(days: date.weekday % 7));
+    }
+    if (key == LogicalKeyboardKey.end) {
+      next = date.add(Duration(days: 6 - date.weekday % 7));
+    }
+    if (key == LogicalKeyboardKey.pageUp ||
+        key == LogicalKeyboardKey.pageDown) {
+      final month = DateTime(
+        date.year,
+        date.month + (key == LogicalKeyboardKey.pageUp ? -1 : 1),
+      );
+      final last = DateTime(month.year, month.month + 1, 0).day;
+      next = DateTime(month.year, month.month, date.day.clamp(1, last));
+    }
+    if (next == null || next.year < 1 || next.year > 9999) {
+      return KeyEventResult.ignored;
+    }
+    final target = next;
+    setState(() => _month = DateTime(target.year, target.month));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus(target).requestFocus();
+    });
+    return KeyEventResult.handled;
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _monthHeader(),
-        const SizedBox(height: 12),
-        _weekdayLabels(),
-        const SizedBox(height: 6),
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: (d) {
-            _anchor = null;
-            _handleDrag(d.localPosition);
-          },
-          onPanUpdate: (d) => _handleDrag(d.localPosition),
-          onPanEnd: (_) {
-            _anchor = null;
-            _emit();
-          },
-          onTapDown: (d) {
-            _anchor = null;
-            _handleDrag(d.localPosition);
-          },
-          onTapUp: (_) {
-            _anchor = null;
-            _emit();
-          },
-          child: SizedBox(
-            key: _gridKey,
-            height: _rowCount * 40.0,
-            child: Column(children: List.generate(_rowCount, _buildWeekRow)),
-          ),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      SizedBox(
+        height: 48,
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: '이전 달',
+              style: IconButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => _browse(-1),
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+            Expanded(
+              child: TextButton(
+                focusNode: _titleFocus,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: _chooseMonth,
+                child: Text(
+                  '${_month.year}년 ${_month.month}월',
+                  semanticsLabel: '${_month.year}년 ${_month.month}월, 연도와 월 선택',
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: '다음 달',
+              style: IconButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: () => _browse(1),
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+          ],
         ),
-      ],
-    );
-  }
-
-  Widget _monthHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _monthArrow(Icons.chevron_left_rounded, () {
-          setState(() => _month = DateTime(_month.year, _month.month - 1));
-        }),
-        Text(
-          '${_month.year}년 ${_month.month}월',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        _monthArrow(Icons.chevron_right_rounded, () {
-          setState(() => _month = DateTime(_month.year, _month.month + 1));
-        }),
-      ],
-    );
-  }
-
-  Widget _monthArrow(IconData icon, VoidCallback onTap) {
-    return InkResponse(
-      onTap: onTap,
-      radius: 20,
-      child: Icon(icon, size: 24, color: AppColors.textSecondary),
-    );
-  }
-
-  Widget _weekdayLabels() {
-    const labels = ['일', '월', '화', '수', '목', '금', '토'];
-    return Row(
-      children: labels
-          .map(
-            (d) => Expanded(
+      ),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          for (final label in ['일', '월', '화', '수', '목', '금', '토'])
+            Expanded(
               child: Center(
                 child: Text(
-                  d,
+                  label,
                   style: const TextStyle(
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
                   ),
                 ),
               ),
             ),
-          )
-          .toList(),
-    );
-  }
-
-  Widget _buildWeekRow(int row) {
-    return SizedBox(
-      height: 40,
-      child: Row(
-        children: List.generate(7, (col) {
-          final dayNum = row * 7 + col - _leadingBlanks + 1;
-          if (dayNum < 1 || dayNum > _daysInMonth) {
-            return const Expanded(child: SizedBox.shrink());
-          }
-          final date = DateTime(_month.year, _month.month, dayNum);
-          return Expanded(child: _buildDayCell(date, dayNum));
-        }),
+        ],
       ),
-    );
-  }
-
-  Widget _buildDayCell(DateTime date, int dayNum) {
-    final inRange = _inRange(date);
-    final isEdge = _isEdge(date);
-    final isStart = _start != null && _isSameDay(date, _start!);
-    final isEnd = _end != null && _isSameDay(date, _end!);
-
-    return Semantics(
-      button: true,
-      selected: isEdge,
-      label: '${date.year}년 ${date.month}월 ${date.day}일',
-      onTap: () {
-        setState(() {
-          _start = date;
-          _end = date;
-        });
-        _emit();
-      },
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // 선택 구간 연결 배경 — 양 끝만 둥글고 가운데는 직각이라 쭉 이어져 보인다
-          if (inRange)
-            Positioned.fill(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.horizontal(
-                      left: Radius.circular(isStart ? 18 : 0),
-                      right: Radius.circular(isEnd ? 18 : 0),
-                    ),
+      const SizedBox(height: 6),
+      GestureDetector(
+        onPanStart: (d) => _drag(d.localPosition, start: true),
+        onPanUpdate: (d) => _drag(d.localPosition),
+        onPanEnd: (_) {
+          _awaitingEnd = false;
+          _emit();
+        },
+        child: SizedBox(
+          key: _gridKey,
+          height: 6 * _cellHeight,
+          child: Column(
+            children: [
+              for (var row = 0; row < 6; row++)
+                SizedBox(
+                  height: _cellHeight,
+                  child: Row(
+                    children: [
+                      for (var col = 0; col < 7; col++)
+                        Expanded(child: _day(row * 7 + col - _leading + 1)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 6),
+      const Text(
+        '오늘은 테두리 · 선택한 날짜는 파란색',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+      ),
+    ],
+  );
+  Widget _day(int day) {
+    if (day < 1 || day > _daysInMonth) return const SizedBox.shrink();
+    final date = DateTime(_month.year, _month.month, day);
+    final today = DateUtils.isSameDay(date, DateTime.now());
+    final edge = date == _start || date == _end;
+    final selected =
+        _start != null &&
+        _end != null &&
+        !date.isBefore(_start!) &&
+        !date.isAfter(_end!);
+    return Focus(
+      onKeyEvent: (_, event) => _key(date, event),
+      child: Semantics(
+        selected: selected,
+        label:
+            '${date.year}년 ${date.month}월 ${date.day}일${today ? ', 오늘' : ''}',
+        child: InkWell(
+          focusNode: _focus(date),
+          onTap: () => _select(date),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            alignment: Alignment.center,
+            color: selected ? AppColors.primaryLight : null,
+            child: Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: edge ? AppColors.primary : null,
+                border: today
+                    ? Border.all(
+                        color: edge ? Colors.white : AppColors.primary,
+                        width: 2,
+                      )
+                    : null,
+              ),
+              child: ExcludeSemantics(
+                child: Text(
+                  '$day',
+                  style: TextStyle(
+                    fontWeight: edge ? FontWeight.w700 : FontWeight.w500,
+                    color: edge ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
               ),
             ),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: isEdge ? AppColors.primary : Colors.transparent,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '$dayNum',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: isEdge ? FontWeight.w700 : FontWeight.w500,
-                color: isEdge ? AppColors.white : AppColors.textPrimary,
-              ),
-            ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class _MonthDialog extends StatefulWidget {
+  const _MonthDialog({required this.initial});
+  final DateTime initial;
+  @override
+  State<_MonthDialog> createState() => _MonthDialogState();
+}
+
+class _MonthDialogState extends State<_MonthDialog> {
+  late final _year = TextEditingController(text: '${widget.initial.year}');
+  late int _month = widget.initial.month;
+  final _form = GlobalKey<FormState>();
+  @override
+  void dispose() {
+    _year.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    if (_form.currentState!.validate()) {
+      Navigator.of(context).pop(DateTime(int.parse(_year.text), _month));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('연도와 월 선택'),
+    content: SizedBox(
+      width: 320,
+      child: SingleChildScrollView(
+        child: Form(
+          key: _form,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                key: const ValueKey('calendar-year'),
+                controller: _year,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(4),
+                ],
+                decoration: const InputDecoration(labelText: '연도 (1~9999)'),
+                validator: (s) =>
+                    (int.tryParse(s ?? '') ?? 0) < 1 ? '올바른 연도를 입력해주세요' : null,
+                onFieldSubmitted: (_) => _confirm(),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (var m = 1; m <= 12; m++)
+                    ChoiceChip(
+                      label: Text('$m월'),
+                      selected: _month == m,
+                      onSelected: (_) => setState(() => _month = m),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('취소'),
+      ),
+      FilledButton(onPressed: _confirm, child: const Text('이동')),
+    ],
+  );
 }

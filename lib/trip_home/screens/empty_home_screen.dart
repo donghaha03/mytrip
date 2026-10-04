@@ -17,11 +17,7 @@ class EmptyHomeScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFEFF4FE),
-              Color(0xFFF9FAFC),
-              AppColors.bg,
-            ],
+            colors: [Color(0xFFEFF4FE), Color(0xFFF9FAFC), AppColors.bg],
             stops: [0, 0.55, 1],
           ),
         ),
@@ -37,7 +33,7 @@ class EmptyHomeScreen extends StatelessWidget {
                   const _PlaneMark(),
                   const SizedBox(height: 28),
                   const Text(
-                    '아직 떠날 준비가 남았어요',
+                    '첫 여행을 추가해 보세요',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
@@ -48,7 +44,7 @@ class EmptyHomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    '첫 여행을 추가하면\n쓴 만큼 바로 원화로 보여드릴게요',
+                    '여행 일정과 지출을 한곳에서 관리해요',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -61,8 +57,7 @@ class EmptyHomeScreen extends StatelessWidget {
                   AddTripCta(
                     label: '여행 추가하기',
                     onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                          builder: (_) => const AddTripScreen()),
+                      MaterialPageRoute(builder: (_) => const AddTripScreen()),
                     ),
                   ),
                   const SizedBox(height: 26),
@@ -99,8 +94,11 @@ class _BrandBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: const [
-          Icon(Icons.flight_takeoff_rounded,
-              size: 13, color: AppColors.primary),
+          Icon(
+            Icons.flight_takeoff_rounded,
+            size: 13,
+            color: AppColors.primary,
+          ),
           SizedBox(width: 6),
           Text(
             '환율 걱정 없는 여행 장부',
@@ -128,9 +126,7 @@ class _PlaneMark extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Positioned.fill(
-            child: CustomPaint(painter: _FlightPathPainter()),
-          ),
+          Positioned.fill(child: CustomPaint(painter: _FlightPathPainter())),
           Container(
             width: 116,
             height: 116,
@@ -150,8 +146,11 @@ class _PlaneMark extends StatelessWidget {
               ],
             ),
             alignment: Alignment.center,
-            child: const Icon(Icons.send_rounded,
-                size: 44, color: AppColors.primary),
+            child: const Icon(
+              Icons.send_rounded,
+              size: 44,
+              color: AppColors.primary,
+            ),
           ),
         ],
       ),
@@ -206,20 +205,23 @@ class _FeatureRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Expanded(child: _Feature(icon: '💱', label: '자동 환산')),
+        const Expanded(
+          child: _Feature(icon: '💱', label: '자동 환산'),
+        ),
         _divider(),
-        const Expanded(child: _Feature(icon: '📍', label: '소비 기록')),
+        const Expanded(
+          child: _Feature(icon: '📍', label: '소비 기록'),
+        ),
         _divider(),
-        const Expanded(child: _Feature(icon: '📊', label: '예산 관리')),
+        const Expanded(
+          child: _Feature(icon: '📊', label: '예산 관리'),
+        ),
       ],
     );
   }
 
-  Widget _divider() => Container(
-        width: 1,
-        height: 22,
-        color: AppColors.divider,
-      );
+  Widget _divider() =>
+      Container(width: 1, height: 22, color: AppColors.divider);
 }
 
 class _Feature extends StatelessWidget {

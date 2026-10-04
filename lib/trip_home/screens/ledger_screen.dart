@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../widgets/category_charts.dart';
 
 import '../../api/api.dart';
 import '../data/trip_store.dart';
 import '../models/trip.dart';
+import '../models/spending_summary.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_sheet.dart';
@@ -77,9 +79,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: Listenable.merge([tripStore, RateApi.changes]),
     builder: (context, _) {
-      final available =
-          RateApi.quotedKrw(trip.country.currency) > 0 &&
-          trip.ratesAvailable(trip.expenses);
+      final available = trip.ratesAvailable(trip.expenses);
       final entries = trip.expensesNewestFirst
           .where(
             (e) =>
@@ -99,7 +99,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       final groups = <Object, List<Expense>>{};
       for (final e in entries) {
         final Object key = _categories
-            ? (e.category == '숙소' ? '숙박' : e.category)
+            ? normalizedCategory(e.category)
             : DateTime(e.date.year, e.date.month, e.date.day);
         (groups[key] ??= []).add(e);
       }
@@ -180,12 +180,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           const SizedBox(height: 16),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: available ? trip.spentRatio : 0,
-                              minHeight: 6,
-                              backgroundColor: AppColors.progressTrack,
-                              color: AppColors.white,
-                            ),
+                            child: CategoryBudgetBar(trip: trip),
                           ),
                           const SizedBox(height: 16),
                           Wrap(
@@ -301,6 +296,14 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     for (final group in orderedGroups) ...[
                       Row(
                         children: [
+                          if (_categories) ...[
+                            Icon(
+                              Icons.circle,
+                              size: 8,
+                              color: categoryColor(group.key as String),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
                           Expanded(
                             child: Text(
                               _categories

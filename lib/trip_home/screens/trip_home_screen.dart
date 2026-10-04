@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/category_charts.dart';
 
 import '../data/trip_store.dart';
 import '../models/trip.dart';
@@ -14,6 +15,7 @@ import '../widgets/sheets.dart';
 import '../widgets/today_budget_sheet.dart';
 import 'ledger_entry.dart';
 import 'more_screen.dart';
+import 'spending_overview_screen.dart';
 
 /// 여행별 예산·지출 요약과 환산 화면.
 /// 전체 장부와 지출 입력은 ledger_entry.dart에서 연결한다.
@@ -98,7 +100,11 @@ class TripHomeScreen extends StatelessWidget {
                       RecentExpensesCard(
                         trip: trip,
                         now: DateTime.now(),
-                        onOpenLedger: () => openLedger(context, trip),
+                        onOpenLedger: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => SpendingOverviewScreen(trip: trip),
+                          ),
+                        ),
                         onAddExpense: () => openLedger(
                           context,
                           trip,
@@ -171,7 +177,8 @@ class _SpendingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = trip.country;
-    final available = RateApi.quotedKrw(c.currency) > 0;
+    final available = trip.ratesAvailable(trip.expenses);
+    final foreignAvailable = available && RateApi.quotedKrw(c.currency) > 0;
     final remain = trip.remainKrw;
     final over = remain < 0;
     final percent = trip.budgetKrw == 0
@@ -261,11 +268,11 @@ class _SpendingCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  available
+                  foreignAvailable
                       ? c.formatForeign(
                           RateApi.fromKrw(trip.spentKrw, c.currency),
                         )
-                      : c.formatForeign(trip.spentForeign),
+                      : '통화별 표시',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -285,14 +292,7 @@ class _SpendingCard extends StatelessWidget {
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: trip.spentRatio,
-                      minHeight: 8,
-                      backgroundColor: AppColors.white.withValues(alpha: 0.22),
-                      valueColor: AlwaysStoppedAnimation(
-                        over ? const Color(0xFFFFB4B4) : AppColors.white,
-                      ),
-                    ),
+                    child: CategoryBudgetBar(trip: trip, showLegend: true),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -325,7 +325,7 @@ class _SpendingCard extends StatelessWidget {
                 _Figure(
                   label: over ? '초과' : '남은 금액',
                   value: available ? formatWon(remain.abs()) : '환율 없음',
-                  sub: !available
+                  sub: !foreignAvailable
                       ? '환율 없음'
                       : c.formatForeign(
                           RateApi.fromKrw(remain.abs(), c.currency),

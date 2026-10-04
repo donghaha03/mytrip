@@ -149,6 +149,18 @@ class RateApi {
       }
       rates[country.currency] = value.toDouble();
     }
+    // New destinations may use currencies absent from the original shortlist.
+    // Keep the same server snapshot/quote rules; absent rates remain unavailable.
+    for (final country in kExpenseCurrencies) {
+      final value = raw[country.currency];
+      if (value is num &&
+          value.isFinite &&
+          value > 0 &&
+          (1 / value).isFinite &&
+          (country.unitAmount / value).isFinite) {
+        rates[country.currency] = value.toDouble();
+      }
+    }
     final date = data['rate_date'];
     if (date is! String || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date)) {
       throw const FormatException('환율 기준일이 없습니다');

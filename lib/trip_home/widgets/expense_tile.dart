@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/api.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
+import '../models/spending_summary.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
@@ -46,6 +47,8 @@ class ExpenseTile extends StatelessWidget {
             child: Row(
               children: [
                 Text(e.icon, style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 5),
+                Icon(Icons.circle, size: 7, color: categoryColor(e.category)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -62,7 +65,7 @@ class ExpenseTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '${e.category} · ${showDate ? formatShortDateWithWeekday(e.date) : time}',
+                        '${normalizedCategory(e.category)} · ${showDate ? formatShortDateWithWeekday(e.date) : time}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,

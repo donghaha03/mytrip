@@ -6,11 +6,7 @@ import '../theme/app_colors.dart';
 /// 그래버 핸들 + (제목 / ✕ 닫기) 헤더 + 본문 구조를 강제해서
 /// 시트마다 헤더가 제각각이 되는 걸 막는다.
 class AppSheet extends StatelessWidget {
-  const AppSheet({
-    super.key,
-    required this.title,
-    required this.children,
-  });
+  const AppSheet({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -72,22 +68,19 @@ class _CloseButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.closeBg,
-      shape: const CircleBorder(),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: const SizedBox(
-          width: 30,
-          height: 30,
-          child: Icon(Icons.close_rounded,
-              size: 16, color: AppColors.textSecondary),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => IconButton(
+    tooltip: '닫기',
+    onPressed: onTap,
+    style: IconButton.styleFrom(
+      backgroundColor: AppColors.closeBg,
+      minimumSize: const Size(48, 48),
+    ),
+    icon: const Icon(
+      Icons.close_rounded,
+      size: 18,
+      color: AppColors.textSecondary,
+    ),
+  );
 }
 
 /// 시트 뒤로 현재 화면이 그대로 비치도록 barrier 를 어둡게만 깐다.
@@ -113,29 +106,17 @@ class SheetPrimaryButton extends StatelessWidget {
   });
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.primary,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          height: 54,
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => FilledButton(
+    onPressed: onTap,
+    style: FilledButton.styleFrom(
+      backgroundColor: AppColors.primary,
+      minimumSize: const Size.fromHeight(54),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+    ),
+    child: Text(label),
+  );
 }

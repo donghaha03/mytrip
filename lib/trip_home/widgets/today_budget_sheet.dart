@@ -118,7 +118,7 @@ class TodayBudgetSheet extends StatelessWidget {
     final b = todayBudget(trip, now);
     final c = trip.country;
     final rate = RateApi.quotedKrw(c.currency);
-    if (rate <= 0) {
+    if (rate <= 0 || !trip.ratesAvailable(trip.expenses)) {
       return AppSheet(
         title: '오늘 예산',
         children: [

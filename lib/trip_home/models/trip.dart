@@ -45,6 +45,7 @@ class Expense {
     this.source,
     this.status = ExpenseStatus.approved,
     this.originalAmount,
+    this.receiptFingerprint,
   });
 
   final String id;
@@ -61,6 +62,7 @@ class Expense {
   final String? source; // demo-card / codef. 직접 입력한 기록은 null.
   final ExpenseStatus status;
   final double? originalAmount;
+  final String? receiptFingerprint;
 
   bool get isImported => source != null;
   String currencyOf(Trip trip) => currency ?? trip.country.currency;
@@ -98,7 +100,9 @@ class Trip {
 
   bool ratesAvailable(Iterable<Expense> entries) => entries.every(
     (e) =>
-        !e.status.countsAsSpending || RateApi.quotedKrw(e.currencyOf(this)) > 0,
+        !e.status.countsAsSpending ||
+        e.amount == 0 ||
+        RateApi.quotedKrw(e.currencyOf(this)) > 0,
   );
 
   /// 항목별 정수 환산액을 더한다. 목록·날짜별 합계·홈이 같은 값을 쓴다.

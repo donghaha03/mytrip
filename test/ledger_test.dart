@@ -860,7 +860,7 @@ void main() {
 
   testWidgets('통화 선택·메모·현재 환산·기록 당시 환율을 저장하고 상세에서 읽는다', (tester) async {
     await tester.pumpWidget(_wrap(ExpenseFormScreen(trip: trip)));
-    await tester.tap(find.byKey(const ValueKey('expense-currency')));
+    await tester.tap(find.byType(DropdownButtonFormField<String>).first);
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('🇰🇷 KRW · 원').last);
     await tester.pumpAndSettle();
