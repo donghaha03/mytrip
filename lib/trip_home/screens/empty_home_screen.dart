@@ -144,7 +144,10 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
                                   ),
                                 ),
                                 const SizedBox(height: 28),
-                                OnboardingExample(step: i),
+                                OnboardingExample(
+                                  step: i,
+                                  active: i == _page && !_departing,
+                                ),
                               ],
                             ),
                           ),

@@ -169,16 +169,16 @@ void main() {
 
     expect(find.byType(TripHomeScreen), findsOneWidget);
     expect(find.text('🇯🇵 일본 여행'), findsOneWidget); // 상단바
-    expect(find.text('D-11'), findsOneWidget); // 목업: 오늘 + 11일 출발
-    expect(find.textContaining('4박 5일'), findsOneWidget);
+    expect(find.text('D-11'), findsNothing); // 일정은 목록·여행 편집에서 확인한다.
+    expect(find.textContaining('4박 5일'), findsNothing);
 
     // 목업 지출 ¥1,200 + ¥3,500 + ¥2,800 + ¥40,600 = ¥48,100 -> 456,950원
     expect(find.text('사용한 금액'), findsOneWidget);
     expect(find.text('456,950원'), findsOneWidget);
-    expect(find.text('¥48,100'), findsOneWidget);
+    expect(find.text('¥48,100'), findsNothing);
     expect(find.text('38%'), findsOneWidget);
     expect(find.text('1,200,000원'), findsOneWidget);
-    expect(find.text('하루 240,000원'), findsOneWidget); // 1,200,000 / 5일
+    expect(find.text('하루 240,000원'), findsNothing);
     expect(find.text('남은 금액'), findsOneWidget);
     expect(find.text('743,050원'), findsOneWidget);
 
@@ -315,8 +315,12 @@ void main() {
     final t = tripStore.byId('t3')!;
     expect(t.durationLabel, '2박 3일');
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: t)));
-    expect(find.textContaining('01.10 – 01.12'), findsOneWidget);
-    expect(find.text('하루 100,000원'), findsOneWidget);
+    expect(find.text('300,000원'), findsNWidgets(2));
+    expect(find.text('하루 100,000원'), findsNothing);
+    await tester.tap(find.byTooltip('여행 편집'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('01.10'), findsOneWidget);
+    expect(find.textContaining('01.12'), findsOneWidget);
   });
 
   testWidgets('여행 홈: 여행 이름 옆 환율 + ⓘ 툴팁 (07)', (tester) async {
@@ -421,7 +425,8 @@ void main() {
     await tester.tap(find.text('가' * 20));
     await tester.pumpAndSettle();
     expect(find.byType(TripHomeScreen), findsOneWidget);
-    expect(find.text('여행 완료'), findsOneWidget); // 미국 여행은 이미 끝났다
+    expect(find.text('🇺🇸 ${'가' * 20}'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('여행 홈: 편집 시트에서 삭제하면 리스트로 돌아가고 사라진다', (tester) async {
@@ -883,9 +888,9 @@ void main() {
     expect(japan.spentKrw, 414622);
     expect(japan.remainKrw, 785378);
     expect(find.text('414,622원'), findsOneWidget);
-    expect(find.text('¥48,100'), findsOneWidget);
+    expect(find.text('¥48,100'), findsNothing);
     expect(find.text('785,378원'), findsOneWidget);
-    expect(find.text('¥91,111'), findsOneWidget);
+    expect(find.text('¥91,111'), findsNothing);
     expect(find.text('10,344원'), findsWidgets); // 최근 지출도 1200 * 862 ~/ 100.
     final input = find.descendant(
       of: find.byType(QuickConverter),
@@ -938,7 +943,8 @@ void main() {
     );
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: trip)));
     expect(trip.spentKrw, 439);
-    expect(find.text('¥50'), findsOneWidget); // 439 * 100 ~/ 862, 기록 원본 51과 구분.
+    expect(RateApi.fromKrw(trip.spentKrw, 'JPY'), 50);
+    expect(find.text('¥50'), findsNothing); // 외화 요약을 반복하지 않는다.
     final input = find.descendant(
       of: find.byType(QuickConverter),
       matching: find.byType(TextField),

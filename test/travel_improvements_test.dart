@@ -380,7 +380,11 @@ void main() {
       final t = trip([expense('a', 1000), expense('b', 200, code: 'AED')]);
       await tester.pumpWidget(wrap(TripHomeScreen(trip: t)));
       expect(find.text('환율 없음'), findsWidgets);
-      expect(find.text('통화별 표시'), findsOneWidget);
+      expect(find.text('통화별 표시'), findsNothing);
+      expect(
+        tester.widget<Text>(find.text('환율 없음').first).style!.fontSize,
+        36,
+      ); // 주요 합계가 누락 통화를 빼고 부분 합산한 금액으로 표시되지 않는다.
       expect(tester.takeException(), isNull);
     },
   );
@@ -743,6 +747,23 @@ void main() {
             .first,
       );
       expect(scroll.position.maxScrollExtent, 0);
+      expect(
+        tester.widget<Text>(find.text(formatWon(t.spentKrw))).style!.fontSize,
+        36,
+      );
+      expect(
+        tester
+            .widget<Text>(find.text(formatWon(t.remainKrw.abs())))
+            .style!
+            .fontSize,
+        20,
+      );
+      expect(
+        tester.widget<Text>(find.text(formatWon(t.budgetKrw))).style!.fontSize,
+        14,
+      );
+      expect(find.textContaining('하루 '), findsNothing);
+      expect(find.textContaining('4박 5일'), findsNothing);
       expect(find.byType(ExpenseTile), findsOneWidget);
       expect(t.expenses.length, 4);
       expect(find.text('빠른 환산'), findsOneWidget);
@@ -794,7 +815,7 @@ void main() {
   });
 
   testWidgets(
-    'swipe demo reveals actions then resets without mutating records',
+    'swipe demo repeats slowly and stops when the user takes control',
     (tester) async {
       var edits = 0, deletes = 0;
       await tester.pumpWidget(
@@ -818,7 +839,13 @@ void main() {
       expect(find.byTooltip('예시 수정'), findsOneWidget);
       expect(find.byTooltip('예시 삭제'), findsOneWidget);
       expect(edits + deletes, 0);
+      await tester.pump(const Duration(milliseconds: 2200));
+      expect(find.byTooltip('예시 수정'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1800));
+      expect(find.byTooltip('예시 수정'), findsOneWidget);
+      await tester.drag(find.byType(SwipeActions), const Offset(160, 0));
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 8));
       expect(find.byTooltip('예시 수정'), findsNothing);
       expect(edits + deletes, 0);
       expect(tester.takeException(), isNull);
@@ -912,23 +939,48 @@ void main() {
   );
 
   testWidgets(
-    'tutorial demonstration starts explicitly and waits before swiping',
+    'tutorial demonstration autoplays without a button and pauses offscreen',
     (tester) async {
       await tester.pumpWidget(
         wrap(SingleChildScrollView(child: const OnboardingExample(step: 2))),
       );
-      await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.touch_app_outlined), findsNothing);
+      expect(find.byIcon(Icons.touch_app_outlined), findsOneWidget);
       expect(find.text('밀기 동작 다시 보기'), findsNothing);
-      await tester.ensureVisible(find.text('스와이프 예시 보기'));
-      await tester.tap(find.text('스와이프 예시 보기'));
-      await tester.pump();
+      expect(find.text('스와이프 예시 보기'), findsNothing);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 800));
       expect(find.byTooltip('일본 여행 여행 삭제'), findsNothing);
       await tester.pump(const Duration(milliseconds: 1000));
       expect(find.byTooltip('일본 여행 여행 삭제'), findsOneWidget);
       expect(find.byIcon(Icons.touch_app_outlined), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 2200));
+      expect(find.byTooltip('일본 여행 여행 삭제'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 1800));
+      expect(find.byTooltip('일본 여행 여행 삭제'), findsOneWidget);
+      await tester.pumpWidget(
+        wrap(
+          SingleChildScrollView(
+            child: const OnboardingExample(step: 2, active: false),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.touch_app_outlined), findsNothing);
+      await tester.pumpWidget(
+        wrap(SingleChildScrollView(child: const OnboardingExample(step: 2))),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1800));
+      await tester.tap(find.byTooltip('일본 여행 여행 수정'));
+      await tester.pumpAndSettle();
+      expect(find.text('여행 이름을 수정했어요'), findsOneWidget);
+      expect(find.byIcon(Icons.touch_app_outlined), findsNothing);
+      await tester.pump(const Duration(seconds: 8));
+      expect(find.byIcon(Icons.touch_app_outlined), findsNothing);
+      await tester.tap(find.text('처음부터 해보기'));
+      await tester.pump();
+      expect(find.byIcon(Icons.touch_app_outlined), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
       expect(tripStore.isEmpty, isTrue);
       expect(tester.takeException(), isNull);
@@ -941,7 +993,9 @@ void main() {
     await tester.pumpWidget(wrap(const EmptyHomeScreen()));
     for (var i = 0; i < 4; i++) {
       await tester.tap(find.byTooltip('다음 안내'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
     }
     await tester.tap(find.byTooltip('출발하기'));
     await tester.pump(const Duration(milliseconds: 400));
@@ -1153,7 +1207,12 @@ void main() {
           tester.getTopLeft(pages) + const Offset(280, 36),
           const Offset(-280, 0),
         );
-        await tester.pumpAndSettle();
+        if (i == 2) {
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pump();
+        } else {
+          await tester.pumpAndSettle();
+        }
         if (i < 5) expect(find.text('${i + 1} / 5'), findsOneWidget);
       }
       expect(find.byType(PageView), findsNothing);
@@ -1217,7 +1276,9 @@ void main() {
     await tester.pumpWidget(wrap(const EmptyHomeScreen()));
     for (var i = 0; i < 4; i++) {
       await tester.tap(find.byTooltip('다음 안내'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump();
     }
     await tester.tap(find.byTooltip('출발하기'));
     await tester.pump(const Duration(milliseconds: 320));

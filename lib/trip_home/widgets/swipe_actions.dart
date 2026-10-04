@@ -31,6 +31,7 @@ class _SwipeActionsState extends State<SwipeActions>
   double _dragDistance = 0;
   bool _startedOpen = false, _draggedLeft = false;
   bool _dragging = false;
+  bool _previewInterrupted = false;
   final _focus = FocusNode();
   late final _preview = AnimationController(
     vsync: this,
@@ -58,16 +59,41 @@ class _SwipeActionsState extends State<SwipeActions>
   void initState() {
     super.initState();
     _preview.addListener(() => setState(() => _offset = _previewOffset.value));
-    if (widget.previewSwipe) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (MediaQuery.disableAnimationsOf(context)) {
-          setState(() => _offset = -_width);
-        } else {
-          _preview.forward();
-        }
-      });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncPreview();
+  }
+
+  @override
+  void didUpdateWidget(SwipeActions oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.previewSwipe != widget.previewSwipe) {
+      _previewInterrupted = false;
+      _syncPreview();
     }
+  }
+
+  void _syncPreview() {
+    if (!widget.previewSwipe ||
+        _previewInterrupted ||
+        !TickerMode.valuesOf(context).enabled) {
+      _preview.stop();
+    } else if (MediaQuery.disableAnimationsOf(context)) {
+      _preview.stop();
+      _offset = -_width;
+    } else if (!_preview.isAnimating) {
+      _offset = 0;
+      _preview.reset();
+      _preview.repeat();
+    }
+  }
+
+  void _stopPreview() {
+    _previewInterrupted = true;
+    _preview.stop();
   }
 
   @override
@@ -78,13 +104,13 @@ class _SwipeActionsState extends State<SwipeActions>
   }
 
   void _reveal(double offset) {
-    _preview.stop();
+    _stopPreview();
     setState(() => _offset = offset);
     _focus.requestFocus();
   }
 
   void _close() {
-    _preview.stop();
+    _stopPreview();
     setState(() => _offset = 0);
   }
 
@@ -125,9 +151,12 @@ class _SwipeActionsState extends State<SwipeActions>
           if (_offset != 0 && !_dragging) _close();
         },
         child: GestureDetector(
-          onTapDown: (_) => _focus.requestFocus(),
+          onTapDown: (_) {
+            _stopPreview();
+            _focus.requestFocus();
+          },
           onHorizontalDragStart: (_) {
-            _preview.stop();
+            _stopPreview();
             _startedOpen = _offset != 0;
             _draggedLeft = false;
             _dragDistance = 0;

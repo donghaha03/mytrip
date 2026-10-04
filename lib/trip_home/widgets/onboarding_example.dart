@@ -13,8 +13,9 @@ import 'trip_card.dart';
 
 /// Interactive examples use isolated data, never the user's trip store.
 class OnboardingExample extends StatefulWidget {
-  const OnboardingExample({super.key, required this.step});
+  const OnboardingExample({super.key, required this.step, this.active = true});
   final int step;
+  final bool active;
   @override
   State<OnboardingExample> createState() => _OnboardingExampleState();
 }
@@ -164,7 +165,7 @@ class _OnboardingExampleState extends State<OnboardingExample> {
                     TripCard(
                       key: ValueKey('guide-preview-$_previewRun'),
                       trip: _trip,
-                      previewSwipe: _previewRun > 0,
+                      previewSwipe: widget.active && !_edited,
                       onTap: () {},
                       onLongPress: () => setState(() {
                         _trip.name = '도쿄 여행';
@@ -195,17 +196,16 @@ class _OnboardingExampleState extends State<OnboardingExample> {
                     ),
                   if (_edited && !_deleted)
                     const Text('여행 이름을 수정했어요', textAlign: TextAlign.center),
-                  TextButton(
-                    onPressed: () => setState(() {
-                      _deleted = false;
-                      _edited = false;
-                      _trip.name = '일본 여행';
-                      _previewRun++;
-                    }),
-                    child: Text(
-                      _deleted || _edited ? '처음부터 해보기' : '스와이프 예시 보기',
+                  if (_deleted || _edited)
+                    TextButton(
+                      onPressed: () => setState(() {
+                        _deleted = false;
+                        _edited = false;
+                        _trip.name = '일본 여행';
+                        _previewRun++;
+                      }),
+                      child: const Text('처음부터 해보기'),
                     ),
-                  ),
                 ],
                 3 => [
                   if (_receiptStage < 2)
