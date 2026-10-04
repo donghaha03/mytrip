@@ -14,17 +14,8 @@ import 'services/session.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 
-bool _guideSeen = false;
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    _guideSeen =
-        (await SharedPreferences.getInstance()).getBool('trip_guide_seen') ??
-        false;
-  } catch (_) {
-    /* Guidance also works without storage. */
-  }
 
   // 기본은 DB 없이 샘플 데이터로 화면을 확인한다.
   if (await Backend.init() == BackendMode.firebase) {
@@ -112,6 +103,34 @@ class HomeRouter extends StatefulWidget {
 
 class _HomeRouterState extends State<HomeRouter> {
   bool _autoOpened = false;
+  bool? _guideSeen;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGuidePreference();
+  }
+
+  Future<void> _loadGuidePreference() async {
+    var seen = false;
+    try {
+      seen =
+          (await SharedPreferences.getInstance()).getBool('trip_guide_seen') ??
+          false;
+    } catch (_) {
+      // Without storage, show guidance rather than bypassing it.
+    }
+    if (mounted) setState(() => _guideSeen = seen);
+  }
+
+  void _completeGuide() {
+    setState(() => _guideSeen = true);
+    unawaited(
+      SharedPreferences.getInstance()
+          .then((prefs) => prefs.setBool('trip_guide_seen', true))
+          .catchError((_) => false),
+    );
+  }
 
   /// 여행 중인 여행이 있으면 그 화면을 목록 위에 띄운다.
   /// Firebase 모드에서는 첫 스냅샷이 올 때까지 기다린다.
@@ -139,20 +158,26 @@ class _HomeRouterState extends State<HomeRouter> {
     return AnimatedBuilder(
       animation: tripStore,
       builder: (context, _) {
+        if (_guideSeen == null) return const _Loading();
+        if (!_guideSeen!) {
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final upcoming =
+              tripStore.trips
+                  .where((trip) => !trip.start.isBefore(today))
+                  .toList()
+                ..sort((a, b) => a.start.compareTo(b.start));
+          return EmptyHomeScreen(
+            destination:
+                (ongoingTrip(tripStore.trips, now) ?? upcoming.firstOrNull)
+                    ?.country,
+            onGuideFinished: _completeGuide,
+          );
+        }
         if (tripStore.isLoading) return const _Loading();
         _openOngoingTripOnce();
         return tripStore.isEmpty
-            ? EmptyHomeScreen(
-                showGuide: !_guideSeen,
-                onGuideFinished: () {
-                  _guideSeen = true;
-                  unawaited(
-                    SharedPreferences.getInstance()
-                        .then((prefs) => prefs.setBool('trip_guide_seen', true))
-                        .catchError((_) => false),
-                  );
-                },
-              )
+            ? const EmptyHomeScreen(showGuide: false)
             : const TripListScreen();
       },
     );

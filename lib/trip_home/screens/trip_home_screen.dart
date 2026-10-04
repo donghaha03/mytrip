@@ -154,8 +154,13 @@ class _SpendingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final available = trip.ratesAvailable(trip.expenses);
     final remain = trip.remainKrw;
+    final hasRate = RateApi.quotedKrw(trip.country.currency) > 0;
+    String foreign(int krw) =>
+        trip.country.formatForeign(RateApi.fromKrw(krw, trip.country.currency));
+    String md(DateTime date) =>
+        '${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
@@ -165,14 +170,41 @@ class _SpendingCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text(
-                  '사용한 금액',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.onPrimaryMuted,
-                  ),
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.progressTrackOnPrimary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        child: Text(
+                          tripStatusLabel(trip, DateTime.now()),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${md(trip.start)}–${md(trip.end)}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1.2,
+                        color: AppColors.onPrimaryMuted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               _CardIcon(
@@ -188,37 +220,72 @@ class _SpendingCard extends StatelessWidget {
               ),
             ],
           ),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              available ? formatWon(trip.spentKrw) : '환율 없음',
-              style: const TextStyle(
-                fontSize: 36,
-                height: 1.2,
-                fontWeight: FontWeight.w700,
-                color: AppColors.white,
-              ),
+          const SizedBox(height: 12),
+          const Text(
+            '사용한 금액',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: AppColors.onPrimaryMuted,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    available ? formatWon(trip.spentKrw) : '환율 없음',
+                    style: const TextStyle(
+                      fontSize: 36,
+                      height: 1.2,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.white,
+                    ),
+                  ),
+                ),
+              ),
+              if (available && hasRate) ...[
+                const SizedBox(width: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 96),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      foreign(trip.spentKrw),
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.onPrimaryMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 12),
           BudgetProgressPanel(trip: trip),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: _Figure(
-                  label: remain < 0 ? '예산 초과' : '남은 금액',
-                  value: available ? formatWon(remain.abs()) : '환율 없음',
-                  prominent: true,
+                  label: '예산',
+                  value: formatWon(trip.budgetKrw),
+                  sub: hasRate ? foreign(trip.budgetKrw) : null,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _Figure(
-                  label: '예산',
-                  value: formatWon(trip.budgetKrw),
+                  label: remain < 0 ? '예산 초과' : '남은 금액',
+                  value: available ? formatWon(remain.abs()) : '환율 없음',
+                  sub: available && hasRate ? foreign(remain.abs()) : null,
                   alignEnd: true,
                 ),
               ),
@@ -250,6 +317,7 @@ class _CardIcon extends StatelessWidget {
       style: IconButton.styleFrom(
         foregroundColor: AppColors.white,
         minimumSize: const Size(44, 44),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
       icon: Icon(icon, size: 18, color: AppColors.white),
     );
@@ -260,13 +328,13 @@ class _Figure extends StatelessWidget {
   const _Figure({
     required this.label,
     required this.value,
-    this.prominent = false,
+    this.sub,
     this.alignEnd = false,
   });
 
   final String label;
   final String value;
-  final bool prominent;
+  final String? sub;
   final bool alignEnd;
 
   @override
@@ -292,13 +360,25 @@ class _Figure extends StatelessWidget {
           child: Text(
             value,
             style: TextStyle(
-              fontSize: prominent ? 20 : 14,
+              fontSize: 16,
               height: 1.2,
-              fontWeight: prominent ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: FontWeight.w500,
               color: AppColors.white,
             ),
           ),
         ),
+        if (sub != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            sub!,
+            textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.2,
+              color: AppColors.onPrimaryMuted,
+            ),
+          ),
+        ],
       ],
     );
   }

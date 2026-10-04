@@ -57,7 +57,7 @@ Future<void> _loadRates({double? yenRate}) async {
 
 void main() {
   setUpAll(() async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'trip_guide_seen': true});
     await _loadRates();
   });
 
@@ -81,7 +81,9 @@ void main() {
   });
 
   testWidgets('00 빈 화면이 그려진다', (tester) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     await tester.tap(find.text('건너뛰기'));
     await tester.pumpAndSettle();
     expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
@@ -93,6 +95,7 @@ void main() {
   testWidgets('01 여행 리스트 + 여행완료 도장', (tester) async {
     tripStore.seedMockTrips();
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     expect(find.text('내 여행'), findsOneWidget);
     expect(find.text('일본 여행'), findsOneWidget);
     expect(find.text('가족 여행'), findsOneWidget);
@@ -164,18 +167,19 @@ void main() {
 
   testWidgets('여행 홈: 사용한 금액과 예산이 메인', (tester) async {
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     await tester.tap(find.text('일본 여행'));
     await tester.pumpAndSettle();
 
     expect(find.byType(TripHomeScreen), findsOneWidget);
     expect(find.text('🇯🇵 일본 여행'), findsOneWidget); // 상단바
-    expect(find.text('D-11'), findsNothing); // 일정은 목록·여행 편집에서 확인한다.
+    expect(find.text('D-11'), findsOneWidget);
     expect(find.textContaining('4박 5일'), findsNothing);
 
     // 목업 지출 ¥1,200 + ¥3,500 + ¥2,800 + ¥40,600 = ¥48,100 -> 456,950원
     expect(find.text('사용한 금액'), findsOneWidget);
     expect(find.text('456,950원'), findsOneWidget);
-    expect(find.text('¥48,100'), findsNothing);
+    expect(find.text('¥48,100'), findsOneWidget);
     expect(find.text('38%'), findsOneWidget);
     expect(find.text('1,200,000원'), findsOneWidget);
     expect(find.text('하루 240,000원'), findsNothing);
@@ -216,6 +220,7 @@ void main() {
 
   testWidgets('여행 홈: 하단에 장부로 가는 버튼들', (tester) async {
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     await tester.tap(find.text('일본 여행'));
     await tester.pumpAndSettle();
 
@@ -239,6 +244,7 @@ void main() {
 
   testWidgets('여행 홈: 오른쪽 위 ≡ 로 더보기에 들어가고 나온다', (tester) async {
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     await tester.tap(find.text('일본 여행'));
     await tester.pumpAndSettle();
 
@@ -256,6 +262,7 @@ void main() {
 
   testWidgets('여행 홈: 뒤로가기로 01 리스트에 돌아온다', (tester) async {
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     await tester.tap(find.text('일본 여행'));
     await tester.pumpAndSettle();
 
@@ -319,8 +326,8 @@ void main() {
     expect(find.text('하루 100,000원'), findsNothing);
     await tester.tap(find.byTooltip('여행 편집'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('01.10'), findsOneWidget);
-    expect(find.textContaining('01.12'), findsOneWidget);
+    expect(find.textContaining('01.10'), findsNWidgets(2));
+    expect(find.textContaining('01.12'), findsNWidgets(2));
   });
 
   testWidgets('여행 홈: 여행 이름 옆 환율 + ⓘ 툴팁 (07)', (tester) async {
@@ -422,6 +429,7 @@ void main() {
     // 넘치면 RenderFlex overflow 로 이 테스트가 깨진다.
     tripStore.rename('t1', '가' * 20);
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     await tester.tap(find.text('가' * 20));
     await tester.pumpAndSettle();
     expect(find.byType(TripHomeScreen), findsOneWidget);
@@ -431,6 +439,7 @@ void main() {
 
   testWidgets('여행 홈: 편집 시트에서 삭제하면 리스트로 돌아가고 사라진다', (tester) async {
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     await tester.tap(find.text('가' * 20)); // 위 테스트에서 이름을 바꾼 미국 여행
     await tester.pumpAndSettle();
 
@@ -547,7 +556,7 @@ void main() {
 
     testWidgets('환율이 없으면 계산을 비활성화한다', (tester) async {
       RateApi.reset();
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({'trip_guide_seen': true});
       addTearDown(() => _loadRates());
       await tester.pumpWidget(
         _wrap(Scaffold(body: QuickConverter(country: countryByCode('JPY')!))),
@@ -778,6 +787,7 @@ void main() {
     view.devicePixelRatio = 2.0;
 
     await tester.pumpWidget(const TripApp());
+    await tester.pumpAndSettle();
     // 화면이 아무리 넓어도 본문은 kPhoneWidth 를 넘지 않는다
     final body = tester.getSize(find.byType(Scaffold).first);
     expect(body.width, lessThanOrEqualTo(kPhoneWidth));
@@ -888,9 +898,9 @@ void main() {
     expect(japan.spentKrw, 414622);
     expect(japan.remainKrw, 785378);
     expect(find.text('414,622원'), findsOneWidget);
-    expect(find.text('¥48,100'), findsNothing);
+    expect(find.text('¥48,100'), findsOneWidget);
     expect(find.text('785,378원'), findsOneWidget);
-    expect(find.text('¥91,111'), findsNothing);
+    expect(find.text('¥91,111'), findsOneWidget);
     expect(find.text('10,344원'), findsWidgets); // 최근 지출도 1200 * 862 ~/ 100.
     final input = find.descendant(
       of: find.byType(QuickConverter),
@@ -944,7 +954,7 @@ void main() {
     await tester.pumpWidget(_wrap(TripHomeScreen(trip: trip)));
     expect(trip.spentKrw, 439);
     expect(RateApi.fromKrw(trip.spentKrw, 'JPY'), 50);
-    expect(find.text('¥50'), findsNothing); // 외화 요약을 반복하지 않는다.
+    expect(find.text('¥50'), findsOneWidget);
     final input = find.descendant(
       of: find.byType(QuickConverter),
       matching: find.byType(TextField),

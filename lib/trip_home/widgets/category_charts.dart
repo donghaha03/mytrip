@@ -27,27 +27,23 @@ class _BudgetProgressPanelState extends State<BudgetProgressPanel> {
       children: [
         Row(
           children: [
-            const Expanded(
-              child: Text(
-                '예산 사용',
-                style: TextStyle(fontSize: 12, color: AppColors.onPrimaryMuted),
-              ),
-            ),
-            Text(
-              summary.available ? '$percent%' : '—',
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.white,
+            Expanded(
+              child: CategoryBudgetBar(
+                trip: widget.trip,
+                height: 8,
+                track: AppColors.progressTrackOnPrimary,
               ),
             ),
             const SizedBox(width: 8),
             Semantics(
+              label: _expanded ? '카테고리별 지출 접기' : '카테고리별 지출 더보기',
               expanded: _expanded,
               child: TextButton.icon(
                 key: const ValueKey('spending-categories-toggle'),
                 onPressed: () => setState(() => _expanded = !_expanded),
                 style: TextButton.styleFrom(
                   minimumSize: const Size(48, 44),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   foregroundColor: AppColors.white,
                 ),
@@ -56,17 +52,16 @@ class _BudgetProgressPanelState extends State<BudgetProgressPanel> {
                   size: 18,
                 ),
                 label: Text(
-                  _expanded ? '접기' : '더보기',
-                  style: const TextStyle(fontSize: 12),
+                  summary.available ? '$percent%' : '—',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.white,
+                  ),
                 ),
               ),
             ),
           ],
-        ),
-        CategoryBudgetBar(
-          trip: widget.trip,
-          height: 8,
-          track: AppColors.progressTrackOnPrimary,
         ),
         if (_expanded)
           Padding(

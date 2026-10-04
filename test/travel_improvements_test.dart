@@ -95,7 +95,7 @@ Future<void> rates() async {
 void main() {
   setUp(() async {
     RateApi.reset();
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'trip_guide_seen': true});
     tripStore.connect(null);
     await rates();
   });
@@ -756,11 +756,11 @@ void main() {
             .widget<Text>(find.text(formatWon(t.remainKrw.abs())))
             .style!
             .fontSize,
-        20,
+        16,
       );
       expect(
         tester.widget<Text>(find.text(formatWon(t.budgetKrw))).style!.fontSize,
-        14,
+        16,
       );
       expect(find.textContaining('하루 '), findsNothing);
       expect(find.textContaining('4박 5일'), findsNothing);

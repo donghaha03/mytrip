@@ -39,10 +39,13 @@ class ExpenseTile extends StatelessWidget {
       child: Row(
         children: [
           Text(e.icon, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 5),
-          Icon(Icons.circle, size: 7, color: categoryColor(e.category)),
+          if (interactive) ...[
+            const SizedBox(width: 5),
+            Icon(Icons.circle, size: 7, color: categoryColor(e.category)),
+          ],
           const SizedBox(width: 12),
           Expanded(
+            flex: interactive ? 1 : 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -56,29 +59,40 @@ class ExpenseTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  '${normalizedCategory(e.category)} · ${showDate ? formatShortDateWithWeekday(e.date) : time}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                if (!interactive)
+                  Text(
+                    '${countryByCode(currency)?.formatForeign(amount) ?? formatNumber(amount.truncate())} $currency'
+                    '${e.status != ExpenseStatus.approved ? ' · ${e.status.label}' : ''}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${e.paymentMethod?.label ?? '결제수단 미지정'}${e.isTaxFree ? ' · 면세' : ''}'
-                  '${e.source == 'demo-card'
-                      ? ' · 테스트'
-                      : e.isImported
-                      ? ' · 자동'
-                      : ''}'
-                  '${e.status != ExpenseStatus.approved ? ' · ${e.status.label}' : ''}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                if (interactive) ...[
+                  Text(
+                    '${normalizedCategory(e.category)} · ${showDate ? formatShortDateWithWeekday(e.date) : time}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${e.paymentMethod?.label ?? '결제수단 미지정'}${e.isTaxFree ? ' · 면세' : ''}'
+                    '${e.source == 'demo-card'
+                        ? ' · 테스트'
+                        : e.isImported
+                        ? ' · 자동'
+                        : ''}'
+                    '${e.status != ExpenseStatus.approved ? ' · ${e.status.label}' : ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -97,15 +111,17 @@ class ExpenseTile extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  '${countryByCode(currency)?.formatForeign(amount) ?? formatNumber(amount.truncate())} $currency',
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                if (interactive) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    '${countryByCode(currency)?.formatForeign(amount) ?? formatNumber(amount.truncate())} $currency',
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

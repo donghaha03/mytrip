@@ -1,7 +1,7 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
+import '../models/country.dart';
+import '../widgets/departure_map.dart';
 import '../widgets/onboarding_example.dart';
 import '../widgets/screen_top_bar.dart';
 import '../theme/app_colors.dart';
@@ -16,10 +16,12 @@ class EmptyHomeScreen extends StatefulWidget {
     this.guideOnly = false,
     this.showGuide = true,
     this.onGuideFinished,
+    this.destination,
   });
   final bool guideOnly;
   final bool showGuide;
   final VoidCallback? onGuideFinished;
+  final Country? destination;
   @override
   State<EmptyHomeScreen> createState() => _EmptyHomeScreenState();
 }
@@ -39,7 +41,7 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
   final _pages = PageController();
   late final _flight = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2200),
+    duration: const Duration(milliseconds: 3200),
   );
   late bool _showGuide = widget.guideOnly || widget.showGuide;
   bool _departing = false;
@@ -79,10 +81,11 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
 
   Future<void> _depart() async {
     if (_departing || !mounted) return;
+    Tooltip.dismissAllToolTips();
     setState(() => _departing = true);
     _flight.duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : const Duration(milliseconds: 2200);
+        : const Duration(milliseconds: 3200);
     try {
       await _flight.forward(from: 0).orCancel;
     } on TickerCanceled {
@@ -201,84 +204,38 @@ class _EmptyHomeScreenState extends State<EmptyHomeScreen>
               Positioned.fill(
                 child: ColoredBox(
                   color: AppColors.primarySoft,
-                  child: AnimatedBuilder(
-                    animation: _flight,
-                    builder: (context, _) => Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              height: 180,
-                              child: LayoutBuilder(
-                                builder: (_, constraints) {
-                                  final size = Size(constraints.maxWidth, 180);
-                                  final path = _flightPath(
-                                    size,
-                                  ).computeMetrics().single;
-                                  final progress = const Interval(
-                                    .25,
-                                    .75,
-                                    curve: Curves.easeInOutCubic,
-                                  ).transform(_flight.value);
-                                  final point = path.getTangentForOffset(
-                                    path.length * progress,
-                                  )!;
-                                  return Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      const Positioned(
-                                        left: 24,
-                                        top: 16,
-                                        child: Icon(
-                                          Icons.cloud_outlined,
-                                          size: 44,
-                                          color: AppColors.white,
-                                        ),
-                                      ),
-                                      const Positioned(
-                                        right: 28,
-                                        bottom: 28,
-                                        child: Icon(
-                                          Icons.cloud_outlined,
-                                          size: 36,
-                                          color: AppColors.white,
-                                        ),
-                                      ),
-                                      Positioned.fill(
-                                        child: CustomPaint(
-                                          painter: _FlightPathPainter(),
-                                        ),
-                                      ),
-                                      Positioned(
-                                        left: point.position.dx - 22,
-                                        top: point.position.dy - 22,
-                                        child: Transform.rotate(
-                                          angle: point.angle + math.pi / 2,
-                                          child: const Icon(
-                                            Icons.flight_rounded,
-                                            size: 44,
-                                            color: AppColors.primary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          DepartureMap(
+                            destination:
+                                widget.destination ?? kPrimaryCountries[1],
+                            animation: _flight,
+                          ),
+                          const SizedBox(height: 24),
+                          const Text(
+                            '여행을 준비하러 출발해요',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
                             ),
-                            const SizedBox(height: 24),
-                            const Text(
-                              '여행을 준비하러 출발해요',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                              ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.destination?.code == 'KR'
+                                ? '대한민국 여행'
+                                : '한국 → ${widget.destination?.name ?? '일본'}${widget.destination == null ? ' · 여행 예시' : ''}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
