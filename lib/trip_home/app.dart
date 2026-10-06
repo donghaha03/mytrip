@@ -15,9 +15,11 @@ import '../api/api.dart';
 import 'services/session.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
+import 'receipts/receipt_platform.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(recoverReceiptCamera().catchError((Object _) {}));
 
   // 기본은 DB 없이 샘플 데이터로 화면을 확인한다.
   if (await Backend.init() == BackendMode.firebase) {

@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: server/receipt
+      - run: node --test server/receipt/remote.test.mjs
+      - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: server/card
       - run: npm test
         working-directory: server/card

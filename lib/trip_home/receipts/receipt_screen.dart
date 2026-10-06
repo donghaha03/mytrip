@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_colors.dart';
 import '../widgets/screen_top_bar.dart';
@@ -10,15 +11,24 @@ import '../models/country.dart';
 import '../models/trip.dart';
 import 'receipt_draft.dart';
 import 'receipt_platform.dart';
+import 'receipt_client.dart';
 
 class ReceiptScreen extends StatefulWidget {
-  const ReceiptScreen({super.key});
+  const ReceiptScreen({super.key, this.client});
+  final ReceiptClient? client;
   @override
   State<ReceiptScreen> createState() => _ReceiptScreenState();
 }
 
 class _ReceiptScreenState extends State<ReceiptScreen> {
+  late final _client = widget.client ?? ReceiptClient();
+  final _accessCode = TextEditingController();
+  ReceiptConnection? _connection;
+  ReceiptDraft? _draft;
+  String? _imageData;
+  Uint8List? _image;
   String? _error;
+  bool _configured = false, _busy = false, _consented = false;
   @override
   void initState() {
     super.initState();
@@ -28,42 +38,132 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   @override
   void dispose() {
     closeReceiptCamera();
+    _client.close();
+    _accessCode.dispose();
     super.dispose();
   }
 
-  Future<void> _capture() async {
-    setState(() => _error = null);
+  Future<void> _connect() async {
+    _connection = await _client.connection(
+      localRuntime: getReceiptRuntime(),
+      configUrl: receiptConfigUrl,
+    );
+    _configured = true;
+  }
+
+  Future<void> _review(ReceiptDraft draft) async {
+    final result = await Navigator.of(context).push<ReceiptDraft>(
+      MaterialPageRoute(
+        builder: (_) => ReceiptReviewScreen(draft: draft, image: _image!),
+      ),
+    );
+    if (mounted && result != null) Navigator.of(context).pop(result);
+  }
+
+  Future<void> _capture({bool gallery = false}) async {
+    if (_busy) return;
+    setState(() {
+      _error = null;
+      _busy = true;
+    });
     try {
-      final raw = await openReceiptCamera();
+      if (!_configured) {
+        try {
+          await _connect();
+        } on ReceiptConnectionException catch (error) {
+          _error = error.message;
+        }
+      }
+      if (!mounted) return;
+      final raw = await openReceiptCamera(
+        captureOnly: !_configured || _connection != null,
+        gallery: gallery,
+      );
       if (!mounted) return;
       if (raw == null) {
-        Navigator.of(context).pop();
+        if (_image == null) Navigator.of(context).pop();
         return;
       }
       final data = jsonDecode(raw) as Map<String, dynamic>;
-      final draft = data['draft'] is Map<String, dynamic>
-          ? ReceiptDraft.fromLlm(data['draft'] as Map<String, dynamic>)
-          : ReceiptDraft.parse(
-              data['text'] as String,
-              confidence: (data['confidence'] as num).toDouble(),
-            );
-      final result = await Navigator.of(context).push<ReceiptDraft>(
-        MaterialPageRoute(
-          builder: (_) => ReceiptReviewScreen(
-            draft: draft,
-            image: base64Decode((data['image'] as String).split(',').last),
-          ),
-        ),
-      );
-      if (mounted) Navigator.of(context).pop(result);
+      final image = data['image'] as String;
+      if (image.length > 12000000 || !image.startsWith('data:image/')) {
+        throw const FormatException();
+      }
+      setState(() {
+        _imageData = image;
+        _image = base64Decode(image.split(',').last);
+        _consented = false;
+        _draft = null;
+      });
+      if (_configured && _connection == null && data['text'] is String) {
+        _draft = ReceiptDraft.parse(
+          data['text'] as String,
+          confidence: (data['confidence'] as num).toDouble(),
+        );
+        await _review(_draft!);
+      } else if (_connection == null) {
+        setState(
+          () => _error ??=
+              'LLM 영수증 서버가 아직 연결되지 않았어요. 서버 설정 후 재시도하거나 수동으로 입력해주세요.',
+        );
+      }
     } catch (error) {
       if (mounted) {
         setState(
-          () => _error = error is PlatformException
-              ? error.message ?? '인식하지 못했어요. 다시 시도하거나 수동으로 입력해주세요.'
-              : '영수증 인식을 시작하지 못했어요. 카메라 권한을 확인하거나 수동으로 입력해주세요.',
+          () => _error = error is ReceiptConnectionException
+              ? error.message
+              : error is PlatformException
+              ? error.message ?? '촬영하지 못했어요. 권한을 확인하거나 사진을 선택해주세요.'
+              : '사진을 열지 못했어요. 다시 촬영하거나 사진 선택·수동 입력을 이용해주세요.',
         );
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _recognize() async {
+    if (_busy || _imageData == null) return;
+    if (_draft != null) {
+      setState(() => _busy = true);
+      try {
+        await _review(_draft!);
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+      return;
+    }
+    if (!_consented) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      if (_connection == null) await _connect();
+      if (_connection == null) {
+        throw const ReceiptConnectionException(
+          'LLM 영수증 서버가 아직 연결되지 않았어요. 서버 설정 후 재시도하거나 수동으로 입력해주세요.',
+        );
+      }
+      final draft = await _client.recognize(
+        _connection!,
+        _imageData!,
+        accessCode: _accessCode.text.trim(),
+      );
+      if (mounted) {
+        setState(() => _draft = draft);
+        await _review(draft);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error = error is ReceiptConnectionException
+              ? error.message
+              : '인식하지 못했어요. 다시 시도하거나 수동으로 입력해주세요.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -72,29 +172,114 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     body: SafeArea(
       child: Column(
         children: [
-          const ScreenTopBar(title: '영수증 촬영'),
+          ScreenTopBar(title: _image == null ? '영수증 촬영' : '영수증 사진 확인'),
           Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: _error == null
-                    ? const Text('영수증 촬영 화면을 열고 있어요…')
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(_error!),
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            onPressed: _capture,
-                            child: const Text('다시 시도'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('수동 입력으로 돌아가기'),
-                          ),
-                        ],
+            child: ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                if (_image != null) ...[
+                  Image.memory(
+                    _image!,
+                    height: MediaQuery.sizeOf(context).height * .38,
+                    fit: BoxFit.contain,
+                    semanticLabel: '촬영한 영수증 원본',
+                  ),
+                  const SizedBox(height: 16),
+                  if (_draft == null) ...[
+                    const Text('사진 전체를 OpenAI로 보내 내용을 읽어요. 인식 후 직접 확인하고 저장해요.'),
+                    TextButton(
+                      onPressed: () => launchUrl(
+                        Uri.parse(
+                          'https://developers.openai.com/api/docs/guides/your-data',
+                        ),
+                        mode: LaunchMode.externalApplication,
                       ),
-              ),
+                      child: const Text('OpenAI 데이터 보관 정책'),
+                    ),
+                    if (_connection?.needsAccessCode == true)
+                      TextField(
+                        controller: _accessCode,
+                        obscureText: true,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        enabled: !_busy,
+                        decoration: const InputDecoration(
+                          labelText: '접속 코드',
+                          helperText: '서버 관리자가 공유한 코드예요. API 키는 입력하지 마세요.',
+                          helperMaxLines: 2,
+                        ),
+                      ),
+                    if (_connection?.csrf != null)
+                      TextButton(
+                        onPressed: () => launchUrl(
+                          _connection!.url.resolve('/receipt-connect'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        child: const Text('ChatGPT 연결 관리'),
+                      ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _consented,
+                      title: const Text('이 사진을 OpenAI로 보내는 데 동의해요'),
+                      onChanged: _busy
+                          ? null
+                          : (value) =>
+                                setState(() => _consented = value ?? false),
+                    ),
+                  ],
+                ],
+                if (_busy) ...[
+                  const Center(child: CircularProgressIndicator()),
+                  const SizedBox(height: 12),
+                  Text(
+                    _image == null ? '영수증 촬영 화면을 열고 있어요…' : '영수증 사진을 읽고 있어요…',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.danger),
+                    ),
+                  ),
+                if (_image != null)
+                  FilledButton(
+                    onPressed: !_busy && (_draft != null || _consented)
+                        ? _recognize
+                        : null,
+                    child: Text(
+                      _draft != null
+                          ? '인식한 내용 확인'
+                          : _error == null
+                          ? '이 사진으로 인식'
+                          : '인식 재시도',
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _busy ? null : _capture,
+                        child: Text(_image == null ? '촬영 다시 시도' : '재촬영'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _busy ? null : () => _capture(gallery: true),
+                        child: const Text('사진 선택'),
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('수동 입력으로 돌아가기'),
+                ),
+              ],
             ),
           ),
         ],

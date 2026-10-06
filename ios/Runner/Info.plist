@@ -27,7 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>영수증을 촬영해 지출 내용을 입력하기 위해 카메라를 사용해요. 사진은 기기 안에서 인식해요.</string>
+	<string>영수증을 촬영해 지출 내용을 입력하기 위해 카메라를 사용해요. 외부 인식을 사용하면 사진 전송 전에 동의를 받아요.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>선택한 영수증 사진으로 지출 내용을 입력해요.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

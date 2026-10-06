@@ -24,7 +24,9 @@ import VisionKit
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }
       switch call.method {
-      case "open": self.receipt.open(result)
+      case "open":
+        let options = call.arguments as? [String: Any]
+        self.receipt.open(result, captureOnly: options?["captureOnly"] as? Bool ?? false)
       case "close": self.receipt.close(); result(nil)
       default: result(FlutterMethodNotImplemented)
       }
@@ -32,11 +34,12 @@ import VisionKit
   }
 }
 
-/// Apple's scanner handles receipt edges and retakes; Vision stays on-device.
+/// Apple's scanner handles receipt edges and retakes. Configured LLM mode returns only the photo.
 private final class ReceiptBridge: NSObject,
   VNDocumentCameraViewControllerDelegate, PHPickerViewControllerDelegate {
   private var completion: FlutterResult?
   private var session: UUID?
+  private var captureOnly = false
   private weak var presented: UIViewController?
 
   private var presenter: UIViewController? {
@@ -48,7 +51,7 @@ private final class ReceiptBridge: NSObject,
     return controller
   }
 
-  func open(_ result: @escaping FlutterResult) {
+  func open(_ result: @escaping FlutterResult, captureOnly: Bool) {
     guard completion == nil else {
       result(FlutterError(code: "busy", message: "이미 영수증을 인식하고 있어요.", details: nil))
       return
@@ -58,9 +61,10 @@ private final class ReceiptBridge: NSObject,
       return
     }
     completion = result
+    self.captureOnly = captureOnly
     session = UUID()
     let token = session
-    let sheet = UIAlertController(title: "영수증 추가", message: "기기에서 인식한 뒤 내용을 확인해요.", preferredStyle: .actionSheet)
+    let sheet = UIAlertController(title: "영수증 추가", message: "영수증 전체가 보이게 촬영해주세요.", preferredStyle: .actionSheet)
     sheet.addAction(UIAlertAction(title: "영수증 촬영", style: .default) { [weak self, weak sheet] _ in
       guard self?.session == token else { return }
       sheet?.dismiss(animated: true) { self?.startCamera(token) }
@@ -162,10 +166,11 @@ private final class ReceiptBridge: NSObject,
 
   private func recognize(_ image: UIImage) {
     guard let token = session else { return }
+    let photoOnly = captureOnly
     DispatchQueue.global(qos: .userInitiated).async {
       do {
         // Normalize orientation and bound memory, without a square crop.
-        let scale = min(1, 2500 / max(image.size.width, image.size.height))
+        let scale = min(1, 2000 / max(image.size.width, image.size.height))
         let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
@@ -173,24 +178,24 @@ private final class ReceiptBridge: NSObject,
           image.draw(in: CGRect(origin: .zero, size: size))
         }
         guard let cgImage = normalized.cgImage,
-              let jpeg = normalized.jpegData(compressionQuality: 0.92) else {
+              let jpeg = normalized.jpegData(compressionQuality: 0.95) else {
           throw NSError(domain: "Receipt", code: 1)
         }
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        let supported = try request.supportedRecognitionLanguages()
-        request.recognitionLanguages = ["ko-KR", "en-US", "ja-JP", "zh-Hans"]
-          .filter { supported.contains($0) }
-        if #available(iOS 16.0, *) { request.automaticallyDetectsLanguage = true }
-        try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
-        let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first }
-        guard !lines.isEmpty else { throw NSError(domain: "Receipt", code: 2) }
-        let payload: [String: Any] = [
-          "text": lines.map { $0.string }.joined(separator: "\n"),
-          "confidence": Double(lines.map { $0.confidence }.reduce(0, +)) / Double(lines.count) * 100,
-          "image": "data:image/jpeg;base64," + jpeg.base64EncodedString(),
-        ]
+        var payload: [String: Any] = ["image": "data:image/jpeg;base64," + jpeg.base64EncodedString()]
+        if !photoOnly {
+          let request = VNRecognizeTextRequest()
+          request.recognitionLevel = .accurate
+          request.usesLanguageCorrection = true
+          let supported = try request.supportedRecognitionLanguages()
+          request.recognitionLanguages = ["ko-KR", "en-US", "ja-JP", "zh-Hans"]
+            .filter { supported.contains($0) }
+          if #available(iOS 16.0, *) { request.automaticallyDetectsLanguage = true }
+          try VNImageRequestHandler(cgImage: cgImage, options: [:]).perform([request])
+          let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first }
+          guard !lines.isEmpty else { throw NSError(domain: "Receipt", code: 2) }
+          payload["text"] = lines.map { $0.string }.joined(separator: "\n")
+          payload["confidence"] = Double(lines.map { $0.confidence }.reduce(0, +)) / Double(lines.count) * 100
+        }
         let json = try JSONSerialization.data(withJSONObject: payload)
         DispatchQueue.main.async {
           guard self.session == token else { return }

@@ -79,13 +79,13 @@ test('right swipe closes the receipt camera, while short, left and vertical drag
   up({ pointerId: 1, clientX: 230, clientY: 210 });
   assert.equal(await result, null); assert.equal(env.counters().stopCount, 1);
 });
-test('receipt UI uses bundled app fonts and keeps device-language settings out of primary LLM controls', async () => {
+test('receipt UI uses bundled app fonts and keeps language settings out of capture-only controls', async () => {
   for (const llm of [false, true]) {
     const env = environment({ llm }); const result = env.window.mytripReceipt.open();
-    assert.equal((env.dialog.innerHTML.match(/id="receipt-language"/g) ?? []).length, 1);
+    assert.equal((env.dialog.innerHTML.match(/id="receipt-language"/g) ?? []).length, llm ? 0 : 1);
     assert.match(env.dialog.innerHTML, /https:\/\/test\.invalid\/mytrip\/assets\/assets\/fonts\/Pretendard-Regular\.otf/);
     assert.doesNotMatch(env.dialog.innerHTML, /JPEG|정사각형|写真/);
-    const primary = env.dialog.innerHTML.split('id="receipt-recognition"')[1].split('id="receipt-llm"')[0];
+    const primary = env.dialog.innerHTML.split('id="receipt-recognition"')[1];
     assert.equal(primary.includes('id="receipt-language"'), !llm);
     env.window.mytripReceipt.close(); assert.equal(await result, null);
   }
@@ -161,45 +161,27 @@ test('close during OCR initialization cleans up the late worker', async () => {
   assert.equal(await result, null); assert.equal(env.counters().terminateCount, 1);
 });
 
-test('local primary recognition sends current photo to LLM once and returns review data', async () => {
-  const pending = deferred(); let calls = 0, request;
-  const draft = { merchant: 'TEST CAFE', date: null, amount: 7600, currency: 'KRW', items: [], warnings: ['날짜 확인 필요'] };
-  const env = environment({ llm: true, fetchReceipt: async (url, options) => {
-    calls++; request = { url, options }; return pending.promise;
-  } });
-  const { result } = await captured(env);
-  const running = env.element('#receipt-ocr').onclick();
-  await env.element('#receipt-ocr').onclick(); assert.equal(calls, 1);
-  assert.equal(request.url, '/receipt/recognize');
-  assert.equal(request.options.headers['X-mytrip-csrf'], 'test-csrf');
-  assert.equal(JSON.parse(request.options.body).image, 'data:image/jpeg;base64,dGVzdA==');
-  assert.equal(env.options(), undefined); // no automatic device OCR
-  pending.resolve({ ok: true, json: async () => ({ draft }) }); await running;
-  const data = JSON.parse(await result); assert.deepEqual(data.draft, draft);
-  assert.equal(data.image, 'data:image/jpeg;base64,dGVzdA==');
-  assert.equal(data.text, undefined);
-});
-test('LLM failure retains photo, re-enables retry and never falls back silently', async () => {
-  let calls = 0;
-  const env = environment({ llm: true, fetchReceipt: async () => { calls++; return { ok: false, json: async () => ({ error: 'ChatGPT 로그인이 필요합니다' }) }; } });
-  const { result } = await captured(env);
-  await env.element('#receipt-ocr').onclick();
-  assert.match(env.element('.error').textContent, /로그인/);
-  assert.equal(env.element('img').hidden, false); assert.equal(env.element('#receipt-ocr').disabled, false);
-  await env.element('#receipt-ocr').onclick(); assert.equal(calls, 2); assert.equal(env.options(), undefined);
-  env.window.mytripReceipt.close(); assert.equal(await result, null);
-});
-test('LLM close and timeout abort network request without accepting late results', async () => {
-  for (const close of [true, false]) {
-    let signal;
-    const env = environment({ llm: true, fetchReceipt: async (_url, options) => {
-      signal = options.signal;
-      return new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
-    } });
-    const { result } = await captured(env); const running = env.element('#receipt-ocr').onclick();
-    if (close) env.window.mytripReceipt.close(); else env.timers.get(1)();
-    await running; assert.equal(signal.aborted, true);
-    if (!close) { assert.match(env.element('.error').textContent, /시간이 초과/); env.window.mytripReceipt.close(); }
-    assert.equal(await result, null);
+test('local and public LLM modes only return the photo to Flutter, without uploads or OCR', async () => {
+  for (const llm of [true, false]) {
+    let calls = 0;
+    const env = environment({ llm, fetchReceipt: async () => { calls++; throw new Error('must not upload before Flutter consent'); } });
+    const result = env.window.mytripReceipt.open(true);
+    await env.element('#receipt-start').onclick(); env.element('#receipt-shot').onclick();
+    assert.match(env.dialog.innerHTML, /사진 사용/);
+    env.element('#receipt-ocr').onclick(); env.element('#receipt-ocr').onclick();
+    assert.deepEqual(JSON.parse(await result), { image: 'data:image/jpeg;base64,dGVzdA==' });
+    assert.equal(calls, 0); assert.equal(env.options(), undefined);
   }
+});
+
+test('local runtime exposes only the endpoint and CSRF value, not OpenAI credentials', () => {
+  const env = environment({ llm: true });
+  assert.deepEqual(JSON.parse(env.window.mytripReceipt.connection()), { url: 'https://test.invalid/receipt/recognize', csrf: 'test-csrf' });
+  assert.equal(environment().window.mytripReceipt.connection(), null);
+});
+
+test('cancelling the LLM photo workflow sends no photo and releases the camera', async () => {
+  const env = environment({ llm: true }); const { result } = await captured(env);
+  env.window.mytripReceipt.close();
+  assert.equal(await result, null); assert.equal(env.counters().stopCount, 1); assert.equal(env.options(), undefined);
 });

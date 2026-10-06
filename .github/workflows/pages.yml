@@ -49,6 +49,11 @@ jobs:
           echo "base-href: $BASE"
           flutter build web --release --no-wasm-dry-run --base-href "$BASE"
 
+      - name: Configure receipt server
+        run: node tool/configure_receipts.mjs
+        env:
+          RECEIPT_SERVER_URL: ${{ vars.RECEIPT_SERVER_URL }}
+
       # 실패하면 배포를 중단하므로 마지막 정상 환율과 앱이 그대로 남는다.
       - name: Update daily rates
         run: node tool/update_rates.mjs

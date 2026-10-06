@@ -1,4 +1,4 @@
-/* Device OCR stays local. The optional local runtime sends images to OpenAI. */
+/* Capture only when configured. Flutter owns the shared LLM request/review flow. */
 (() => {
   let active;
   const base = new URL('ocr/', document.baseURI);
@@ -11,8 +11,13 @@
   const stop = (stream) => stream?.getTracks().forEach((track) => track.stop());
   const supportsCamera = () => !!navigator.mediaDevices?.getUserMedia && window.isSecureContext;
   window.mytripReceipt = {
+    connection: () => window.mytripReceiptLLM ? JSON.stringify({
+      url: new URL('/receipt/recognize', document.baseURI).href,
+      csrf: window.mytripReceiptLLM.csrf,
+    }) : null,
     close: () => active?.finish(null),
-    open: () => new Promise((resolve, reject) => {
+    open: (captureOnly = false) => new Promise((resolve, reject) => {
+      captureOnly = captureOnly || !!window.mytripReceiptLLM;
       if (active) { reject(new Error('이미 영수증 촬영 화면이 열려 있어요')); return; }
       const previousFocus = document.activeElement;
       const dialog = document.createElement('dialog');
@@ -31,14 +36,13 @@
         <p id="receipt-status" role="status" aria-live="polite"></p><p class="error" role="alert"></p>
         <div class="actions"><button class="primary" id="receipt-start">카메라 시작</button><button class="primary" id="receipt-shot" hidden>촬영</button><button id="receipt-retake" hidden>재촬영</button><button id="receipt-choose">사진 선택</button></div>
         <input id="receipt-file" hidden type="file" accept="image/jpeg,image/png,image/webp" aria-label="영수증 사진">
-        <div id="receipt-recognition" hidden>${window.mytripReceiptLLM ? '' : language}
-        <progress hidden max="1" value="0" aria-label="영수증 인식 진행률"></progress><div class="actions"><button class="primary" id="receipt-ocr">이 사진으로 인식</button></div></div>
-        <div id="receipt-llm" hidden><p class="note">사진을 OpenAI로 보내 인식해요. 검토 후에만 적용됩니다.</p><p><a href="/receipt-connect" target="_blank" rel="noopener">ChatGPT 연결 관리</a></p><details><summary>기기에서 인식</summary>${window.mytripReceiptLLM ? language : ''}<div class="actions"><button id="receipt-ai">기기에서 인식</button></div><p class="note">사진은 기기에서만 처리해요.</p></details></div>
-        ${window.mytripReceiptLLM ? '' : '<p class="note">사진은 기기에서만 인식해요.</p>'}`;
+        <div id="receipt-recognition" hidden>${captureOnly ? '' : language}
+        <progress hidden max="1" value="0" aria-label="영수증 인식 진행률"></progress><div class="actions"><button class="primary" id="receipt-ocr">${captureOnly ? '사진 사용' : '이 사진으로 인식'}</button></div></div>
+        ${captureOnly ? '' : '<p class="note">사진은 기기에서만 인식해요.</p>'}`;
       document.body.append(dialog);
       const $ = (selector) => dialog.querySelector(selector);
       const video = $('video'), image = $('img'), status = $('#receipt-status'), error = $('.error');
-      let stream, worker, pixels, controller, closed = false, busy = false, generation = 0;
+      let stream, worker, pixels, closed = false, busy = false, generation = 0;
       const cleanupCamera = () => { stop(stream); stream = undefined; video.srcObject = null; };
       const setBusy = (value) => {
         busy = value;
@@ -47,7 +51,7 @@
       const finish = (value) => {
         if (closed) return;
         closed = true;
-        generation++; controller?.abort();
+        generation++;
         cleanupCamera();
         worker?.terminate();
         window.removeEventListener('pagehide', onHide);
@@ -92,7 +96,6 @@
         video.hidden = true; $('.frame').hidden = false; $('.guide').hidden = true;
         $('#receipt-shot').hidden = true; $('#receipt-start').hidden = true;
         $('#receipt-retake').hidden = false; $('#receipt-recognition').hidden = false;
-        $('#receipt-llm').hidden = !window.mytripReceiptLLM;
         status.textContent = '사진을 확인해주세요.';
       };
       const camera = async () => {
@@ -106,7 +109,6 @@
           stream = candidate; video.srcObject = stream; video.hidden = false;
           image.hidden = true; $('.frame').hidden = false; $('.guide').hidden = false;
           $('#receipt-recognition').hidden = true; $('#receipt-shot').hidden = false;
-          $('#receipt-llm').hidden = true;
           $('#receipt-start').hidden = true; $('#receipt-retake').hidden = true;
           await video.play(); fitFrame(video.videoWidth, video.videoHeight); status.textContent = '';
         } catch (e) { cleanupCamera(); if (!closed) { error.textContent = message(e); status.textContent = ''; $('#receipt-start').hidden = false; } }
@@ -141,29 +143,6 @@
         } catch { if (!closed) error.textContent = '사진을 열지 못했어요. 다른 사진을 선택하거나 수동으로 입력해주세요.'; }
         finally { URL.revokeObjectURL(url); if (!closed) setBusy(false); }
       };
-      const recognizeWithLLM = async () => {
-        if (busy || !pixels || !window.mytripReceiptLLM) return;
-        setBusy(true); error.textContent = ''; status.textContent = 'ChatGPT에서 영수증 사진을 읽고 있어요…';
-        controller = new AbortController(); const current = controller;
-        const attempt = ++generation;
-        const timer = setTimeout(() => current.abort(), 90000);
-        try {
-          const response = await fetch('/receipt/recognize', {
-            method: 'POST', signal: current.signal,
-            headers: { 'Content-Type': 'application/json', 'X-mytrip-csrf': window.mytripReceiptLLM.csrf },
-            body: JSON.stringify({ image: pixels }),
-          });
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || '인식하지 못했어요.');
-          if (!result.draft || !Array.isArray(result.draft.items) || !Array.isArray(result.draft.warnings)) throw new Error('인식 결과가 올바르지 않아요.');
-          if (!closed && attempt === generation) finish({ image: pixels, draft: result.draft });
-        } catch (e) {
-          if (!closed && attempt === generation) {
-            error.textContent = e.name === 'AbortError' ? '인식 시간이 초과됐어요. 다시 시도하거나 수동으로 입력해주세요.' : e.message;
-            status.textContent = ''; $('#receipt-ocr').textContent = '인식 재시도';
-          }
-        } finally { clearTimeout(timer); if (controller === current) controller = undefined; if (!closed) setBusy(false); }
-      };
       const recognizeOnDevice = async () => {
         if (busy || !pixels) return;
         setBusy(true); error.textContent = ''; $('progress').hidden = false;
@@ -194,12 +173,13 @@
           if (!closed) {
             error.textContent = e.message === 'timeout' ? '인식 시간이 초과됐어요. 다시 시도하거나 수동으로 입력해주세요.' :
               '영수증을 인식하지 못했어요. 다시 촬영하거나 인식을 재시도해주세요.';
-            status.textContent = ''; $(window.mytripReceiptLLM ? '#receipt-ai' : '#receipt-ocr').textContent = window.mytripReceiptLLM ? '기기 인식 재시도' : '인식 재시도';
+            status.textContent = ''; $('#receipt-ocr').textContent = '인식 재시도';
           }
         } finally { clearTimeout(timer); if (!closed) { setBusy(false); $('progress').hidden = true; } }
       };
-      $('#receipt-ocr').onclick = window.mytripReceiptLLM ? recognizeWithLLM : recognizeOnDevice;
-      $('#receipt-ai').onclick = recognizeOnDevice;
+      $('#receipt-ocr').onclick = captureOnly ? () => {
+        if (!busy && pixels) finish({ image: pixels });
+      } : recognizeOnDevice;
       dialog.showModal(); $('#receipt-start').focus();
     }),
   };
