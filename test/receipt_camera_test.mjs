@@ -6,6 +6,19 @@ import vm from 'node:vm';
 import test from 'node:test';
 
 const source = await readFile(new URL('../web/receipt.js', import.meta.url), 'utf8');
+test('a new release loads matching receipt and Flutter scripts instead of cached app code', async () => {
+  const index = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
+  const bootstrap = await readFile(new URL('../web/flutter_bootstrap.js', import.meta.url), 'utf8');
+  assert.match(index, /receipt\.js\?v=\{\{flutter_service_worker_version\}\}/);
+  assert.match(index, /\{\{flutter_bootstrap_js\}\}/);
+  let loaded = 0;
+  const config = { builds: [{ mainJsPath: 'main.dart.js' }, { mainWasmPath: 'main.dart.wasm' }] };
+  const executable = bootstrap.replace('{{flutter_js}}', '').replace('{{flutter_build_config}}', '').replaceAll('{{flutter_service_worker_version}}', 'release-2');
+  vm.runInNewContext(executable, { _flutter: { buildConfig: config, loader: { load: () => loaded++ } } });
+  assert.equal(config.builds[0].mainJsPath, 'main.dart.js?v=release-2');
+  assert.equal(config.builds[1].mainWasmPath, 'main.dart.wasm');
+  assert.equal(loaded, 1);
+});
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 function environment({ cameraError, noCamera = false, secure = true, mediaPromise, workerPromise, workerError, width = 100, height = 200, llm = false, fetchReceipt } = {}) {
   const elements = new Map(); const callbacks = new Map(); const timers = new Map();
