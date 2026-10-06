@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'receipt_draft.dart';
+import 'receipt_consent.dart';
 
 class ReceiptConnection {
   const ReceiptConnection(this.url, {this.csrf, this.provider = 'openai'});
@@ -11,7 +12,7 @@ class ReceiptConnection {
   final String? csrf;
   final String provider;
   bool get isGemini => provider == 'gemini';
-  bool get needsAccessCode => csrf == null;
+  bool get needsAccessCode => csrf == null && !isGemini;
 }
 
 class ReceiptConnectionException implements Exception {
@@ -116,6 +117,9 @@ class ReceiptClient {
     }
     _busy = true;
     try {
+      if (connection.isGemini && await receiptConsent(connection.url) != true) {
+        throw const ReceiptConnectionException('사진 전송에 먼저 동의해주세요.');
+      }
       final response = await _client
           .post(
             connection.url,
@@ -124,13 +128,15 @@ class ReceiptClient {
               if (connection.csrf != null) 'X-mytrip-csrf': connection.csrf!,
               if (connection.needsAccessCode)
                 'Authorization': 'Bearer $accessCode',
+              if (connection.isGemini)
+                'X-Receipt-Consent': receiptConsentVersion,
             },
             body: jsonEncode({'image': image}),
           )
           .timeout(const Duration(seconds: 90));
       if (response.statusCode != 200) {
         throw ReceiptConnectionException(switch (response.statusCode) {
-          401 => '접속 코드를 확인해주세요.',
+          401 => connection.isGemini ? '사진 전송 동의를 확인해주세요.' : '접속 코드를 확인해주세요.',
           403 => '영수증 서버의 연결 권한을 확인해주세요.',
           413 => '사진이 너무 커요. 다시 촬영해주세요.',
           429 => '인식 요청이 많거나 사용 한도에 도달했어요. 잠시 후 다시 시도해주세요.',

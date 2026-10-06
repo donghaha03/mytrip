@@ -167,7 +167,7 @@ test('local and public LLM modes only return the photo to Flutter, without uploa
     const env = environment({ llm, fetchReceipt: async () => { calls++; throw new Error('must not upload before Flutter consent'); } });
     const result = env.window.mytripReceipt.open(true);
     await env.element('#receipt-start').onclick(); env.element('#receipt-shot').onclick();
-    assert.match(env.dialog.innerHTML, /사진 사용/);
+    assert.match(env.dialog.innerHTML, /인식하기/);
     env.element('#receipt-ocr').onclick(); env.element('#receipt-ocr').onclick();
     assert.deepEqual(JSON.parse(await result), { image: 'data:image/jpeg;base64,dGVzdA==' });
     assert.equal(calls, 0); assert.equal(env.options(), undefined);

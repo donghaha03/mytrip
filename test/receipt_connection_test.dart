@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tripapp/trip_home/receipts/receipt_consent.dart';
 import 'package:tripapp/trip_home/receipts/receipt_client.dart';
 import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
 import 'package:tripapp/trip_home/receipts/receipt_platform_native.dart';
@@ -31,6 +33,11 @@ final configUrl = Uri.parse(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(
+    () => SharedPreferences.setMockInitialValues({
+      receiptConsentKey(Uri.parse('https://receipt.example.invalid')): true,
+    }),
+  );
   test(
     'Gemini provider is shared by native/web configuration and unknown providers are rejected',
     () async {
@@ -112,6 +119,7 @@ void main() {
       final public = await client.connection(
         configUrl: configUrl,
         serverUrl: 'https://receipt.example.invalid',
+        provider: 'openai',
       );
       final local = await client.connection(
         configUrl: configUrl,
@@ -157,6 +165,7 @@ void main() {
       final connection = await client.connection(
         configUrl: configUrl,
         serverUrl: 'https://receipt.example.invalid',
+        provider: 'openai',
       );
       await expectLater(
         client.recognize(
@@ -191,6 +200,7 @@ void main() {
     final connection = await client.connection(
       configUrl: configUrl,
       serverUrl: 'https://receipt.example.invalid',
+      provider: 'openai',
     );
     final first = client.recognize(connection!, tinyImage, accessCode: code);
     await Future<void>.delayed(Duration.zero);
@@ -227,9 +237,10 @@ void main() {
   );
 
   testWidgets(
-    'iPhone photo needs consent; failure retains photo and review cancel does not save',
+    'iPhone asks once before camera; no code, automatic inference, retained photo and cached review',
     (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      SharedPreferences.setMockInitialValues({});
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final image =
           'data:image/png;base64,${base64Encode(File('test/fixtures/receipt_en.png').readAsBytesSync())}';
@@ -282,17 +293,15 @@ void main() {
       await tester.tap(find.text('촬영 열기'));
       await tester.pumpAndSettle();
       expect(posts, 0);
-      expect(find.text('영수증 사진 확인'), findsOneWidget);
-      expect(find.text('Google 데이터 처리·보관 정책'), findsOneWidget);
-      expect(find.text('OpenAI 데이터 보관 정책'), findsNothing);
-      await tester.enterText(find.byType(TextField), code);
+      expect(find.text('영수증 인식 안내'), findsOneWidget);
+      expect(find.text('접속 코드'), findsNothing);
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('이 사진으로 인식'));
-      await tester.tap(find.text('이 사진으로 인식'));
+      await tester.ensureVisible(find.text('동의하고 시작하기'));
+      await tester.tap(find.text('동의하고 시작하기'));
       await tester.pumpAndSettle();
       expect(posts, 1);
-      expect(find.text('접속 코드를 확인해주세요.'), findsOneWidget);
+      expect(find.text('사진 전송 동의를 확인해주세요.'), findsOneWidget);
       expect(find.byType(Image), findsOneWidget);
       fail = false;
       await tester.ensureVisible(find.text('인식 재시도'));
@@ -305,12 +314,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('영수증 사진 확인'), findsOneWidget);
       expect(saved, isNull);
+      await tester.ensureVisible(find.text('재촬영'));
+      await tester.tap(find.text('재촬영'));
+      await tester.pumpAndSettle();
+      expect(posts, 3);
+      expect(find.text('영수증 인식 안내'), findsNothing);
+      expect(find.text('영수증 내용 확인'), findsOneWidget);
+      Navigator.of(tester.element(find.text('영수증 내용 확인'))).pop();
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('인식한 내용 확인'));
       await tester.tap(find.text('인식한 내용 확인'));
       await tester.pumpAndSettle();
       expect(
         posts,
-        2,
+        3,
         reason: 'Reviewing the same photo must not incur another request',
       );
       expect(find.text('영수증 내용 확인'), findsOneWidget);
@@ -322,6 +339,53 @@ void main() {
       expect(saved, isNull);
       expect(find.text('촬영 열기'), findsOneWidget);
       debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
+  test(
+    'Gemini needs scoped consent, never a secret; revocation blocks upload',
+    () async {
+      var posts = 0;
+      final client = ReceiptClient(
+        client: MockClient((request) async {
+          posts++;
+          expect(request.headers['X-Receipt-Consent'], receiptConsentVersion);
+          expect(request.headers['Authorization'], isNull);
+          return http.Response.bytes(
+            utf8.encode(
+              jsonEncode({
+                'draft': {...draft, 'category': '식비'},
+              }),
+            ),
+            200,
+          );
+        }),
+      );
+      addTearDown(client.close);
+      final connection = ReceiptConnection(
+        Uri.parse('https://receipt.example.invalid/receipt/recognize'),
+        provider: 'gemini',
+      );
+      expect(connection.needsAccessCode, isFalse);
+      expect((await client.recognize(connection, tinyImage)).category, '식비');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(receiptConsentKey(connection.url), false);
+      await expectLater(
+        client.recognize(connection, tinyImage),
+        throwsA(isA<ReceiptConnectionException>()),
+      );
+      await prefs.setBool(receiptConsentKey(connection.url), true);
+      await expectLater(
+        client.recognize(
+          ReceiptConnection(
+            Uri.parse('https://changed.example/receipt/recognize'),
+            provider: 'gemini',
+          ),
+          tinyImage,
+        ),
+        throwsA(isA<ReceiptConnectionException>()),
+      );
+      expect(posts, 1);
     },
   );
 }

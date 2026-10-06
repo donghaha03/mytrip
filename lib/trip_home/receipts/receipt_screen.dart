@@ -12,6 +12,7 @@ import '../models/trip.dart';
 import 'receipt_draft.dart';
 import 'receipt_platform.dart';
 import 'receipt_client.dart';
+import 'receipt_consent.dart';
 
 class ReceiptScreen extends StatefulWidget {
   const ReceiptScreen({super.key, this.client});
@@ -51,6 +52,28 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     _configured = true;
   }
 
+  Future<bool> _checkConsent({bool manage = false}) async {
+    final connection = _connection;
+    if (connection?.isGemini != true) return true;
+    if (!manage && await receiptConsent(connection!.url) == true) {
+      _consented = true;
+      return true;
+    }
+    if (!mounted) return false;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => ReceiptConsentScreen(
+          url: connection!.url,
+          onDecision: (value) => Navigator.of(context).pop(value),
+        ),
+      ),
+    );
+    final approved = await receiptConsent(connection!.url) == true;
+    if (!mounted) return false;
+    setState(() => _consented = approved);
+    return _consented;
+  }
+
   Future<void> _retryConnection() async {
     if (_busy) return;
     setState(() {
@@ -65,6 +88,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           '영수증 서버가 아직 연결되지 않았어요. 수동 입력을 이용해주세요.',
         );
       }
+      await _checkConsent();
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -96,6 +120,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         }
       }
       if (!mounted) return;
+      if (!await _checkConsent()) {
+        if (mounted) Navigator.of(context).pop();
+        return;
+      }
       final raw = await openReceiptCamera(
         captureOnly: !_configured || _connection != null,
         gallery: gallery,
@@ -113,7 +141,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       setState(() {
         _imageData = image;
         _image = base64Decode(image.split(',').last);
-        _consented = false;
+        if (_connection?.isGemini != true) _consented = false;
         _draft = null;
       });
       if (_configured && _connection == null && data['text'] is String) {
@@ -127,6 +155,9 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
           () => _error ??=
               'LLM 영수증 서버가 아직 연결되지 않았어요. 서버 설정 후 재시도하거나 수동으로 입력해주세요.',
         );
+      } else if (_connection!.isGemini) {
+        setState(() => _busy = false);
+        await _recognize();
       }
     } catch (error) {
       if (mounted) {
@@ -200,26 +231,18 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     semanticLabel: '촬영한 영수증 원본',
                   ),
                   const SizedBox(height: 16),
-                  if (_draft == null && _connection != null) ...[
-                    Text(
-                      _connection!.isGemini
-                          ? '사진을 Cloudflare 중계 서버를 통해 Google Gemini로 보내요. 무료 서비스는 사진·결과를 제품 개선에 사용하거나 사람이 검토할 수 있어요. 카드번호·연락처 등 개인정보를 먼저 가려주세요.'
-                          : '사진 전체를 OpenAI로 보내 내용을 읽어요. 인식 후 직접 확인하고 저장해요.',
-                    ),
+                  if (_draft == null &&
+                      _connection != null &&
+                      !_connection!.isGemini) ...[
+                    const Text('사진 전체를 OpenAI로 보내 내용을 읽어요. 인식 후 직접 확인하고 저장해요.'),
                     TextButton(
                       onPressed: () => launchUrl(
                         Uri.parse(
-                          _connection!.isGemini
-                              ? 'https://ai.google.dev/gemini-api/terms'
-                              : 'https://developers.openai.com/api/docs/guides/your-data',
+                          'https://developers.openai.com/api/docs/guides/your-data',
                         ),
                         mode: LaunchMode.externalApplication,
                       ),
-                      child: Text(
-                        _connection!.isGemini
-                            ? 'Google 데이터 처리·보관 정책'
-                            : 'OpenAI 데이터 보관 정책',
-                      ),
+                      child: const Text('OpenAI 데이터 보관 정책'),
                     ),
                     if (_connection?.needsAccessCode == true)
                       TextField(
@@ -245,11 +268,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       value: _consented,
-                      title: Text(
-                        _connection!.isGemini
-                            ? '만 18세 이상이며 개인정보를 가린 사진을 Google로 보내는 데 동의해요'
-                            : '이 사진을 OpenAI로 보내는 데 동의해요',
-                      ),
+                      title: const Text('이 사진을 OpenAI로 보내는 데 동의해요'),
                       onChanged: _busy
                           ? null
                           : (value) =>
@@ -316,6 +335,11 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('수동 입력으로 돌아가기'),
                 ),
+                if (_connection?.isGemini == true)
+                  TextButton(
+                    onPressed: _busy ? null : () => _checkConsent(manage: true),
+                    child: const Text('사진 전송 동의'),
+                  ),
               ],
             ),
           ),

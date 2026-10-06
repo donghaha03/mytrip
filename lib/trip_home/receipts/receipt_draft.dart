@@ -1,5 +1,6 @@
 import '../models/country.dart';
 import '../models/receipt_item.dart';
+import '../models/trip.dart';
 
 /// Suggestions only: review is mandatory. Never add subtotal/tax to total.
 class ReceiptDraft {
@@ -84,9 +85,11 @@ class ReceiptDraft {
             .01) {
       warnings.add('품목 합계와 결제금액이 달라요. 할인·세금·누락 품목을 원본에서 확인해주세요.');
     }
-    final category = merchant.isEmpty
-        ? '기타'
-        : ReceiptDraft.parse(merchant).category;
+    final category = expenseCategoryIcons.containsKey(data['category'])
+        ? data['category'] as String
+        : _suggestCategory(
+            '$merchant\n${items.map((item) => item.name).join('\n')}',
+          );
     return ReceiptDraft(
       merchant: merchant,
       date: date,
@@ -187,20 +190,10 @@ class ReceiptDraft {
         '';
     if (merchant.isEmpty) warnings.add('상호명 확인 필요');
     if (confidence < 65) warnings.add('인식 신뢰도가 낮아요. 모든 항목을 원본과 비교해주세요.');
-    final category =
-        RegExp(
-          r'(cafe|coffee|restaurant|식당|카페|라멘|ラーメン|カフェ)',
-          caseSensitive: false,
-        ).hasMatch(merchant)
-        ? '식비'
-        : RegExp(r'(hotel|호텔|宿|旅館)', caseSensitive: false).hasMatch(merchant)
-        ? '숙박'
-        : RegExp(
-            r'(taxi|rail|metro|택시|철도|駅)',
-            caseSensitive: false,
-          ).hasMatch(merchant)
-        ? '교통'
-        : '기타';
+    final items = _parseItems(lines);
+    final category = _suggestCategory(
+      '$merchant\n${items.map((item) => item.name).join('\n')}',
+    );
     return ReceiptDraft(
       merchant: merchant,
       date: date,
@@ -208,8 +201,27 @@ class ReceiptDraft {
       currency: currency,
       category: category,
       warnings: warnings,
-      items: _parseItems(lines),
+      items: items,
     );
+  }
+
+  // Legacy/device OCR fallback. Gemini uses the full receipt to recommend instead.
+  static String _suggestCategory(String text) {
+    const keywords = {
+      '숙박': r'(hotel|hostel|lodging|room night|호텔|숙박|旅館)',
+      '교통':
+          r'(taxi|rail|metro|train|bus ticket|parking|fuel|택시|철도|기차|버스|주차|주유|駅)',
+      '관광': r'(museum|admission|theme park|tour ticket|박물관|입장권|전망대|놀이공원)',
+      '식비':
+          r'(cafe|coffee|restaurant|americano|latte|steak|milk|rice|tea|식당|카페|라멘|커피|스테이크|우유|밥|식사|ラーメン|カフェ)',
+      '쇼핑': r'(clothing|souvenir|cosmetic|t-shirt|셔츠|의류|기념품|화장품)',
+    };
+    for (final entry in keywords.entries) {
+      if (RegExp(entry.value, caseSensitive: false).hasMatch(text)) {
+        return entry.key;
+      }
+    }
+    return '기타';
   }
 
   static List<ReceiptItem> _parseItems(List<String> lines) {

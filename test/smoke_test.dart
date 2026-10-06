@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tripapp/trip_home/data/trip_store.dart';
 import 'package:tripapp/trip_home/app.dart';
+import 'package:tripapp/trip_home/receipts/receipt_consent.dart';
 import 'package:tripapp/trip_home/screens/add_trip_screen.dart';
 import 'package:tripapp/trip_home/screens/more_screen.dart';
 import 'package:tripapp/trip_home/screens/trip_list_screen.dart';
@@ -57,7 +58,10 @@ Future<void> _loadRates({double? yenRate}) async {
 
 void main() {
   setUpAll(() async {
-    SharedPreferences.setMockInitialValues({'trip_guide_seen': true});
+    SharedPreferences.setMockInitialValues({
+      'trip_guide_seen': true,
+      receiptConsentKey(Uri.parse(receiptServerOrigin)): true,
+    });
     await _loadRates();
   });
 
@@ -81,7 +85,9 @@ void main() {
   });
 
   testWidgets('00 빈 화면이 그려진다', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      receiptConsentKey(Uri.parse(receiptServerOrigin)): true,
+    });
     await tester.pumpWidget(const TripApp());
     await tester.pumpAndSettle();
     await tester.tap(find.text('건너뛰기'));
@@ -556,7 +562,10 @@ void main() {
 
     testWidgets('환율이 없으면 계산을 비활성화한다', (tester) async {
       RateApi.reset();
-      SharedPreferences.setMockInitialValues({'trip_guide_seen': true});
+      SharedPreferences.setMockInitialValues({
+        'trip_guide_seen': true,
+        receiptConsentKey(Uri.parse(receiptServerOrigin)): true,
+      });
       addTearDown(() => _loadRates());
       await tester.pumpWidget(
         _wrap(Scaffold(body: QuickConverter(country: countryByCode('JPY')!))),

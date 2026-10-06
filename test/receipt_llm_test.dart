@@ -3,6 +3,40 @@ import 'package:tripapp/trip_home/models/receipt_item.dart';
 import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
 
 void main() {
+  test('category uses item content and validated model recommendation', () {
+    for (final pair in {
+      'Americano': '식비',
+      '스테이크 우유 밥': '식비',
+      'Train ticket': '교통',
+      'Hotel room night': '숙박',
+      'Museum admission': '관광',
+      'Souvenir': '쇼핑',
+      'Unknown': '기타',
+    }.entries) {
+      final data = <String, dynamic>{
+        'merchant': 'SAMPLE STORE',
+        'date': '2026-10-06',
+        'currency': 'KRW',
+        'amount': 5000,
+        'warnings': [],
+        'items': [
+          {'name': pair.key, 'quantity': 1, 'unit_price': 5000, 'amount': 5000},
+        ],
+      };
+      expect(ReceiptDraft.fromLlm(data).category, pair.value);
+      expect(ReceiptDraft.fromLlm({...data, 'category': '관광'}).category, '관광');
+      expect(
+        ReceiptDraft.fromLlm({...data, 'category': '없는 카테고리'}).category,
+        pair.value,
+      );
+      expect(
+        ReceiptDraft.parse(
+          'SAMPLE STORE\n${pair.key} 1 5000\nTOTAL 5000 KRW',
+        ).category,
+        pair.value,
+      );
+    }
+  });
   test(
     'LLM draft preserves final total and item prices; conflicting dates stay empty',
     () {

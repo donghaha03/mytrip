@@ -37,7 +37,7 @@
         <div class="actions"><button class="primary" id="receipt-start">카메라 시작</button><button class="primary" id="receipt-shot" hidden>촬영</button><button id="receipt-retake" hidden>재촬영</button><button id="receipt-choose">사진 선택</button></div>
         <input id="receipt-file" hidden type="file" accept="image/jpeg,image/png,image/webp" aria-label="영수증 사진">
         <div id="receipt-recognition" hidden>${captureOnly ? '' : language}
-        <progress hidden max="1" value="0" aria-label="영수증 인식 진행률"></progress><div class="actions"><button class="primary" id="receipt-ocr">${captureOnly ? '사진 사용' : '이 사진으로 인식'}</button></div></div>
+        <progress hidden max="1" value="0" aria-label="영수증 인식 진행률"></progress><div class="actions"><button class="primary" id="receipt-ocr">${captureOnly ? '인식하기' : '이 사진으로 인식'}</button></div></div>
         ${captureOnly ? '' : '<p class="note">사진은 기기에서만 인식해요.</p>'}`;
       document.body.append(dialog);
       const $ = (selector) => dialog.querySelector(selector);

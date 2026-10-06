@@ -5,6 +5,8 @@
 `gemini.mjs`를 Cloudflare **Workers Free**에 배포합니다. 촬영한 사진을 Google의
 `gemini-3.5-flash-lite` 이미지 이해 모델에 한 번 전달하고, 검증된 JSON을 기존 검토 화면으로
 돌려줍니다. 상호명·날짜·통화·최종 결제금액과 품목 이름·수량·단가·금액을 읽습니다.
+상호명과 구매 품목을 함께 보고 기존 6개 카테고리 중 하나를 추천합니다. 혼합 구매는 품목
+지출이 가장 큰 분류를 사용하고, 불명확하면 기타로 남깁니다. 검토 화면에서 바꿀 수 있습니다.
 Google 권장 Interactions API에 `store:false`로 요청하며 대화 이력·도구를 연결하지 않습니다.
 JSON 출력 모드를 사용하고 서버의 공통 영수증 검증기로 필드·날짜·금액·수량을 검사합니다.
 출력 스키마 옵션의 수용 여부와 별개로, 잘못된 결과를 검토 초안으로 전달하지 않습니다.
@@ -19,8 +21,8 @@ JSON 출력 모드를 사용하고 서버의 공통 영수증 검증기로 필�
 - Cloudflare도 **Workers Free** 계정이어야 합니다. 유료 전환·결제수단 추가는 하지 않습니다.
 - Google 무료 한도는 프로젝트·모델에 따라 다릅니다. 429는 수동 재시도·수동 입력으로 안내합니다.
   다른 모델·OpenAI API·유료 플랜으로 자동 전환하지 않습니다.
-- 사진 전체와 추출 프롬프트가 Cloudflare를 거쳐 Google에 전송됩니다. 이 Worker에는 사진·응답
-  저장소가 없고 관측 로그를 끕니다. Google의 무료 서비스는 입력·결과를 제품 개선에 사용하고
+- 사진 전체와 추출 프롬프트가 Cloudflare를 거쳐 Google에 전송됩니다. 이 Worker는 사진·응답을
+  저장하지 않고 관측 로그를 끕니다. Google의 무료 서비스는 입력·결과를 제품 개선에 사용하고
   사람이 검토할 수 있습니다. 고정 삭제 기한이나 무보관을 보장하지 않습니다.
 - 개인정보 없는 테스트 사진을 사용합니다. 실제 사진은 카드번호·연락처·주소 등 개인/기밀 정보를
   먼저 가려야 합니다. 출력에서 제외하도록 지시하는 것만으로 원본 전송을 막을 수는 없습니다.
@@ -46,8 +48,9 @@ npx --yes wrangler@4.147.0 secret put RECEIPT_ACCESS_CODE
 
 키는 비밀값 입력 프롬프트 또는 Cloudflare 대시보드의 Worker → Settings → Variables and Secrets에서
 **Secret** 형식으로 입력합니다. 명령 인수·채팅·GitHub·앱 코드에 넣지 않습니다.
-`RECEIPT_ACCESS_CODE`는 API 키와 다른 무작위 URL-safe 32~128자 코드입니다.
-발표 참여자에게만 공유하고 앱의 사진 확인 화면에서 입력합니다. 앱에는 저장하지 않습니다.
+`RECEIPT_ACCESS_CODE`는 API 키와 다른 무작위 URL-safe 32~128자 서버 비밀값입니다.
+공개 Gemini 앱은 이 값을 입력받거나 포함하지 않습니다. 익명 사용량 해시의 서버 전용 키와
+운영자 검사 인증에만 사용합니다. 기존 값을 재사용할 수 있습니다.
 Windows에서는 `powershell -File prepare-access.ps1`로 무작위 접속 코드를 생성·등록할 수 있습니다.
 로컬 복사본은 `%LOCALAPPDATA%/mytrip-receipt/gemini-access.dpapi`에 현재 Windows 사용자 전용으로
 암호화합니다. 사용자가 직접 `powershell -File prepare-access.ps1 -Copy`를 실행하면 코드가
@@ -65,6 +68,23 @@ Windows에서는 `powershell -File prepare-access.ps1`로 무작위 접속 코�
 | `GEMINI_FREE_TIER_CONFIRMED=yes` | 무료 Gemini 프로젝트 확인 후 서버 변수 |
 | `RECEIPT_FREE_HOSTING_CONFIRMED=yes` | Workers Free 확인 후 서버 변수 |
 | `RECEIPT_ALLOWED_ORIGINS` | 기본 `https://donghaha03.github.io` |
+| `RECEIPT_PUBLIC_CONSENT=yes` | 동의 기반 발표용 공개 인식, 영속 호출 제한 필수 |
+| `RECEIPT_USAGE` | Workers Free SQLite Durable Object, 익명 사용량만 저장 |
+
+앱은 최초 실행의 사용 안내 다음에 전송·무료 데이터 조건과 성인 여부를 확인합니다.
+동의 여부는 기기/브라우저에 제공자·서버 주소·정책 버전별로 저장합니다. 이후에는 카메라의
+사진 확인 버튼을 누르면 자동 인식하고 결과 검토로 이동합니다. 데이터 초기화·기기 변경이나
+서버/정책 변경 시 다시 동의가 필요합니다. 거절해도 수동 입력은 가능하고 촬영 화면의
+‘사진 전송 동의’에서 철회할 수 있습니다. 저장 실패나 미동의에는 업로드하지 않습니다.
+
+`X-Receipt-Consent: gemini-free-v1`은 동의 흐름 표시이지 로그인/사용자 인증이 아닙니다.
+발표용 익명 공개 엔드포인트이며 CORS만으로 앱 외 호출을 막을 수 없습니다. 서버는 전체
+200회/UTC 일, 접속 IP별 50회/일·5회/분으로 실제 Google 호출을 영속적으로 제한합니다.
+실패한 Google 호출도 포함하며 설정/카운터 장애 시 차단합니다. 동일 와이파이는 한 IP로
+집계될 수 있습니다. Google의 프로젝트 한도가 더 낮으면 먼저 중단될 수 있습니다.
+날짜별 HMAC IP 해시와 횟수만 SQLite Durable Object에 저장합니다. 현행 집계는 다음 날
+교체되지만 Cloudflare 복구 기록에는 최대 30일 남을 수 있습니다. 사진·결제내역·원본 IP는
+이 카운터에 저장하지 않습니다. 일반 서비스로 확장할 때는 사용자 인증/악용 방지를 강화해야 합니다.
 
 `GET https://서버주소/receipt/status`는 설정 유무·제공자·모델만 반환합니다. 키나 영수증을 반환하지
 않고 Google 호출도 하지 않습니다. `configured:true`는 변수 확인이며 실제 계정 결제 상태나
@@ -109,9 +129,8 @@ flutter build web --dart-define=RECEIPT_SERVER_URL=https://서버주소 --dart-d
 서버 주소가 `null`인 공개 배포는 연결 완료 상태가 아니며 기존 기기 OCR을 유지합니다.
 LLM 연결 후 오류에는 사진을 보존하고 다른 제공자로 자동 전송하지 않습니다.
 
-추가 SDK·DB·파일 업로드 API·영수증 보관 서버를 사용하지 않습니다. 공유 접속 코드와 Google 무료
-한도에 의존하는 소규모 발표용입니다. 여러 사용자·공개 가입에는 별도 사용자 인증과 영속 사용량
-제한이 필요합니다. Workers Free의 CPU 제한(호출당 10ms)도 실제 사진 크기로 확인해야 하며,
+추가 SDK·여행 DB·파일 업로드 API·영수증 보관 서버를 사용하지 않습니다. 소규모 발표용이며
+사용량 카운터만 Cloudflare에 추가합니다. Workers Free의 CPU 제한(호출당 10ms)도 실제 사진 크기로 확인해야 하며,
 제한에 걸리면 사진 최적화 또는 수동 입력을 사용하고 유료 업그레이드는 하지 않습니다.
 
 공식 문서: [Gemini 가격](https://ai.google.dev/gemini-api/docs/pricing),
@@ -119,14 +138,17 @@ LLM 연결 후 오류에는 사진을 보존하고 다른 제공자로 자동 �
 [Google 데이터 처리 약관](https://ai.google.dev/gemini-api/terms),
 [Gemini Interactions REST](https://ai.google.dev/api/interactions-api),
 [Cloudflare 무료 제한](https://developers.cloudflare.com/workers/platform/pricing/),
+[Durable Objects 무료 한도](https://developers.cloudflare.com/durable-objects/platform/pricing/),
+[복구 보관](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/),
 [서버 비밀값](https://developers.cloudflare.com/workers/configuration/secrets/).
 
 테스트: `node --test *.test.mjs`, `flutter analyze`, `flutter test`.
 Gemini 모의 응답 테스트와 실제 인식·무료 프로젝트·모바일 촬영 검증은 별도입니다.
-연결 후 `RECEIPT_SERVER_URL`과 별도 `RECEIPT_ACCESS_CODE`를 비공개 환경 변수로 설정하고
+연결 후 `RECEIPT_SERVER_URL`을 설정하고
 `npm run test:live:gemini`를 실행하면 저장소의 개인정보 없는 세로·가로 영수증만 전송해
 상호명·날짜·통화·총액, 가로 영수증의 Americano 1개 5,000원을 실제 응답과 비교합니다.
-실패한 실제 호출은 자동 재시도하지 않습니다. Gemini 키는 이 검사 프로그램에 전달하지 않습니다.
+카테고리 추천도 실제 응답과 비교합니다. 실패한 실제 호출은 자동 재시도하지 않습니다.
+공개 동의 경로를 검사하므로 접속 코드와 Gemini 키는 이 검사 프로그램에 전달하지 않습니다.
 
 ## 로컬 ChatGPT 구독 방식
 

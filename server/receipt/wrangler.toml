@@ -7,7 +7,7 @@ workers_dev = true
 [placement]
 region = "gcp:us-east4"
 
-# No receipt/photo/response logs or storage bindings.
+# No receipt/photo/response logs. The binding stores anonymous usage counts only.
 [observability]
 enabled = false
 
@@ -16,3 +16,12 @@ RECEIPT_ALLOWED_ORIGINS = "https://donghaha03.github.io"
 # Set yes only after checking the actual Gemini project and Workers account plan.
 GEMINI_FREE_TIER_CONFIRMED = "no"
 RECEIPT_FREE_HOSTING_CONFIRMED = "no"
+RECEIPT_PUBLIC_CONSENT = "yes"
+
+[[durable_objects.bindings]]
+name = "RECEIPT_USAGE"
+class_name = "ReceiptUsage"
+
+[[migrations]]
+tag = "receipt-usage-v1"
+new_sqlite_classes = ["ReceiptUsage"]

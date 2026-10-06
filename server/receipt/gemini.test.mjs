@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createGeminiHandler, GEMINI_MODEL, geminiBody, readGemini } from './gemini.mjs';
+import { createGeminiHandler, GEMINI_MODEL, geminiBody, readGemini, CONSENT_VERSION, ReceiptUsage } from './gemini.mjs';
 
 const image = `data:image/png;base64,${(await readFile(new URL('../../test/fixtures/receipt_en.png', import.meta.url))).toString('base64')}`;
 const accessCode = 'fixture-access-code-0123456789-abcd';
@@ -26,6 +26,9 @@ test('real image bytes, shared prompt and JSON schema go only to the fixed Gemin
   assert.equal(body.response_format.mime_type, 'application/json');
   assert.deepEqual(body.generation_config, { max_output_tokens: 8192 });
   assert.match(body.system_instruction, /Use exactly this JSON schema/);
+  assert.deepEqual(body.system_instruction.includes('purchased items'), true);
+  const schema = JSON.parse(body.system_instruction.split('Use exactly this JSON schema: ')[1]);
+  assert.deepEqual(new Set(schema.required), new Set(Object.keys(schema.properties)), 'Strict OpenAI and Gemini schemas must require all properties');
   assert.equal(body.tools, undefined);
   assert.equal(body.previous_interaction_id, undefined);
   assert.deepEqual(readGemini(reply(draft)), draft);
@@ -86,7 +89,64 @@ test('disabled Free Tier/hosting confirmation, bad origins and wrong codes never
   assert.deepEqual(await status.json(), { configured: true, provider: 'gemini', model: GEMINI_MODEL, placement: null });
   const preflight = await handler(request(undefined, {}, 'OPTIONS'), env);
   assert.equal(preflight.status, 204);
-  assert.equal(preflight.headers.get('Access-Control-Allow-Headers'), 'Authorization, Content-Type');
+  assert.equal(preflight.headers.get('Access-Control-Allow-Headers'), 'Authorization, Content-Type, X-Receipt-Consent');
+});
+
+function usageBinding() {
+  let value, pending = Promise.resolve();
+  const storage = { transaction: callback => {
+    const task = pending.then(() => callback({
+      get: async () => structuredClone(value),
+      put: async (_, next) => { value = structuredClone(next); },
+    }));
+    pending = task.catch(() => {}); return task;
+  } };
+  let usage = new ReceiptUsage({ storage });
+  return { idFromName: name => name, get: () => ({ fetch: (url, options) => usage.fetch(new Request(url, options)) }),
+    restart: () => { usage = new ReceiptUsage({ storage }); }, state: () => value };
+}
+
+test('consent-only public access is capped atomically across requests/restarts without secrets or photos in counters', async () => {
+  const binding = usageBinding(); let calls = 0;
+  const publicEnv = { ...env, RECEIPT_PUBLIC_CONSENT: 'yes', RECEIPT_USAGE: binding };
+  const handler = createGeminiHandler({ fetchGemini: async () => { calls++; return Response.json(reply({ ...draft, category: '식비' })); } });
+  const anonymous = (extra = {}) => request(undefined, { Authorization: '', 'X-Receipt-Consent': CONSENT_VERSION, 'CF-Connecting-IP': '192.0.2.5', ...extra });
+  const statuses = await Promise.all(Array.from({ length: 9 }, async () => (await handler(anonymous(), publicEnv)).status));
+  assert.equal(statuses.filter(status => status === 200).length, 5);
+  assert.equal(statuses.filter(status => status === 429).length, 4);
+  binding.restart();
+  assert.equal((await handler(anonymous(), publicEnv)).status, 429);
+  assert.equal(calls, 5);
+  assert.equal((await handler(anonymous({ 'X-Receipt-Consent': 'old-version' }), publicEnv)).status, 401);
+  assert.equal((await handler(anonymous({ 'CF-Connecting-IP': '' }), publicEnv)).status, 503);
+  assert.equal((await handler(anonymous(), { ...publicEnv, RECEIPT_USAGE: null })).status, 503);
+  assert.equal((await handler(anonymous({ Origin: 'https://untrusted.invalid' }), publicEnv)).status, 403);
+  const counterText = JSON.stringify(binding.state());
+  for (const privateValue of [image, env.GEMINI_API_KEY, accessCode, '192.0.2.5', draft.merchant]) assert.ok(!counterText.includes(privateValue));
+  assert.equal(binding.state().total, 5);
+  assert.deepEqual(readGemini(reply({ ...draft, category: '식비' })).category, '식비');
+  assert.throws(() => readGemini(reply({ ...draft, category: '없는 카테고리' })));
+});
+
+test('usage daily/global limits reset at midnight and provider failures still spend quota', async () => {
+  const originalNow = Date.now; let time = Date.UTC(2026, 9, 6);
+  Date.now = () => time;
+  try {
+    const binding = usageBinding();
+    const invoke = key => binding.get().fetch('https://usage.internal', { method: 'POST', body: JSON.stringify({ key: key.toString(16).padStart(64, '0') }) });
+    for (let i = 0; i < 50; i++) { time += 60_000; assert.equal((await invoke(1)).status, 204); }
+    assert.equal((await invoke(1)).status, 429);
+    for (let i = 2; i <= 151; i++) assert.equal((await invoke(i)).status, 204);
+    assert.equal((await invoke(152)).status, 429);
+    time = Date.UTC(2026, 9, 7);
+    assert.equal((await invoke(1)).status, 204);
+    assert.equal(binding.state().total, 1);
+    const handler = createGeminiHandler({ fetchGemini: async () => Response.json({}, { status: 500 }) });
+    const failure = await handler(request(undefined, { Authorization: '', 'X-Receipt-Consent': CONSENT_VERSION, 'CF-Connecting-IP': '192.0.2.6' }),
+      { ...env, RECEIPT_PUBLIC_CONSENT: 'yes', RECEIPT_USAGE: binding });
+    assert.equal(failure.status, 502);
+    assert.equal(binding.state().total, 2);
+  } finally { Date.now = originalNow; }
 });
 
 test('provider failures/quotas make one call with no retries, fallback or leaked provider error', async () => {

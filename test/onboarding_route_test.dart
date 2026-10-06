@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripapp/trip_home/app.dart';
+import 'package:tripapp/trip_home/receipts/receipt_consent.dart';
 import 'package:tripapp/trip_home/data/trip_store.dart';
 import 'package:tripapp/trip_home/models/country.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
@@ -12,10 +13,76 @@ import 'package:tripapp/trip_home/theme/app_theme.dart';
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      receiptConsentKey(Uri.parse(receiptServerOrigin)): true,
+    });
     tripStore.connect(null);
   });
   tearDown(() => tripStore.connect(null));
+  for (final size in [const Size(320, 480), const Size(812, 375)]) {
+    testWidgets(
+      'consent details and decision stay reachable with large text at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: buildAppTheme(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(1.5)),
+              child: child!,
+            ),
+            home: ReceiptConsentScreen(
+              url: Uri.parse(receiptServerOrigin),
+              onDecision: (_) {},
+            ),
+          ),
+        );
+        await tester.scrollUntilVisible(find.text('전송·보관·무료 사용 안내'), 100);
+        await tester.tap(find.text('전송·보관·무료 사용 안내'));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(find.text('동의하지 않고 직접 입력하기'), 150);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+  for (final accept in [true, false]) {
+    testWidgets(
+      'first launch consent decision $accept remembered after guidance',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        await tester.pumpWidget(const TripApp());
+        await tester.pumpAndSettle();
+        expect(find.text('앱 사용방법'), findsOneWidget);
+        await tester.tap(find.text('건너뛰기'));
+        await tester.pumpAndSettle();
+        expect(find.text('영수증 인식 안내'), findsOneWidget);
+        expect(
+          tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+          isNull,
+        );
+        if (accept) {
+          await tester.tap(find.byType(CheckboxListTile));
+          await tester.pump();
+        }
+        final label = accept ? '동의하고 시작하기' : '동의하지 않고 직접 입력하기';
+        await tester.scrollUntilVisible(find.text(label), 150);
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+        expect(await receiptConsent(Uri.parse(receiptServerOrigin)), accept);
+        expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpWidget(const TripApp());
+        await tester.pumpAndSettle();
+        expect(find.text('영수증 인식 안내'), findsNothing);
+        expect(find.text('앱 사용방법'), findsNothing);
+      },
+    );
+  }
   for (final ongoing in [true, false]) {
     testWidgets(
       'first run guide precedes ${ongoing ? 'ongoing' : 'upcoming'} trip and is remembered',

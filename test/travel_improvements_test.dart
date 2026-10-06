@@ -9,6 +9,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripapp/api/api.dart';
 import 'package:tripapp/trip_home/app.dart';
+import 'package:tripapp/trip_home/receipts/receipt_consent.dart';
 import 'package:tripapp/trip_home/data/trip_repository.dart';
 import 'package:tripapp/trip_home/data/trip_store.dart';
 import 'package:tripapp/trip_home/models/country.dart';
@@ -95,7 +96,10 @@ Future<void> rates() async {
 void main() {
   setUp(() async {
     RateApi.reset();
-    SharedPreferences.setMockInitialValues({'trip_guide_seen': true});
+    SharedPreferences.setMockInitialValues({
+      'trip_guide_seen': true,
+      receiptConsentKey(Uri.parse(receiptServerOrigin)): true,
+    });
     tripStore.connect(null);
     await rates();
   });

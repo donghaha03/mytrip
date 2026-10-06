@@ -1,13 +1,14 @@
 import { receiptSchema, receiptInstructions, validateDraft } from './contract.mjs';
 
 export const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+export const CONSENT_VERSION = 'gemini-free-v1';
 const endpoint = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 const maxBody = 12_100_000;
 // Google's terms require Paid Services for API clients available in these regions.
 const paidOnlyRegions = new Set('AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO CH GB'.split(' '));
 const messages = {
   400: '사진을 읽지 못했어요. 다시 촬영해주세요.',
-  401: '접속 코드를 확인해주세요.',
+  401: '사진 전송 동의를 확인해주세요.',
   403: '영수증 서버의 연결 권한을 확인해주세요.',
   413: '사진이 너무 커요. 다시 촬영해주세요.',
   429: '무료 인식 한도에 도달했어요. 잠시 후 다시 시도하거나 수동으로 입력해주세요.',
@@ -80,6 +81,37 @@ async function validCode(supplied, expected) {
   return difference === 0;
 }
 
+// Only daily salted IP hashes and counters are stored, never receipt data.
+async function usageKey(ip, secret, day) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const hash = new Uint8Array(await crypto.subtle.sign('HMAC', key, encoder.encode(`${day}:${ip}`)));
+  return Array.from(hash, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export class ReceiptUsage {
+  constructor(ctx) { this.storage = ctx.storage; }
+  async fetch(request) {
+    const { key } = await request.json();
+    if (!/^[a-f0-9]{64}$/.test(key)) return new Response(null, { status: 400 });
+    const now = Date.now(), day = Math.floor(now / 86_400_000), minute = Math.floor(now / 60_000);
+    // ponytail: one atomic counter for the small presentation pilot (200 photos/day).
+    // Partition only if the presentation becomes a larger authenticated service.
+    const allowed = await this.storage.transaction(async txn => {
+      let usage = await txn.get('usage');
+      if (usage?.day !== day) usage = { day, total: 0, clients: {} };
+      const client = usage.clients[key] ?? { total: 0, minute, recent: 0 };
+      if (client.minute !== minute) { client.minute = minute; client.recent = 0; }
+      if (usage.total >= 200 || client.total >= 50 || client.recent >= 5) return false;
+      client.total++; client.recent++; usage.total++;
+      usage.clients[key] = client;
+      await txn.put('usage', usage);
+      return true;
+    });
+    return new Response(null, { status: allowed ? 204 : 429 });
+  }
+}
+
 export function createGeminiHandler({ fetchGemini = fetch, timeoutMs = 85_000 } = {}) {
   return async (request, env) => {
     const origin = request.headers.get('Origin');
@@ -92,7 +124,7 @@ export function createGeminiHandler({ fetchGemini = fetch, timeoutMs = 85_000 } 
     if (url.search || !['/receipt/recognize', '/receipt/status'].includes(url.pathname)) return send(404, {});
     if (request.method === 'OPTIONS') {
       headers['Access-Control-Allow-Methods'] = 'GET, POST';
-      headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type';
+      headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type, X-Receipt-Consent';
       return send(204);
     }
     const configured = env.GEMINI_FREE_TIER_CONFIRMED === 'yes' && env.RECEIPT_FREE_HOSTING_CONFIRMED === 'yes' &&
@@ -105,7 +137,9 @@ export function createGeminiHandler({ fetchGemini = fetch, timeoutMs = 85_000 } 
     if (request.method !== 'POST') return send(405, {});
     if (paidOnlyRegions.has(request.cf?.country)) return send(403);
     if (!configured) return send(503);
-    if (!await validCode(/^Bearer ([A-Za-z0-9_-]+)$/.exec(request.headers.get('Authorization') ?? '')?.[1] ?? '', env.RECEIPT_ACCESS_CODE)) return send(401);
+    const publicMode = env.RECEIPT_PUBLIC_CONSENT === 'yes';
+    const consented = publicMode && request.headers.get('X-Receipt-Consent') === CONSENT_VERSION;
+    if (!consented && !await validCode(/^Bearer ([A-Za-z0-9_-]+)$/.exec(request.headers.get('Authorization') ?? '')?.[1] ?? '', env.RECEIPT_ACCESS_CODE)) return send(401);
     if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') ?? '')) return send(400);
     const controller = new AbortController();
     const cancel = () => controller.abort();
@@ -120,8 +154,19 @@ export function createGeminiHandler({ fetchGemini = fetch, timeoutMs = 85_000 } 
         body = geminiBody(data.image);
       } catch (error) { return send(controller.signal.aborted ? 504 : error.message === 'too_large' ? 413 : 400); }
       if (controller.signal.aborted) return send(504);
-      // ponytail: presentation pilot, shared access code and Google's Free Tier quota;
-      // add per-user auth/persistent quotas before public signup. Never retry/upgrade automatically.
+      if (publicMode) {
+        const ip = request.headers.get('CF-Connecting-IP');
+        if (!ip || !env.RECEIPT_USAGE) return send(503); // Never bypass limits on a binding failure.
+        const key = await usageKey(ip, env.RECEIPT_ACCESS_CODE, Math.floor(Date.now() / 86_400_000));
+        let quota;
+        try {
+          quota = await env.RECEIPT_USAGE.get(env.RECEIPT_USAGE.idFromName('mytrip')).fetch('https://usage.internal', {
+            method: 'POST', body: JSON.stringify({ key }),
+          });
+        } catch { return send(503); }
+        if (quota.status !== 204) return send(quota.status === 429 ? 429 : 503);
+      }
+      // No automatic retries, provider fallback, or paid upgrade.
       const upstream = await fetchGemini(endpoint, {
         method: 'POST', signal: controller.signal,
         headers: { 'x-goog-api-key': env.GEMINI_API_KEY, 'Content-Type': 'application/json' },
