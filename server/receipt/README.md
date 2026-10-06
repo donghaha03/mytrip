@@ -3,8 +3,12 @@
 ## Gemini 무료 API · 공개 웹과 앱
 
 `gemini.mjs`를 Cloudflare **Workers Free**에 배포합니다. 촬영한 사진을 Google의
-`gemini-2.5-flash` 이미지 이해 모델에 한 번 전달하고, 검증된 JSON을 기존 검토 화면으로
+`gemini-3.5-flash-lite` 이미지 이해 모델에 한 번 전달하고, 검증된 JSON을 기존 검토 화면으로
 돌려줍니다. 상호명·날짜·통화·최종 결제금액과 품목 이름·수량·단가·금액을 읽습니다.
+Google 권장 Interactions API에 `store:false`로 요청하며 대화 이력·도구를 연결하지 않습니다.
+JSON 출력 모드를 사용하고 서버의 공통 영수증 검증기로 필드·날짜·금액·수량을 검사합니다.
+출력 스키마 옵션의 수용 여부와 별개로, 잘못된 결과를 검토 초안으로 전달하지 않습니다.
+이 설정은 Google 무료 서비스의 제품 개선·사람 검토 조건을 없애는 설정은 아닙니다.
 품목·세금·소계를 총액에 다시 더하지 않으며, 모호한 값은 비워 확인을 요청합니다.
 사용자가 검토하고 지출 양식에 적용한 뒤 저장합니다.
 
@@ -66,8 +70,36 @@ Windows에서는 `powershell -File prepare-access.ps1`로 무작위 접속 코�
 않고 Google 호출도 하지 않습니다. `configured:true`는 변수 확인이며 실제 계정 결제 상태나
 인식 성공의 증거는 아닙니다. 개인정보 없는 사진으로 실제 호출까지 확인해야 합니다.
 
-mytrip의 Actions 변수 `RECEIPT_SERVER_URL=https://서버주소`, `RECEIPT_PROVIDER=gemini`를 설정하고
-Pages를 배포합니다. `receipt-config.json`에는 공개 주소와 제공자만 들어갑니다. 웹·iOS·Android는
+Google이 `LOCATION_UNSUPPORTED`로 거절하면 Cloudflare의 실행 위치를 확인합니다.
+`wrangler.toml`의 `placement.region`은 지원 지역 가까이 실행하도록 하는 힌트이며,
+실제 출구 IP 위치나 Google의 허용 여부를 보장하지 않습니다. 계정 무료 상태를 바꾸거나
+유료 서버로 자동 전환하지 않습니다.
+
+### Tesseract.js와 실제 비교
+
+임시 디렉터리에 `tesseract.js@6.0.1`을 설치하고 `TESSERACT_MODULE`을 그 설치의
+`src/index.js` 절대 경로로 지정한 뒤 저장소 루트에서 실행합니다. 앱에는 새 의존성을 넣지 않습니다.
+앱에 번들된 WASM 해시와 언어 데이터를 확인하고 같은 PSM 6 설정을 사용합니다.
+
+```powershell
+node tool/benchmark_receipts.mjs
+flutter test tool/evaluate_receipt_benchmark.dart --reporter expanded
+```
+
+`RECEIPT_SERVER_URL`과 비밀 접속 코드 `RECEIPT_ACCESS_CODE`를 환경에 지정하면 동일한
+개인정보 없는 테스트 사진 3장으로 실제 Gemini도 호출합니다. 재시도·유료 대체는 없습니다.
+결과는 Git에서 제외된 `.dart_tool/receipt-benchmark-scored.json`에만 저장합니다.
+상호·날짜·통화·총액 및 명시된 품목·수량을 앱의 실제 파서로 채점하며, 빈 이미지의 허위 추출은
+별도로 계산합니다. 호출 실패와 미실행은 인식 정확도로 환산하지 않습니다.
+선명한 합성 사진 2장의 결과를 실사용 성공률로 발표하면 안 됩니다. Node의 처리 시간 역시
+휴대폰 브라우저에서의 처리 시간과 구분합니다.
+선택적인 `RECEIPT_REFERENCE_FILE`은 기존 페이히어 예시 사진의 로컬 Tesseract 검사 전용입니다.
+이 원본 사진은 Gemini에 보내지 않습니다. 결과 파일에는 로컬 OCR 텍스트가 포함되므로 공유하지 않습니다.
+
+저장소의 `web/receipt-config.json`은 검증된 공개 Gemini 서버를 기본값으로 사용합니다.
+다른 서버로 바꿀 때는 mytrip의 Actions 변수 `RECEIPT_SERVER_URL=https://서버주소`,
+`RECEIPT_PROVIDER=gemini`를 설정하고 Pages를 배포합니다.
+`receipt-config.json`에는 공개 주소와 제공자만 들어갑니다. 웹·iOS·Android는
 같은 설정과 호출 계약을 사용합니다. 개발 빌드에서는 다음처럼 지정할 수 있습니다.
 
 ```powershell
@@ -85,7 +117,7 @@ LLM 연결 후 오류에는 사진을 보존하고 다른 제공자로 자동 �
 공식 문서: [Gemini 가격](https://ai.google.dev/gemini-api/docs/pricing),
 [결제 등급](https://ai.google.dev/gemini-api/docs/billing),
 [Google 데이터 처리 약관](https://ai.google.dev/gemini-api/terms),
-[Gemini REST](https://ai.google.dev/api/generate-content),
+[Gemini Interactions REST](https://ai.google.dev/api/interactions-api),
 [Cloudflare 무료 제한](https://developers.cloudflare.com/workers/platform/pricing/),
 [서버 비밀값](https://developers.cloudflare.com/workers/configuration/secrets/).
 

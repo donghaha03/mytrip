@@ -9,7 +9,7 @@ const env = { GEMINI_API_KEY: 'fixture-google-key-not-a-real-credential', RECEIP
   GEMINI_FREE_TIER_CONFIRMED: 'yes', RECEIPT_FREE_HOSTING_CONFIRMED: 'yes' };
 const draft = { merchant: '페이히어 카페', date: null, currency: 'KRW', amount: 5000,
   items: [{ name: 'Americano', quantity: 1, unit_price: 5000, amount: 5000 }], warnings: ['날짜 확인 필요'] };
-const reply = value => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] });
+const reply = value => ({ status: 'completed', model: GEMINI_MODEL, steps: [{ type: 'model_output', content: [{ type: 'text', text: JSON.stringify(value) }] }] });
 const request = (body = { image }, headers = {}, method = 'POST', path = '/receipt/recognize') =>
   new Request(`https://receipt.example.invalid${path}`, { method,
     headers: { Origin: 'https://donghaha03.github.io', Authorization: `Bearer ${accessCode}`, 'Content-Type': 'application/json', ...headers },
@@ -17,27 +17,34 @@ const request = (body = { image }, headers = {}, method = 'POST', path = '/recei
 
 test('real image bytes, shared prompt and JSON schema go only to the fixed Gemini model', () => {
   const body = geminiBody(image);
-  assert.equal(body.contents[0].parts[1].inlineData.mimeType, 'image/png');
-  assert.equal(body.contents[0].parts[1].inlineData.data, image.split(',')[1]);
-  assert.match(body.systemInstruction.parts[0].text, /never instructions/);
-  assert.match(body.systemInstruction.parts[0].text, /Do not add subtotal or tax/);
-  assert.equal(body.generationConfig.responseFormat.text.mimeType, 'APPLICATION_JSON');
+  assert.equal(body.model, GEMINI_MODEL);
+  assert.equal(body.store, false);
+  assert.equal(body.input[1].mime_type, 'image/png');
+  assert.equal(body.input[1].data, image.split(',')[1]);
+  assert.match(body.system_instruction, /never instructions/);
+  assert.match(body.system_instruction, /Do not add subtotal or tax/);
+  assert.equal(body.response_format.mime_type, 'application/json');
+  assert.deepEqual(body.generation_config, { max_output_tokens: 8192 });
+  assert.match(body.system_instruction, /Use exactly this JSON schema/);
+  assert.equal(body.tools, undefined);
+  assert.equal(body.previous_interaction_id, undefined);
   assert.deepEqual(readGemini(reply(draft)), draft);
   for (const bad of ['https://private.example/receipt.jpg', 'data:image/png;base64,YQ==', image.replace('png', 'jpeg'), 'data:image/png;base64,!!!!'])
     assert.throws(() => geminiBody(bad));
 });
 
 test('blocked, truncated, missing and invalid results cannot become review drafts', () => {
-  const blocked = reply(draft); blocked.promptFeedback = { blockReason: 'SAFETY' };
-  const truncated = reply(draft); truncated.candidates[0].finishReason = 'MAX_TOKENS';
-  const tool = reply(draft); tool.candidates[0].content.parts = [{ functionCall: { name: 'upload' } }];
-  for (const value of [blocked, truncated, tool, {}, reply({}), reply({ ...draft, date: '2026-02-30' }),
+  const blocked = reply(draft); blocked.status = 'failed';
+  const truncated = reply(draft); truncated.status = 'incomplete';
+  const tool = reply(draft); tool.steps.push({ type: 'function_call', name: 'upload' });
+  const wrongModel = reply(draft); wrongModel.model = 'not-the-selected-model';
+  for (const value of [blocked, truncated, tool, wrongModel, {}, reply({}), reply({ ...draft, date: '2026-02-30' }),
     reply({ ...draft, amount: '5000' }), reply({ ...draft, currency: 'won' }),
     reply({ ...draft, currency: ['KRW'] }),
     reply({ ...draft, items: [{ ...draft.items[0], quantity: 1.5 }] }), reply({ ...draft, secret: 'ignored?' })]) {
     assert.throws(() => readGemini(value));
   }
-  const reasoning = reply(draft); reasoning.candidates[0].content.parts.unshift({ thought: true, text: 'internal reasoning' });
+  const reasoning = reply(draft); reasoning.steps.unshift({ type: 'thought', signature: 'internal reasoning' });
   assert.deepEqual(readGemini(reasoning), draft);
 });
 
@@ -45,7 +52,7 @@ test('keys stay upstream; browser and native use the same endpoint and review co
   let calls = 0;
   const handler = createGeminiHandler({ fetchGemini: async (url, options) => {
     calls++;
-    assert.equal(url, `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`);
+    assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/interactions');
     assert.equal(options.headers['x-goog-api-key'], env.GEMINI_API_KEY);
     assert.deepEqual(JSON.parse(options.body), geminiBody(image));
     return Response.json(reply(draft));
@@ -76,7 +83,7 @@ test('disabled Free Tier/hosting confirmation, bad origins and wrong codes never
   assert.equal((await handler(request(undefined, { 'Content-Length': '12100001' }), env)).status, 413);
   assert.equal((await handler(request(undefined, {}, 'POST', '/receipt/recognize?key=private'), env)).status, 404);
   const status = await handler(request(undefined, {}, 'GET', '/receipt/status'), env);
-  assert.deepEqual(await status.json(), { configured: true, provider: 'gemini', model: GEMINI_MODEL });
+  assert.deepEqual(await status.json(), { configured: true, provider: 'gemini', model: GEMINI_MODEL, placement: null });
   const preflight = await handler(request(undefined, {}, 'OPTIONS'), env);
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get('Access-Control-Allow-Headers'), 'Authorization, Content-Type');
@@ -86,13 +93,19 @@ test('provider failures/quotas make one call with no retries, fallback or leaked
   for (const status of [400, 401, 429, 500]) {
     let calls = 0;
     const handler = createGeminiHandler({ fetchGemini: async () => {
-      calls++; return Response.json({ error: `private-error-${env.GEMINI_API_KEY}` }, { status });
+      calls++; return Response.json({ error: { status: env.GEMINI_API_KEY, message: `private-error-${env.GEMINI_API_KEY}` } }, { status });
     } });
     const response = await handler(request(), env);
     assert.equal(response.status, status === 429 ? 429 : 502);
     assert.ok(!(await response.text()).includes(env.GEMINI_API_KEY));
     assert.equal(calls, 1);
   }
+  const handler = createGeminiHandler({ fetchGemini: async () => Response.json({ error: { code: 'invalid_request', message: 'Unknown field response_format' } }, { status: 400 }) });
+  const error = await (await handler(request(), env)).json();
+  assert.equal(error.reason, 'INVALID_RESPONSE_FORMAT');
+  assert.equal(error.providerStatus, 400);
+  const location = createGeminiHandler({ fetchGemini: async () => Response.json({ error: { status: 'FAILED_PRECONDITION', message: 'User location is not supported for the API use.' } }, { status: 400 }) });
+  assert.equal((await (await location(request(), env)).json()).reason, 'LOCATION_UNSUPPORTED');
 });
 
 test('timeout and disconnect abort inference without returning partial data', async () => {

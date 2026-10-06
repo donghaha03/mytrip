@@ -3,6 +3,10 @@ main = "gemini.mjs"
 compatibility_date = "2026-10-06"
 workers_dev = true
 
+# Run close to a supported Google backend region, not the default global edge.
+[placement]
+region = "gcp:us-east4"
+
 # No receipt/photo/response logs or storage bindings.
 [observability]
 enabled = false

@@ -1,7 +1,7 @@
 import { receiptSchema, receiptInstructions, validateDraft } from './contract.mjs';
 
-export const GEMINI_MODEL = 'gemini-2.5-flash';
-const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+export const GEMINI_MODEL = 'gemini-3.5-flash-lite';
+const endpoint = 'https://generativelanguage.googleapis.com/v1beta/interactions';
 const maxBody = 12_100_000;
 // Google's terms require Paid Services for API clients available in these regions.
 const paidOnlyRegions = new Set('AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO CH GB'.split(' '));
@@ -24,24 +24,25 @@ export function geminiBody(image) {
   if (!(match[1] === 'jpeg' ? head.startsWith('\xff\xd8\xff') : match[1] === 'png' ?
     head.startsWith('\x89PNG\r\n\x1a\n') : head.startsWith('RIFF') && head.slice(8, 12) === 'WEBP')) throw new Error('invalid_image');
   return {
-    systemInstruction: { parts: [{ text: receiptInstructions }] },
-    contents: [{ role: 'user', parts: [
-      { text: '영수증의 상호명, 최종 결제금액, 품목과 수량을 읽고 확인할 항목을 알려주세요.' },
-      { inlineData: { mimeType: `image/${match[1]}`, data: match[2] } },
-    ] }],
-    generationConfig: {
-      temperature: 0, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 1024 },
-      responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: receiptSchema } },
-    },
+    model: GEMINI_MODEL, store: false,
+    system_instruction: `${receiptInstructions}\nUse exactly this JSON schema: ${JSON.stringify(receiptSchema)}`,
+    input: [
+      { type: 'text', text: '영수증의 상호명, 최종 결제금액, 품목과 수량을 읽고 확인할 항목을 알려주세요.' },
+      { type: 'image', mime_type: `image/${match[1]}`, data: match[2] },
+    ],
+    generation_config: { max_output_tokens: 8192 },
+    // Native JSON mode; the full receipt contract is enforced by validateDraft.
+    response_format: { type: 'text', mime_type: 'application/json' },
   };
 }
 
 export function readGemini(data) {
-  if (data?.promptFeedback?.blockReason || data?.candidates?.length !== 1) throw new Error('invalid_draft');
-  const candidate = data.candidates[0];
-  if (candidate.finishReason !== 'STOP' || !Array.isArray(candidate.content?.parts)) throw new Error('incomplete_draft');
-  const parts = candidate.content.parts.filter(part => !part.thought);
-  if (!parts.length || parts.some(part => typeof part.text !== 'string')) throw new Error('invalid_draft');
+  if (data?.status !== 'completed' || data?.model !== GEMINI_MODEL || !Array.isArray(data?.steps)) throw new Error('incomplete_draft');
+  if (data.steps.some(step => !['thought', 'model_output'].includes(step.type))) throw new Error('invalid_draft');
+  const outputs = data.steps.filter(step => step.type === 'model_output');
+  if (outputs.length !== 1 || !Array.isArray(outputs[0].content)) throw new Error('invalid_draft');
+  const parts = outputs[0].content;
+  if (!parts.length || parts.some(part => part.type !== 'text' || typeof part.text !== 'string')) throw new Error('invalid_draft');
   const output = parts.map(part => part.text).join('');
   if (output.length > 250_000) throw new Error('invalid_draft');
   return validateDraft(JSON.parse(output));
@@ -99,7 +100,8 @@ export function createGeminiHandler({ fetchGemini = fetch, timeoutMs = 85_000 } 
       /^[A-Za-z0-9_-]{32,128}$/.test(env.RECEIPT_ACCESS_CODE ?? '') &&
       !/^(AIza|sk-)/.test(env.RECEIPT_ACCESS_CODE) && env.RECEIPT_ACCESS_CODE !== env.GEMINI_API_KEY;
     if (url.pathname === '/receipt/status') return request.method === 'GET' ?
-      send(200, { configured, provider: 'gemini', model: GEMINI_MODEL }) : send(405, {});
+      send(200, { configured, provider: 'gemini', model: GEMINI_MODEL,
+        placement: /^(local|remote)-[A-Z]{3}$/.test(request.headers.get('cf-placement') ?? '') ? request.headers.get('cf-placement') : null }) : send(405, {});
     if (request.method !== 'POST') return send(405, {});
     if (paidOnlyRegions.has(request.cf?.country)) return send(403);
     if (!configured) return send(503);
@@ -126,8 +128,19 @@ export function createGeminiHandler({ fetchGemini = fetch, timeoutMs = 85_000 } 
         body: JSON.stringify(body),
       });
       if (!upstream.ok) {
-        await upstream.body?.cancel();
-        return send(upstream.status === 429 ? 429 : 502);
+        const status = upstream.status === 429 ? 429 : 502;
+        let reason = 'UPSTREAM_ERROR';
+        try {
+          const failure = await readBody(upstream, 64_000, controller.signal);
+          const code = typeof failure?.error?.code === 'string' ? failure.error.code.toUpperCase() : failure?.error?.status;
+          if (['INVALID_ARGUMENT', 'INVALID_REQUEST', 'UNAUTHENTICATED', 'PERMISSION_DENIED', 'NOT_FOUND', 'RESOURCE_EXHAUSTED', 'UNAVAILABLE', 'SERVICE_UNAVAILABLE', 'FAILED_PRECONDITION'].includes(code)) reason = code;
+          if (upstream.status === 400 && /response_format|schema/i.test(failure?.error?.message ?? '')) reason = 'INVALID_RESPONSE_FORMAT';
+          if (failure?.error?.message?.includes('API key not valid')) reason = 'API_KEY_INVALID';
+          if (/location.*(not supported|unsupported)|unsupported.*location/i.test(failure?.error?.message ?? '')) reason = 'LOCATION_UNSUPPORTED';
+          else if (/free tier.*(not available|unavailable|country|region)/i.test(failure?.error?.message ?? '')) reason = 'FREE_TIER_REGION_UNAVAILABLE';
+          else if (/enable billing|billing.*(required|enabled)/i.test(failure?.error?.message ?? '')) reason = 'BILLING_REQUIRED';
+        } catch { reason = 'INVALID_PROVIDER_ERROR_BODY'; /* Never expose raw errors, keys or requests. */ }
+        return send(status, { error: messages[status], providerStatus: upstream.status, reason });
       }
       const draft = readGemini(await readBody(upstream, 1_000_000, controller.signal));
       if (controller.signal.aborted) return send(504);

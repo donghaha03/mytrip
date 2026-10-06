@@ -23,8 +23,10 @@ for (const [file, merchant, total] of [
     method: 'POST', headers: { Authorization: `Bearer ${code}`, 'Content-Type': 'application/json', Origin: 'https://donghaha03.github.io' },
     body: JSON.stringify({ image }), signal: AbortSignal.timeout(90000),
   });
-  assert.equal(response.status, 200, `Live recognition failed (${response.status}); no retry/fallback was sent.`);
-  const { draft, model } = await response.json();
+  const payload = await response.json().catch(() => ({}));
+  const reason = /^[A-Z_]{1,40}$/.test(payload.reason ?? '') ? payload.reason : 'UNKNOWN';
+  assert.equal(response.status, 200, `Live recognition failed (${response.status}, provider ${Number(payload.providerStatus) || 0}, ${reason}); no retry/fallback was sent.`);
+  const { draft, model } = payload;
   assert.equal(model, GEMINI_MODEL);
   assert.equal(draft.merchant, merchant);
   assert.equal(draft.date, '2026-10-04');
