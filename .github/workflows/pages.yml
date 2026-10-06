@@ -53,6 +53,7 @@ jobs:
         run: node tool/configure_receipts.mjs
         env:
           RECEIPT_SERVER_URL: ${{ vars.RECEIPT_SERVER_URL }}
+          RECEIPT_PROVIDER: ${{ vars.RECEIPT_PROVIDER }}
 
       # 실패하면 배포를 중단하므로 마지막 정상 환율과 앱이 그대로 남는다.
       - name: Update daily rates

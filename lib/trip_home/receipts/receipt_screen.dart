@@ -51,6 +51,27 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     _configured = true;
   }
 
+  Future<void> _retryConnection() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _consented = false;
+      _error = null;
+    });
+    try {
+      await _connect();
+      if (_connection == null) {
+        throw const ReceiptConnectionException(
+          '영수증 서버가 아직 연결되지 않았어요. 수동 입력을 이용해주세요.',
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _review(ReceiptDraft draft) async {
     final result = await Navigator.of(context).push<ReceiptDraft>(
       MaterialPageRoute(
@@ -133,18 +154,12 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       }
       return;
     }
-    if (!_consented) return;
+    if (!_consented || _connection == null) return;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      if (_connection == null) await _connect();
-      if (_connection == null) {
-        throw const ReceiptConnectionException(
-          'LLM 영수증 서버가 아직 연결되지 않았어요. 서버 설정 후 재시도하거나 수동으로 입력해주세요.',
-        );
-      }
       final draft = await _client.recognize(
         _connection!,
         _imageData!,
@@ -185,16 +200,26 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     semanticLabel: '촬영한 영수증 원본',
                   ),
                   const SizedBox(height: 16),
-                  if (_draft == null) ...[
-                    const Text('사진 전체를 OpenAI로 보내 내용을 읽어요. 인식 후 직접 확인하고 저장해요.'),
+                  if (_draft == null && _connection != null) ...[
+                    Text(
+                      _connection!.isGemini
+                          ? '사진을 Cloudflare 중계 서버를 통해 Google Gemini로 보내요. 무료 서비스는 사진·결과를 제품 개선에 사용하거나 사람이 검토할 수 있어요. 카드번호·연락처 등 개인정보를 먼저 가려주세요.'
+                          : '사진 전체를 OpenAI로 보내 내용을 읽어요. 인식 후 직접 확인하고 저장해요.',
+                    ),
                     TextButton(
                       onPressed: () => launchUrl(
                         Uri.parse(
-                          'https://developers.openai.com/api/docs/guides/your-data',
+                          _connection!.isGemini
+                              ? 'https://ai.google.dev/gemini-api/terms'
+                              : 'https://developers.openai.com/api/docs/guides/your-data',
                         ),
                         mode: LaunchMode.externalApplication,
                       ),
-                      child: const Text('OpenAI 데이터 보관 정책'),
+                      child: Text(
+                        _connection!.isGemini
+                            ? 'Google 데이터 처리·보관 정책'
+                            : 'OpenAI 데이터 보관 정책',
+                      ),
                     ),
                     if (_connection?.needsAccessCode == true)
                       TextField(
@@ -220,13 +245,22 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       value: _consented,
-                      title: const Text('이 사진을 OpenAI로 보내는 데 동의해요'),
+                      title: Text(
+                        _connection!.isGemini
+                            ? '만 18세 이상이며 개인정보를 가린 사진을 Google로 보내는 데 동의해요'
+                            : '이 사진을 OpenAI로 보내는 데 동의해요',
+                      ),
                       onChanged: _busy
                           ? null
                           : (value) =>
                                 setState(() => _consented = value ?? false),
                     ),
                   ],
+                  if (_draft == null && _connection == null)
+                    OutlinedButton(
+                      onPressed: _busy ? null : _retryConnection,
+                      child: const Text('서버 연결 다시 확인'),
+                    ),
                 ],
                 if (_busy) ...[
                   const Center(child: CircularProgressIndicator()),
@@ -246,7 +280,10 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                   ),
                 if (_image != null)
                   FilledButton(
-                    onPressed: !_busy && (_draft != null || _consented)
+                    onPressed:
+                        !_busy &&
+                            (_draft != null ||
+                                (_consented && _connection != null))
                         ? _recognize
                         : null,
                     child: Text(

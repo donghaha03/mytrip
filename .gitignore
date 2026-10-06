@@ -60,3 +60,6 @@ app.*.map.json
 *.dpapi
 *.dpapi.tmp
 runtime.lock
+.wrangler/
+.dev.vars
+.dev.vars.*

@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "engines": { "node": ">=24" },
-  "scripts": { "start": "node index.mjs", "start:remote": "node remote.mjs", "test": "node --test *.test.mjs" },
+  "scripts": { "start": "node index.mjs", "start:remote": "node remote.mjs", "test": "node --test *.test.mjs", "test:live:gemini": "node check-gemini.mjs" },
   "dependencies": { "jose": "6.1.3" }
 }

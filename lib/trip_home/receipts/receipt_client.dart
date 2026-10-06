@@ -6,9 +6,11 @@ import 'package:http/http.dart' as http;
 import 'receipt_draft.dart';
 
 class ReceiptConnection {
-  const ReceiptConnection(this.url, {this.csrf});
+  const ReceiptConnection(this.url, {this.csrf, this.provider = 'openai'});
   final Uri url;
   final String? csrf;
+  final String provider;
+  bool get isGemini => provider == 'gemini';
   bool get needsAccessCode => csrf == null;
 }
 
@@ -28,10 +30,14 @@ class ReceiptClient {
   Future<ReceiptConnection?> connection({
     String? localRuntime,
     String serverUrl = const String.fromEnvironment('RECEIPT_SERVER_URL'),
+    String provider = const String.fromEnvironment(
+      'RECEIPT_PROVIDER',
+      defaultValue: 'gemini',
+    ),
     required Uri configUrl,
   }) async {
     // A compiled server address wins, so all builds can target the same backend.
-    if (serverUrl.isNotEmpty) return _remote(serverUrl);
+    if (serverUrl.isNotEmpty) return _remote(serverUrl, provider);
     if (localRuntime != null) {
       final data = jsonDecode(localRuntime) as Map<String, dynamic>;
       final url = Uri.parse(data['url'] as String);
@@ -56,7 +62,7 @@ class ReceiptClient {
         return null; // Explicitly unconfigured; keep the existing device path.
       }
       if (url is! String) throw const FormatException();
-      return _remote(url);
+      return _remote(url, data['provider'] ?? 'openai');
     } on ReceiptConnectionException {
       rethrow;
     } catch (_) {
@@ -66,9 +72,10 @@ class ReceiptClient {
     }
   }
 
-  ReceiptConnection _remote(String value) {
+  ReceiptConnection _remote(String value, Object provider) {
     final url = Uri.tryParse(value);
-    if (url == null ||
+    if (!['openai', 'gemini'].contains(provider) ||
+        url == null ||
         url.scheme != 'https' ||
         url.host.isEmpty ||
         url.userInfo.isNotEmpty ||
@@ -79,7 +86,10 @@ class ReceiptClient {
         '영수증 서버 주소가 올바르지 않아요. 관리자에게 확인해주세요.',
       );
     }
-    return ReceiptConnection(url.resolve('/receipt/recognize'));
+    return ReceiptConnection(
+      url.resolve('/receipt/recognize'),
+      provider: provider as String,
+    );
   }
 
   Future<ReceiptDraft> recognize(
@@ -97,7 +107,9 @@ class ReceiptClient {
       throw const ReceiptConnectionException('사진을 읽지 못했어요. 다시 촬영해주세요.');
     }
     if (connection.needsAccessCode &&
-        !RegExp(r'^[A-Za-z0-9_-]{32,128}$').hasMatch(accessCode)) {
+        (!RegExp(r'^[A-Za-z0-9_-]{32,128}$').hasMatch(accessCode) ||
+            accessCode.startsWith('AIza') ||
+            accessCode.startsWith('sk-'))) {
       throw const ReceiptConnectionException(
         '서버 관리자가 공유한 접속 코드를 입력해주세요. API 키를 입력하지 마세요.',
       );
@@ -122,6 +134,7 @@ class ReceiptClient {
           403 => '영수증 서버의 연결 권한을 확인해주세요.',
           413 => '사진이 너무 커요. 다시 촬영해주세요.',
           429 => '인식 요청이 많거나 사용 한도에 도달했어요. 잠시 후 다시 시도해주세요.',
+          503 => '영수증 서버가 아직 준비되지 않았어요. 수동 입력을 이용해주세요.',
           504 => '인식 시간이 초과됐어요. 다시 시도하거나 수동으로 입력해주세요.',
           _ => '인식하지 못했어요. 서버 연결·로그인·사용 한도를 확인하고 다시 시도해주세요.',
         });

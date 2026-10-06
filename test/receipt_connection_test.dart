@@ -32,6 +32,38 @@ final configUrl = Uri.parse(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   test(
+    'Gemini provider is shared by native/web configuration and unknown providers are rejected',
+    () async {
+      var provider = 'gemini';
+      final client = ReceiptClient(
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'serverUrl': 'https://receipt.example.invalid',
+              'provider': provider,
+            }),
+            200,
+          ),
+        ),
+      );
+      addTearDown(client.close);
+      expect((await client.connection(configUrl: configUrl))!.isGemini, isTrue);
+      expect(
+        (await client.connection(
+          configUrl: configUrl,
+          serverUrl: 'https://receipt.example.invalid',
+          provider: 'gemini',
+        ))!.isGemini,
+        isTrue,
+      );
+      provider = 'unknown';
+      await expectLater(
+        client.connection(configUrl: configUrl),
+        throwsA(isA<ReceiptConnectionException>()),
+      );
+    },
+  );
+  test(
     'one HTTPS configuration serves browser and native clients without secrets',
     () async {
       final client = ReceiptClient(
@@ -215,7 +247,12 @@ void main() {
       ReceiptDraft? saved;
       final client = ReceiptClient(
         client: MockClient((request) async {
-          if (request.method == 'GET') return http.Response(config, 200);
+          if (request.method == 'GET') {
+            return http.Response(
+              '{"serverUrl":"https://receipt.example.invalid","provider":"gemini"}',
+              200,
+            );
+          }
           posts++;
           expect(jsonDecode(request.body)['image'], image);
           return http.Response.bytes(
@@ -246,6 +283,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(posts, 0);
       expect(find.text('영수증 사진 확인'), findsOneWidget);
+      expect(find.text('Google 데이터 처리·보관 정책'), findsOneWidget);
+      expect(find.text('OpenAI 데이터 보관 정책'), findsNothing);
       await tester.enterText(find.byType(TextField), code);
       await tester.tap(find.byType(CheckboxListTile));
       await tester.pumpAndSettle();

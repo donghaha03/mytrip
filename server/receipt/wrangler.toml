@@ -1,0 +1,14 @@
+name = "mytrip-receipt"
+main = "gemini.mjs"
+compatibility_date = "2026-10-06"
+workers_dev = true
+
+# No receipt/photo/response logs or storage bindings.
+[observability]
+enabled = false
+
+[vars]
+RECEIPT_ALLOWED_ORIGINS = "https://donghaha03.github.io"
+# Set yes only after checking the actual Gemini project and Workers account plan.
+GEMINI_FREE_TIER_CONFIRMED = "no"
+RECEIPT_FREE_HOSTING_CONFIRMED = "no"

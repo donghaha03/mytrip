@@ -1,5 +1,101 @@
 # 영수증 인식 연결
 
+## Gemini 무료 API · 공개 웹과 앱
+
+`gemini.mjs`를 Cloudflare **Workers Free**에 배포합니다. 촬영한 사진을 Google의
+`gemini-2.5-flash` 이미지 이해 모델에 한 번 전달하고, 검증된 JSON을 기존 검토 화면으로
+돌려줍니다. 상호명·날짜·통화·최종 결제금액과 품목 이름·수량·단가·금액을 읽습니다.
+품목·세금·소계를 총액에 다시 더하지 않으며, 모호한 값은 비워 확인을 요청합니다.
+사용자가 검토하고 지출 양식에 적용한 뒤 저장합니다.
+
+### 무료 조건과 데이터
+
+- Gemini 키가 속한 **프로젝트의 Free Tier**를 확인합니다. 결제 계정이 연결된 프로젝트는
+  같은 모델을 호출해도 별도 과금될 수 있습니다. 코드만으로 결제 등급을 판별할 수 없습니다.
+- Cloudflare도 **Workers Free** 계정이어야 합니다. 유료 전환·결제수단 추가는 하지 않습니다.
+- Google 무료 한도는 프로젝트·모델에 따라 다릅니다. 429는 수동 재시도·수동 입력으로 안내합니다.
+  다른 모델·OpenAI API·유료 플랜으로 자동 전환하지 않습니다.
+- 사진 전체와 추출 프롬프트가 Cloudflare를 거쳐 Google에 전송됩니다. 이 Worker에는 사진·응답
+  저장소가 없고 관측 로그를 끕니다. Google의 무료 서비스는 입력·결과를 제품 개선에 사용하고
+  사람이 검토할 수 있습니다. 고정 삭제 기한이나 무보관을 보장하지 않습니다.
+- 개인정보 없는 테스트 사진을 사용합니다. 실제 사진은 카드번호·연락처·주소 등 개인/기밀 정보를
+  먼저 가려야 합니다. 출력에서 제외하도록 지시하는 것만으로 원본 전송을 막을 수는 없습니다.
+- 발표 테스트는 성인 사용자와 [지원 지역](https://ai.google.dev/gemini-api/docs/available-regions)을
+  대상으로 합니다. EEA·스위스·영국 사용자에게 API 앱을 제공할 때는 무료 서비스 사용이 허용되지 않습니다.
+  Cloudflare의 요청 국가 정보로 해당 지역 호출을 차단하고 화면에서 성인 여부를 확인합니다.
+  일반 공개 서비스로 확장하기 전에 사용자별 인증과 더 강한 연령 확인이 필요합니다.
+
+### 서버 연결
+
+저장소 루트가 아니라 `server/receipt` 디렉터리에서 다음 명령을 사용합니다.
+
+```powershell
+npx --yes wrangler@4.147.0 login --use-keyring --scopes account:read user:read workers_scripts:write
+npx --yes wrangler@4.147.0 deploy
+npx --yes wrangler@4.147.0 secret put GEMINI_API_KEY
+npx --yes wrangler@4.147.0 secret put RECEIPT_ACCESS_CODE
+```
+
+배포가 Cloudflare 오류 `10034`로 막히면 가입 이메일의 인증 링크를 완료한 뒤 Wrangler에
+다시 로그인합니다. 프로필에서 이메일 주소를 바꿀 필요는 없습니다. 재인증 후에도 같은 오류가
+계속되면 Cloudflare의 계정 인증 문제를 해결해야 하며, 서버 연결 완료로 처리하지 않습니다.
+
+키는 비밀값 입력 프롬프트 또는 Cloudflare 대시보드의 Worker → Settings → Variables and Secrets에서
+**Secret** 형식으로 입력합니다. 명령 인수·채팅·GitHub·앱 코드에 넣지 않습니다.
+`RECEIPT_ACCESS_CODE`는 API 키와 다른 무작위 URL-safe 32~128자 코드입니다.
+발표 참여자에게만 공유하고 앱의 사진 확인 화면에서 입력합니다. 앱에는 저장하지 않습니다.
+Windows에서는 `powershell -File prepare-access.ps1`로 무작위 접속 코드를 생성·등록할 수 있습니다.
+로컬 복사본은 `%LOCALAPPDATA%/mytrip-receipt/gemini-access.dpapi`에 현재 Windows 사용자 전용으로
+암호화합니다. 사용자가 직접 `powershell -File prepare-access.ps1 -Copy`를 실행하면 코드가
+클립보드에 복사됩니다. 코드나 Gemini 키를 채팅에 보내지 않습니다.
+
+실제 무료 등급을 확인한 뒤 `wrangler.toml`의 두 확인 값을 `yes`로 바꾸고 다시 배포합니다.
+기본 `no`는 실수로 호출되는 것을 막습니다. 나중에 계정에 결제를 연결하면 이 값을 다시 `no`로 바꿔야 합니다.
+저장소 기본값을 바꾸지 않으려면 배포할 때
+`--var GEMINI_FREE_TIER_CONFIRMED:yes --var RECEIPT_FREE_HOSTING_CONFIRMED:yes`로 확인 값을 지정합니다.
+
+| 서버 설정 | 저장 위치 |
+| --- | --- |
+| `GEMINI_API_KEY` | Cloudflare Secret |
+| `RECEIPT_ACCESS_CODE` | Cloudflare Secret |
+| `GEMINI_FREE_TIER_CONFIRMED=yes` | 무료 Gemini 프로젝트 확인 후 서버 변수 |
+| `RECEIPT_FREE_HOSTING_CONFIRMED=yes` | Workers Free 확인 후 서버 변수 |
+| `RECEIPT_ALLOWED_ORIGINS` | 기본 `https://donghaha03.github.io` |
+
+`GET https://서버주소/receipt/status`는 설정 유무·제공자·모델만 반환합니다. 키나 영수증을 반환하지
+않고 Google 호출도 하지 않습니다. `configured:true`는 변수 확인이며 실제 계정 결제 상태나
+인식 성공의 증거는 아닙니다. 개인정보 없는 사진으로 실제 호출까지 확인해야 합니다.
+
+mytrip의 Actions 변수 `RECEIPT_SERVER_URL=https://서버주소`, `RECEIPT_PROVIDER=gemini`를 설정하고
+Pages를 배포합니다. `receipt-config.json`에는 공개 주소와 제공자만 들어갑니다. 웹·iOS·Android는
+같은 설정과 호출 계약을 사용합니다. 개발 빌드에서는 다음처럼 지정할 수 있습니다.
+
+```powershell
+flutter build web --dart-define=RECEIPT_SERVER_URL=https://서버주소 --dart-define=RECEIPT_PROVIDER=gemini
+```
+
+서버 주소가 `null`인 공개 배포는 연결 완료 상태가 아니며 기존 기기 OCR을 유지합니다.
+LLM 연결 후 오류에는 사진을 보존하고 다른 제공자로 자동 전송하지 않습니다.
+
+추가 SDK·DB·파일 업로드 API·영수증 보관 서버를 사용하지 않습니다. 공유 접속 코드와 Google 무료
+한도에 의존하는 소규모 발표용입니다. 여러 사용자·공개 가입에는 별도 사용자 인증과 영속 사용량
+제한이 필요합니다. Workers Free의 CPU 제한(호출당 10ms)도 실제 사진 크기로 확인해야 하며,
+제한에 걸리면 사진 최적화 또는 수동 입력을 사용하고 유료 업그레이드는 하지 않습니다.
+
+공식 문서: [Gemini 가격](https://ai.google.dev/gemini-api/docs/pricing),
+[결제 등급](https://ai.google.dev/gemini-api/docs/billing),
+[Google 데이터 처리 약관](https://ai.google.dev/gemini-api/terms),
+[Gemini REST](https://ai.google.dev/api/generate-content),
+[Cloudflare 무료 제한](https://developers.cloudflare.com/workers/platform/pricing/),
+[서버 비밀값](https://developers.cloudflare.com/workers/configuration/secrets/).
+
+테스트: `node --test *.test.mjs`, `flutter analyze`, `flutter test`.
+Gemini 모의 응답 테스트와 실제 인식·무료 프로젝트·모바일 촬영 검증은 별도입니다.
+연결 후 `RECEIPT_SERVER_URL`과 별도 `RECEIPT_ACCESS_CODE`를 비공개 환경 변수로 설정하고
+`npm run test:live:gemini`를 실행하면 저장소의 개인정보 없는 세로·가로 영수증만 전송해
+상호명·날짜·통화·총액, 가로 영수증의 Americano 1개 5,000원을 실제 응답과 비교합니다.
+실패한 실제 호출은 자동 재시도하지 않습니다. Gemini 키는 이 검사 프로그램에 전달하지 않습니다.
+
 ## 로컬 ChatGPT 구독 방식
 
 사용자가 선택한 별도 로컬 런타임입니다. 데스크톱 대화 세션을 재개하지 않습니다.
@@ -40,7 +136,7 @@ Codex/ChatGPT의 기존 쿠키나 인증정보를 읽지 않습니다. 로그인
 - https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference
 - https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations
 
-## 공개 웹·앱용 API 방식 (연결 준비 상태)
+## 선택하지 않은 OpenAI 유료 API 방식 (기본 비활성)
 
 GitHub Pages는 정적 파일만 제공하므로 별도 HTTPS 서버가 필요합니다.
 `remote.mjs`는 로컬과 같은 사진 요청·프롬프트·모델·JSON 양식을 사용하되,
