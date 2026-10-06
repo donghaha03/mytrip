@@ -26,7 +26,8 @@ import VisionKit
       switch call.method {
       case "open":
         let options = call.arguments as? [String: Any]
-        self.receipt.open(result, captureOnly: options?["captureOnly"] as? Bool ?? false)
+        self.receipt.open(result, captureOnly: options?["captureOnly"] as? Bool ?? false,
+                          gallery: options?["gallery"] as? Bool ?? false)
       case "close": self.receipt.close(); result(nil)
       default: result(FlutterMethodNotImplemented)
       }
@@ -51,33 +52,19 @@ private final class ReceiptBridge: NSObject,
     return controller
   }
 
-  func open(_ result: @escaping FlutterResult, captureOnly: Bool) {
+  func open(_ result: @escaping FlutterResult, captureOnly: Bool, gallery: Bool) {
     guard completion == nil else {
       result(FlutterError(code: "busy", message: "이미 영수증을 인식하고 있어요.", details: nil))
       return
     }
-    guard let parent = presenter else {
+    guard presenter != nil else {
       result(FlutterError(code: "unavailable", message: "촬영 화면을 열지 못했어요.", details: nil))
       return
     }
     completion = result
     self.captureOnly = captureOnly
     session = UUID()
-    let token = session
-    let sheet = UIAlertController(title: "영수증 추가", message: "영수증 전체가 보이게 촬영해주세요.", preferredStyle: .actionSheet)
-    sheet.addAction(UIAlertAction(title: "영수증 촬영", style: .default) { [weak self, weak sheet] _ in
-      guard self?.session == token else { return }
-      sheet?.dismiss(animated: true) { self?.startCamera(token) }
-    })
-    sheet.addAction(UIAlertAction(title: "사진 선택", style: .default) { [weak self, weak sheet] _ in
-      guard self?.session == token else { return }
-      sheet?.dismiss(animated: true) { self?.startPhotos() }
-    })
-    sheet.addAction(UIAlertAction(title: "취소", style: .cancel) { [weak self] _ in self?.finish(nil) })
-    sheet.popoverPresentationController?.sourceView = parent.view
-    sheet.popoverPresentationController?.sourceRect = CGRect(x: parent.view.bounds.midX, y: parent.view.bounds.midY, width: 1, height: 1)
-    presented = sheet
-    parent.present(sheet, animated: true)
+    if gallery { startPhotos() } else { startCamera(session) }
   }
 
   private func startCamera(_ token: UUID?) {

@@ -1,7 +1,7 @@
 import 'dart:js_interop';
 
 @JS('mytripReceipt.open')
-external JSPromise<JSAny?> _open(JSBoolean captureOnly);
+external JSPromise<JSAny?> _open(JSBoolean captureOnly, JSString source);
 @JS('mytripReceipt.connection')
 external JSString? _connection();
 @JS('mytripReceipt.close')
@@ -13,6 +13,9 @@ Future<String?> openReceiptCamera({
   bool captureOnly = false,
   bool gallery = false,
 }) async {
-  final result = await _open(captureOnly.toJS).toDart;
+  final result = await _open(
+    captureOnly.toJS,
+    (gallery ? 'gallery' : 'camera').toJS,
+  ).toDart;
   return (result as JSString?)?.toDart;
 }

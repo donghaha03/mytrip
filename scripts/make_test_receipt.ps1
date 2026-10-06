@@ -1,6 +1,8 @@
-﻿Add-Type -AssemblyName System.Drawing
+﻿param([switch]$AdjustmentsOnly)
+Add-Type -AssemblyName System.Drawing
 $taskReceiptDir = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../test/fixtures'))
 New-Item -ItemType Directory -Force -Path $taskReceiptDir | Out-Null
+if (-not $AdjustmentsOnly) {
 $taskBitmap = New-Object System.Drawing.Bitmap 1000, 1400
 $taskGraphics = [System.Drawing.Graphics]::FromImage($taskBitmap)
 $taskGraphics.Clear([System.Drawing.Color]::White)
@@ -25,14 +27,18 @@ foreach ($taskLine in @('테스트 카페', 'DATE 2026-10-04', '상품명       
 }
 $taskBitmap.Save((Join-Path $taskReceiptDir 'receipt_landscape.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 $taskGraphics.Dispose(); $taskFont.Dispose(); $taskBitmap.Dispose()
+}
 foreach ($taskCase in @(
   @{ File='receipt_food.png'; Lines=@('SAMPLE STORE', 'DATE 2026-10-04', 'Steak      10,000    1    10,000', 'Milk        2,000    1     2,000', 'Rice        1,000    1     1,000', 'TOTAL KRW 13,000') },
   @{ File='receipt_transport.png'; Lines=@('SAMPLE STORE', 'DATE 2026-10-04', 'Bus ticket   5,000    1    5,000', 'TOTAL KRW 5,000') },
   @{ File='receipt_shopping.png'; Lines=@('SAMPLE STORE', 'DATE 2026-10-04', 'T-shirt     10,000    1    10,000', 'TOTAL KRW 10,000') },
   @{ File='receipt_tax_free.png'; Lines=@('SAMPLE TAX FREE', 'DATE 2026-10-04', 'Watch   11,000   1   11,000', 'SUBTOTAL KRW 11,000 (incl. VAT)', 'VAT BEFORE EXEMPTION KRW 1,000', 'TAX FREE APPLIED', 'EXEMPTED TAX KRW 1,000', 'DISCOUNT KRW 500', 'TOTAL PAID KRW 9,500') },
-  @{ File='receipt_consumption_tax.png'; Lines=@('SAMPLE STORE', 'DATE 2026-10-04', 'T-shirt   10,800   1   10,800', 'CONSUMPTION TAX JPY 800 (included)', 'TOTAL PAID JPY 10,800') }
+  @{ File='receipt_consumption_tax.png'; Lines=@('SAMPLE STORE', 'DATE 2026-10-04', 'T-shirt   10,800   1   10,800', 'CONSUMPTION TAX JPY 800 (included)', 'TOTAL PAID JPY 10,800') },
+  @{ File='receipt_adjustments.png'; Lines=@('SAMPLE CAFE', 'DATE 2026-10-04', 'Americano   10,000   1   10,000', 'SUBTOTAL KRW 10,000', 'VAT KRW 909 (included)', 'SERVICE CHARGE KRW 1,000', 'PACKAGING FEE KRW 500', 'TIP KRW 2,000', 'COUPON DISCOUNT KRW 1,000', 'MEMBER DISCOUNT KRW 500', 'TOTAL PAID KRW 12,000') }
 )) {
+  if ($AdjustmentsOnly -and $taskCase.File -ne 'receipt_adjustments.png') { continue }
   $taskBitmap = if ($taskCase.File -in @('receipt_tax_free.png', 'receipt_consumption_tax.png')) { New-Object System.Drawing.Bitmap 1200, 1200 } else { New-Object System.Drawing.Bitmap 1000, 900 }
+  if ($taskCase.File -eq 'receipt_adjustments.png') { $taskBitmap.Dispose(); $taskBitmap = New-Object System.Drawing.Bitmap 1200, 1500 }
   $taskGraphics = [System.Drawing.Graphics]::FromImage($taskBitmap)
   $taskGraphics.Clear([System.Drawing.Color]::White)
   $taskFont = New-Object System.Drawing.Font 'Arial', 32

@@ -4,6 +4,68 @@ import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
 
 void main() {
   test(
+    'applied fees and discount lines persist without changing the final payment',
+    () {
+      final draft = ReceiptDraft.fromLlm({
+        'merchant': 'SAMPLE CAFE',
+        'date': '2026-10-04',
+        'currency': 'KRW',
+        'amount': 10500,
+        'items': [],
+        'warnings': [],
+        'adjustments': {
+          'discount': 1000,
+          'currency': 'KRW',
+          'details': [
+            {
+              'label': '서비스료',
+              'kind': 'surcharge',
+              'amount': 1000,
+              'currency': 'KRW',
+            },
+            {
+              'label': '포장비',
+              'kind': 'surcharge',
+              'amount': 500,
+              'currency': 'KRW',
+            },
+            {
+              'label': '쿠폰 할인',
+              'kind': 'discount',
+              'amount': 1000,
+              'currency': 'KRW',
+            },
+          ],
+        },
+      });
+      final restored = ReceiptAdjustments.fromJson(
+        draft.adjustments!.toJson(),
+      )!;
+      expect(restored.details.map((line) => line.amount), [1000, 500, 1000]);
+      expect(restored.details.last.isDiscount, isTrue);
+      expect(draft.amount, 10500);
+      for (final bad in [double.nan, -1, double.infinity, 1e13]) {
+        expect(
+          ReceiptAdjustmentLine.fromJson({
+            'label': '팁',
+            'kind': 'surcharge',
+            'currency': 'KRW',
+            'amount': bad,
+          }),
+          isNull,
+        );
+      }
+      expect(
+        ReceiptAdjustments.fromJson({
+          'details': [
+            {'label': '팁', 'kind': 'offer', 'currency': 'KRW', 'amount': 500},
+          ],
+        }),
+        isNull,
+      );
+    },
+  );
+  test(
     'explicit exemption and discount are metadata, not another deduction',
     () {
       final data = {

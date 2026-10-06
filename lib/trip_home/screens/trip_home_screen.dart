@@ -160,6 +160,7 @@ class _SpendingCard extends StatelessWidget {
     String md(DateTime date) =>
         '${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
     return Container(
+      key: const ValueKey('home-budget-card'),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       decoration: BoxDecoration(
         gradient: AppColors.budgetGradient,

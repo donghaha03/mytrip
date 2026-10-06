@@ -16,7 +16,7 @@
       csrf: window.mytripReceiptLLM.csrf,
     }) : null,
     close: () => active?.finish(null),
-    open: (captureOnly = false) => new Promise((resolve, reject) => {
+    open: (captureOnly = false, source = null) => new Promise((resolve, reject) => {
       captureOnly = captureOnly || !!window.mytripReceiptLLM;
       if (active) { reject(new Error('이미 영수증 촬영 화면이 열려 있어요')); return; }
       const previousFocus = document.activeElement;
@@ -124,7 +124,8 @@
         return canvas.toDataURL('image/jpeg', 0.95);
       };
       $('#receipt-start').onclick = camera; $('#receipt-retake').onclick = camera;
-      $('#receipt-choose').onclick = () => $('#receipt-file').click();
+      const choose = () => { $('#receipt-file').value = ''; $('#receipt-file').click(); };
+      $('#receipt-choose').onclick = choose;
       $('#receipt-shot').onclick = () => {
         try { preview(encode(video, video.videoWidth, video.videoHeight), video.videoWidth, video.videoHeight); }
         catch { error.textContent = '촬영 준비가 끝나지 않았어요. 잠시 후 다시 촬영해주세요.'; }
@@ -143,6 +144,7 @@
         } catch { if (!closed) error.textContent = '사진을 열지 못했어요. 다른 사진을 선택하거나 수동으로 입력해주세요.'; }
         finally { URL.revokeObjectURL(url); if (!closed) setBusy(false); }
       };
+      $('#receipt-file').oncancel = () => { if (source === 'gallery' && !pixels) finish(null); };
       const recognizeOnDevice = async () => {
         if (busy || !pixels) return;
         setBusy(true); error.textContent = ''; $('progress').hidden = false;
@@ -180,7 +182,10 @@
       $('#receipt-ocr').onclick = captureOnly ? () => {
         if (!busy && pixels) finish({ image: pixels });
       } : recognizeOnDevice;
-      dialog.showModal(); $('#receipt-start').focus();
+      dialog.showModal();
+      if (source === 'gallery') choose();
+      else if (source === 'camera') { $('#receipt-shot').focus(); void camera(); }
+      else $('#receipt-start').focus();
     }),
   };
 })();

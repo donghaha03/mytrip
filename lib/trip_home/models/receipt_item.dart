@@ -6,21 +6,26 @@ class ReceiptAdjustments {
     this.taxFreeBase,
     this.discount,
     this.currency,
+    this.details = const [],
   });
   final bool? taxFree;
   final double? exemptedTax, taxFreeBase, discount;
   final String? currency;
+  final List<ReceiptAdjustmentLine> details;
   bool get hasInformation =>
       taxFree != null ||
       exemptedTax != null ||
       taxFreeBase != null ||
-      discount != null;
+      discount != null ||
+      details.isNotEmpty;
   Map<String, dynamic> toJson() => {
     'taxFree': taxFree,
     'exemptedTax': exemptedTax,
     'taxFreeBase': taxFreeBase,
     'discount': discount,
     'currency': currency,
+    if (details.isNotEmpty)
+      'details': details.map((line) => line.toJson()).toList(),
   };
   static ReceiptAdjustments? fromJson(Object? value) {
     if (value is! Map ||
@@ -37,7 +42,13 @@ class ReceiptAdjustments {
                   !(value[key] as num).isFinite ||
                   (value[key] as num) < 0 ||
                   (value[key] as num) > 1e12),
-        )) {
+        ) ||
+        (value['details'] != null &&
+            (value['details'] is! List ||
+                (value['details'] as List).length > 20 ||
+                (value['details'] as List).any(
+                  (line) => ReceiptAdjustmentLine.fromJson(line) == null,
+                )))) {
       return null;
     }
     return ReceiptAdjustments(
@@ -46,6 +57,50 @@ class ReceiptAdjustments {
       taxFreeBase: (value['taxFreeBase'] as num?)?.toDouble(),
       discount: (value['discount'] as num?)?.toDouble(),
       currency: value['currency'] as String?,
+      details: [
+        for (final line in value['details'] as List? ?? const [])
+          ReceiptAdjustmentLine.fromJson(line)!,
+      ],
+    );
+  }
+}
+
+/// Applied fees/discounts printed on the receipt; informational, not recalculated.
+class ReceiptAdjustmentLine {
+  const ReceiptAdjustmentLine({
+    required this.label,
+    required this.kind,
+    required this.amount,
+    required this.currency,
+  });
+  final String label, kind, currency;
+  final double amount;
+  bool get isDiscount => kind == 'discount';
+  Map<String, dynamic> toJson() => {
+    'label': label,
+    'kind': kind,
+    'amount': amount,
+    'currency': currency,
+  };
+  static ReceiptAdjustmentLine? fromJson(Object? value) {
+    if (value is! Map ||
+        value['label'] is! String ||
+        (value['label'] as String).trim().isEmpty ||
+        (value['label'] as String).length > 50 ||
+        !['surcharge', 'discount'].contains(value['kind']) ||
+        value['amount'] is! num ||
+        !(value['amount'] as num).isFinite ||
+        (value['amount'] as num) < 0 ||
+        (value['amount'] as num) > 1e12 ||
+        value['currency'] is! String ||
+        !RegExp(r'^[A-Z]{3}$').hasMatch(value['currency'] as String)) {
+      return null;
+    }
+    return ReceiptAdjustmentLine(
+      label: (value['label'] as String).trim(),
+      kind: value['kind'] as String,
+      amount: (value['amount'] as num).toDouble(),
+      currency: value['currency'] as String,
     );
   }
 }

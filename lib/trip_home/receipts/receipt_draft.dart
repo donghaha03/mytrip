@@ -92,7 +92,7 @@ class ReceiptDraft {
     final taxes = <ReceiptTax>[];
     final adjustments = ReceiptAdjustments.fromJson(data['adjustments']);
     if (data['adjustments'] != null && adjustments == null) {
-      warnings.add('면세·할인 정보 확인 필요');
+      warnings.add('면세·추가금·할인 정보 확인 필요');
     }
     if (adjustments != null &&
         (adjustments.exemptedTax != null ||
@@ -100,6 +100,12 @@ class ReceiptDraft {
             adjustments.discount != null) &&
         countryByCode(adjustments.currency ?? '') == null) {
       warnings.add('면세·할인 금액의 통화 확인 필요');
+    }
+    if (adjustments?.details.any(
+          (line) => countryByCode(line.currency) == null,
+        ) ==
+        true) {
+      warnings.add('추가금·할인 금액의 통화 확인 필요');
     }
     final taxRows = data['taxes'] is List ? data['taxes'] as List : const [];
     if (taxRows.length > 10) {

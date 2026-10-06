@@ -63,6 +63,7 @@ Future<String?> openReceiptCamera({
   if (defaultTargetPlatform == TargetPlatform.iOS) {
     return receiptChannel.invokeMethod<String>('open', {
       'captureOnly': captureOnly,
+      'gallery': gallery,
     });
   }
   if (defaultTargetPlatform == TargetPlatform.android) {

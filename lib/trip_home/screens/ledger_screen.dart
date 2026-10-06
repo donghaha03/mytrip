@@ -132,29 +132,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
               ),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '여행 장부',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        Text(
-                          '${trip.expenses.length}건',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
                     Container(
+                      key: const ValueKey('ledger-budget-card'),
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         gradient: AppColors.budgetGradient,
@@ -288,6 +269,26 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    Row(
+                      key: const ValueKey('ledger-list-heading'),
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            '여행 장부',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Text(
+                          '${entries.length}건',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     if (groups.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 32),

@@ -78,6 +78,14 @@ void main() {
           taxFree: true,
           exemptedTax: 455,
           currency: 'KRW',
+          details: [
+            ReceiptAdjustmentLine(
+              label: '포장비',
+              kind: 'surcharge',
+              amount: 500,
+              currency: 'KRW',
+            ),
+          ],
         ),
       );
       await repo.saveExpense(t.id, receipt);
@@ -115,6 +123,8 @@ void main() {
       expect(e.receiptTaxes.single.included, isTrue);
       expect(e.receiptAdjustments!.taxFree, isTrue);
       expect(e.receiptAdjustments!.exemptedTax, 455);
+      expect(e.receiptAdjustments!.details.single.label, '포장비');
+      expect(e.receiptAdjustments!.details.single.amount, 500);
       expect(e.amount, 5000);
       expect(expenses.last.status, ExpenseStatus.cancelled);
       expect(expenses.last.originalAmount, 10);
@@ -197,6 +207,7 @@ void main() {
           .setMockMethodCallHandler(receiptChannel, (call) async {
             calls++;
             if (call.method == 'close') return null;
+            expect(call.arguments['gallery'], calls == 2);
             if (calls == 1) {
               return jsonEncode({
                 'text': '페이히어 카페\n결제금액 5,000원',
@@ -217,7 +228,7 @@ void main() {
         jsonDecode((await openReceiptCamera())!)['text'],
         contains('5,000원'),
       );
-      expect(await openReceiptCamera(), isNull);
+      expect(await openReceiptCamera(gallery: true), isNull);
       await expectLater(openReceiptCamera(), throwsA(isA<PlatformException>()));
       closeReceiptCamera();
       await Future<void>.delayed(Duration.zero);

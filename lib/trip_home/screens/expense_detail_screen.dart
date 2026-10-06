@@ -213,13 +213,26 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                       const _Info('소비세 · 부가세', '저장된 세금 정보 없음'),
                     if (e.receiptFingerprint != null ||
                         adjustments != null) ...[
+                      for (final line in adjustments?.details ?? const [])
+                        _Info(
+                          '${line.label} · ${line.isDiscount ? '할인' : '추가금'}',
+                          '${line.isDiscount ? '−' : '+'}${formatNumber(line.amount)} ${line.currency}',
+                        ),
                       _Info('면세액', adjustmentAmount(adjustments?.exemptedTax)),
                       if (adjustments?.taxFreeBase != null)
                         _Info(
                           '면세 대상 금액',
                           adjustmentAmount(adjustments!.taxFreeBase),
                         ),
-                      _Info('할인액', adjustmentAmount(adjustments?.discount)),
+                      if (adjustments?.details.any((line) => line.isDiscount) !=
+                          true)
+                        _Info('할인액', adjustmentAmount(adjustments?.discount))
+                      else if (adjustments?.discount != null &&
+                          adjustments!.details
+                                  .where((line) => line.isDiscount)
+                                  .length >
+                              1)
+                        _Info('할인 합계', adjustmentAmount(adjustments.discount)),
                     ],
                     if (e.status == ExpenseStatus.partiallyCancelled)
                       _Info(
@@ -319,9 +332,16 @@ class _Info extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
         const SizedBox(width: 16),
         Expanded(
+          flex: 3,
           child: Text(
             value,
             textAlign: TextAlign.end,

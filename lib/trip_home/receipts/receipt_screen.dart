@@ -121,7 +121,8 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         }
       }
       if (!mounted) return;
-      if (!await _checkConsent()) {
+      // Keep repeat gallery clicks in the user's gesture for mobile browsers.
+      if (!_consented && !await _checkConsent()) {
         if (mounted) Navigator.of(context).pop();
         return;
       }
@@ -362,6 +363,46 @@ class ReceiptReviewScreen extends StatefulWidget {
   State<ReceiptReviewScreen> createState() => _ReceiptReviewScreenState();
 }
 
+/// Compact input accepts YYYYMd, YYYYMMd / YYYYMdd, and YYYYMMDD.
+/// For seven digits prefer the two-digit month when both readings are valid.
+DateTime? parsePaymentDate(String value) {
+  final input = value.trim();
+  DateTime? valid(int year, int month, int day) {
+    if (year < 1 || year > 9999) return null;
+    final date = DateTime(year, month, day);
+    return date.year == year && date.month == month && date.day == day
+        ? date
+        : null;
+  }
+
+  final separated = RegExp(
+    r'^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$',
+  ).firstMatch(input);
+  if (separated != null) {
+    return valid(
+      int.parse(separated[1]!),
+      int.parse(separated[2]!),
+      int.parse(separated[3]!),
+    );
+  }
+  if (!RegExp(r'^\d{6,8}$').hasMatch(input)) return null;
+  final year = int.parse(input.substring(0, 4));
+  for (final monthLength
+      in input.length == 6
+          ? [1]
+          : input.length == 8
+          ? [2]
+          : [2, 1]) {
+    final date = valid(
+      year,
+      int.parse(input.substring(4, 4 + monthLength)),
+      int.parse(input.substring(4 + monthLength)),
+    );
+    if (date != null) return date;
+  }
+  return null;
+}
+
 class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
   final _form = GlobalKey<FormState>();
   late final _merchant = TextEditingController(text: widget.draft.merchant);
@@ -378,11 +419,29 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
   late var _items = [...widget.draft.items];
   late var _taxes = [...widget.draft.taxes];
   late var _adjustments = widget.draft.adjustments;
-  DateTime? get _parsedDate {
-    final input = _date.text.trim();
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(input)) return null;
-    final parsed = DateTime.tryParse(input);
-    return parsed?.toIso8601String().substring(0, 10) == input ? parsed : null;
+  final _dateFocus = FocusNode();
+  DateTime? get _parsedDate => parsePaymentDate(_date.text);
+
+  @override
+  void initState() {
+    super.initState();
+    _dateFocus.addListener(_dateFocusChanged);
+  }
+
+  void _dateFocusChanged() {
+    if (!_dateFocus.hasFocus) _normalizeDate();
+  }
+
+  void _normalizeDate() {
+    final date = _parsedDate;
+    if (date == null) return;
+    final text = date.toIso8601String().substring(0, 10);
+    if (_date.text != text) {
+      _date.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
   }
 
   @override
@@ -390,10 +449,12 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
     _merchant.dispose();
     _amount.dispose();
     _date.dispose();
+    _dateFocus.dispose();
     super.dispose();
   }
 
   void _apply() {
+    _normalizeDate();
     if (!_confirmed || !_form.currentState!.validate()) return;
     if (_items.any((item) => ReceiptItem.fromJson(item.toJson()) == null)) {
       setState(() => _itemError = '품목 내용을 확인하거나 제외해주세요.');
@@ -481,9 +542,17 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
+                    key: const ValueKey('receipt-payment-date'),
                     controller: _date,
+                    focusNode: _dateFocus,
+                    keyboardType: TextInputType.datetime,
+                    onChanged: (value) {
+                      if (RegExp(r'^\d{8}$').hasMatch(value)) _normalizeDate();
+                    },
+                    onFieldSubmitted: (_) => _normalizeDate(),
                     decoration: const InputDecoration(
-                      labelText: '결제일 (YYYY-MM-DD)',
+                      labelText: '결제일',
+                      hintText: '예: 202691 또는 20260901',
                     ),
                     validator: (_) =>
                         _parsedDate == null ? '올바른 결제일을 확인해주세요' : null,
@@ -522,6 +591,16 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                       child: const Text('세금 정보 제외'),
                     ),
                   if (_adjustments != null) ...[
+                    for (final line in _adjustments!.details)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          '${line.label} · ${line.isDiscount ? '할인' : '추가금'}',
+                        ),
+                        subtitle: Text(
+                          '${line.isDiscount ? '−' : '+'}${formatNumber(line.amount)} ${line.currency}',
+                        ),
+                      ),
                     if (_adjustments!.taxFree != null)
                       ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -531,7 +610,13 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                     for (final entry in {
                       '면세액': _adjustments!.exemptedTax,
                       '면세 대상 금액': _adjustments!.taxFreeBase,
-                      '할인액': _adjustments!.discount,
+                      if (!_adjustments!.details.any((line) => line.isDiscount))
+                        '할인액': _adjustments!.discount,
+                      if (_adjustments!.details
+                              .where((line) => line.isDiscount)
+                              .length >
+                          1)
+                        '할인 합계': _adjustments!.discount,
                     }.entries)
                       if (entry.value != null)
                         ListTile(
@@ -543,13 +628,13 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                         ),
                     TextButton(
                       onPressed: () => setState(() => _adjustments = null),
-                      child: const Text('면세·할인 정보 제외'),
+                      child: const Text('면세·추가금·할인 정보 제외'),
                     ),
                   ],
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: _confirmed,
-                    title: const Text('상호명·날짜·최종 금액·통화·세금을 원본과 비교했어요'),
+                    title: const Text('상호명·날짜·최종 금액·통화·추가금·할인을 원본과 비교했어요'),
                     onChanged: (value) =>
                         setState(() => _confirmed = value ?? false),
                   ),

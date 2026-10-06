@@ -34,7 +34,7 @@ function environment({ cameraError, noCamera = false, secure = true, mediaPromis
     recognize: async () => { throw new Error('failure'); } };
   const element = (key) => {
     if (!elements.has(key)) elements.set(key, { hidden: false, disabled: false, value: key === '#receipt-language' ? 'eng' : '',
-      textContent: '', style: {}, focus() {}, setAttribute() {}, play: async () => {}, videoWidth: width, videoHeight: height });
+      textContent: '', style: {}, focus() {}, click() { this.clickCount = (this.clickCount ?? 0) + 1; }, setAttribute() {}, play: async () => {}, videoWidth: width, videoHeight: height });
     return elements.get(key);
   };
   const dialog = { setAttribute() {}, showModal() {}, close() {}, remove() { dialog.removed = true; },
@@ -136,6 +136,22 @@ test('capture stops tracks, retake opens again, close and Escape release stream'
   await env.element('#receipt-retake').onclick(); assert.equal(env.counters().cameraCalls, 2);
   env.callbacks.get('cancel')({ preventDefault() {} });
   assert.equal(await result, null); assert.equal(env.counters().stopCount, 2);
+});
+test('requested camera and gallery open directly; gallery cancel preserves the parent photo', async () => {
+  const camera = environment(); const cameraResult = camera.window.mytripReceipt.open(true, 'camera');
+  await new Promise(r => setImmediate(r));
+  assert.equal(camera.counters().cameraCalls, 1);
+  assert.equal(camera.element('#receipt-start').hidden, true);
+  assert.equal(camera.element('#receipt-shot').hidden, false);
+  camera.window.mytripReceipt.close(); assert.equal(await cameraResult, null);
+  const gallery = environment(); const galleryResult = gallery.window.mytripReceipt.open(true, 'gallery');
+  assert.equal(gallery.element('#receipt-file').clickCount, 1, 'Picker must open in the same call, before any async camera work.');
+  assert.equal(gallery.counters().cameraCalls, 0);
+  gallery.element('#receipt-file').value = 'previous-file';
+  gallery.element('#receipt-choose').onclick();
+  assert.equal(gallery.element('#receipt-file').value, '', 'Selecting the same photo again must work.');
+  assert.equal(gallery.element('#receipt-file').clickCount, 2);
+  gallery.element('#receipt-file').oncancel(); assert.equal(await galleryResult, null);
 });
 test('leaving during delayed permission resolution stops the late camera', async () => {
   const pending = deferred(); const env = environment({ mediaPromise: pending.promise });

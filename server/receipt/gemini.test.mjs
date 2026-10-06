@@ -102,6 +102,21 @@ test('translation sends only ordered names; shares consent, free-tier quota and 
   assert.ok(!JSON.stringify(binding.state()).includes('Americano'));
   assert.equal((await invoke({ 'Content-Length': '64001' })).status, 413);
 });
+test('applied service charges and individual discounts validate without altering paid total', () => {
+  const details = [
+    { label: '서비스료', kind: 'surcharge', amount: 1000, currency: 'KRW' },
+    { label: '쿠폰 할인', kind: 'discount', amount: 500, currency: 'KRW' },
+  ];
+  const adjusted = { ...draft, amount: 10500, adjustments: { taxFree:null, exemptedTax:null, taxFreeBase:null, discount:500, currency:'KRW', details } };
+  assert.deepEqual(readGemini(reply(adjusted)).adjustments.details, details);
+  assert.equal(readGemini(reply(adjusted)).amount, 10500);
+  for (const bad of [{...details[0], amount:null}, {...details[0], amount:-1}, {...details[0], amount:1e13},
+    {...details[0], kind:'offer'}, {...details[0], label:''}, {...details[0], currency:'won'}, {...details[0], secret:'unexpected'}]) {
+    assert.throws(() => readGemini(reply({...adjusted, adjustments:{...adjusted.adjustments, details:[bad]}})));
+  }
+  assert.throws(() => readGemini(reply({...adjusted, adjustments:{...adjusted.adjustments, details:Array(21).fill(details[0])}})));
+  assert.match(geminiBody(image).system_instruction, /never add or deduct them again/);
+});
 
 test('keys stay upstream; browser and native use the same endpoint and review contract', async () => {
   let calls = 0;

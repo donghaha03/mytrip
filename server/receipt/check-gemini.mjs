@@ -23,14 +23,18 @@ async function pace() {
   }
   callsInBucket++;
 }
-for (const [file, merchant, total, category] of [
+const cases = [
   ['receipt_en.png', 'TEST CAFE', 11000, '식비'], ['receipt_landscape.png', '테스트 카페', 5000, '식비'],
   ['receipt_food.png', 'SAMPLE STORE', 13000, '식비'],
   ['receipt_transport.png', 'SAMPLE STORE', 5000, '교통'],
   ['receipt_shopping.png', 'SAMPLE STORE', 10000, '쇼핑'],
   ['receipt_tax_free.png', 'SAMPLE TAX FREE', 9500, '쇼핑'],
   ['receipt_consumption_tax.png', 'SAMPLE STORE', 10800, '쇼핑'],
-]) {
+  ['receipt_adjustments.png', 'SAMPLE CAFE', 12000, '식비'],
+];
+const only = process.argv[2];
+if (only && !cases.some(([file]) => file === only)) throw new Error('Unknown synthetic receipt fixture.');
+for (const [file, merchant, total, category] of cases.filter(([file]) => !only || file === only)) {
   await pace();
   const image = `data:image/png;base64,${(await readFile(new URL(`../../test/fixtures/${file}`, import.meta.url))).toString('base64')}`;
   const started = Date.now();
@@ -66,7 +70,16 @@ for (const [file, merchant, total, category] of [
     assert.ok(draft.taxes[0].included === true || draft.taxes[0].included === null, 'Unstated inclusion may require review; never fabricate certainty.');
   }
   if (file === 'receipt_tax_free.png') {
-    assert.deepEqual(draft.adjustments, { taxFree: true, exemptedTax: 1000, taxFreeBase: null, discount: 500, currency: 'KRW' });
+    const {details, ...adjustments} = draft.adjustments;
+    assert.deepEqual(adjustments, { taxFree: true, exemptedTax: 1000, taxFreeBase: null, discount: 500, currency: 'KRW' });
+    assert.deepEqual(details.map(line => [line.kind, line.amount]), [['discount', 500]]);
+  }
+  if (file === 'receipt_adjustments.png') {
+    assert.equal(draft.adjustments.discount, 1500);
+    assert.deepEqual(draft.adjustments.details.map(line => [line.kind, line.amount, line.currency]).sort(),
+      [['surcharge',1000,'KRW'], ['surcharge',500,'KRW'], ['surcharge',2000,'KRW'], ['discount',1000,'KRW'], ['discount',500,'KRW']].sort());
+    assert.deepEqual(draft.taxes, [{label:'부가세',amount:909,currency:'KRW',included:true}]);
+    console.log(`Applied charges/discounts: ${draft.adjustments.details.map(line => `${line.label} ${line.amount} ${line.currency}`).join(', ')}; paid amount unchanged.`);
   }
   if (file === 'receipt_consumption_tax.png') {
     assert.deepEqual(draft.taxes, [{ label: '소비세', amount: 800, currency: 'JPY', included: true }]);
@@ -79,7 +92,7 @@ for (const [file, merchant, total, category] of [
 }
 // Five calls/minute is shared by OCR and translation. Wait for the next bucket,
 // never retry or bypass a server rejection to spend more of the free quota.
-for (const [language, expected] of [['ko', [/스테이크/, /우유/, /밥|쌀/]], ['en', [/steak/i, /milk/i, /rice/i]]]) {
+for (const [language, expected] of only ? [] : [['ko', [/스테이크/, /우유/, /밥|쌀/]], ['en', [/steak/i, /milk/i, /rice/i]]]) {
   await pace();
   const response = await fetch(new URL('/receipt/translate', url), {
     method: 'POST', headers: { 'X-Receipt-Consent': CONSENT_VERSION, 'Content-Type': 'application/json', Origin: 'https://donghaha03.github.io' },

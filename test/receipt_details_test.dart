@@ -16,11 +16,13 @@ import 'package:tripapp/trip_home/models/receipt_item.dart';
 import 'package:tripapp/trip_home/models/trip.dart';
 import 'package:tripapp/trip_home/receipts/receipt_client.dart';
 import 'package:tripapp/trip_home/receipts/receipt_consent.dart';
+import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
 import 'package:tripapp/trip_home/receipts/receipt_platform_native.dart';
 import 'package:tripapp/trip_home/receipts/receipt_screen.dart';
 import 'package:tripapp/trip_home/screens/expense_detail_screen.dart';
 import 'package:tripapp/trip_home/screens/expense_form_screen.dart';
 import 'package:tripapp/trip_home/screens/ledger_screen.dart';
+import 'package:tripapp/trip_home/screens/trip_home_screen.dart';
 import 'package:tripapp/trip_home/theme/app_theme.dart';
 import 'package:tripapp/trip_home/widgets/receipt_items.dart';
 import 'package:tripapp/trip_home/widgets/today_budget_sheet.dart';
@@ -42,6 +44,24 @@ Expense receipt() => Expense(
   receiptTaxes: const [
     ReceiptTax(label: '부가세', amount: 455, currency: 'KRW', included: true),
   ],
+  receiptAdjustments: const ReceiptAdjustments(
+    discount: 500,
+    currency: 'KRW',
+    details: [
+      ReceiptAdjustmentLine(
+        label: '서비스료',
+        kind: 'surcharge',
+        amount: 500,
+        currency: 'KRW',
+      ),
+      ReceiptAdjustmentLine(
+        label: '쿠폰 할인',
+        kind: 'discount',
+        amount: 500,
+        currency: 'KRW',
+      ),
+    ],
+  ),
 );
 Trip travel() => Trip(
   id: 'receipt-trip',
@@ -59,6 +79,147 @@ void main() {
     tripStore.connect(null);
   });
   tearDown(() => tripStore.connect(null));
+
+  test(
+    'payment date accepts compact and separated dates but rejects rollover and incomplete input',
+    () {
+      for (final input in [
+        '202691',
+        '20260901',
+        '2026901',
+        '2026-9-1',
+        '2026.09.01',
+        '2026/9/1',
+      ]) {
+        expect(parsePaymentDate(input), DateTime(2026, 9, 1));
+      }
+      expect(parsePaymentDate('2026111'), DateTime(2026, 11, 1));
+      expect(parsePaymentDate('2026911'), DateTime(2026, 9, 11));
+      expect(parsePaymentDate('20240229'), DateTime(2024, 2, 29));
+      for (final input in [
+        '20260229',
+        '20260931',
+        '20261301',
+        '20260001',
+        '20260900',
+        '20269',
+        '202609011',
+        '00000901',
+        '2026-9-31',
+        'wrong',
+      ]) {
+        expect(parsePaymentDate(input), isNull, reason: input);
+      }
+    },
+  );
+
+  testWidgets(
+    'date is formatted after short input finishes, without cutting off a two-digit day',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: ReceiptReviewScreen(
+            draft: ReceiptDraft(
+              merchant: 'TEST CAFE',
+              date: null,
+              amount: 5000,
+              currency: 'KRW',
+              category: '식비',
+              warnings: [],
+            ),
+            image: File('test/fixtures/receipt_en.png').readAsBytesSync(),
+          ),
+        ),
+      );
+      final dateField = find.byKey(const ValueKey('receipt-payment-date'));
+      await tester.scrollUntilVisible(
+        dateField,
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.enterText(dateField, '202691');
+      expect(
+        tester.widget<TextFormField>(dateField).controller!.text,
+        '202691',
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      expect(
+        tester.widget<TextFormField>(dateField).controller!.text,
+        '2026-09-01',
+      );
+      await tester.enterText(dateField, '2026911');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      expect(
+        tester.widget<TextFormField>(dateField).controller!.text,
+        '2026-09-11',
+      );
+      await tester.enterText(dateField, '20260901');
+      await tester.pump();
+      expect(
+        tester.widget<TextFormField>(dateField).controller!.text,
+        '2026-09-01',
+      );
+      await tester.enterText(dateField, '20260230');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pump();
+      expect(tester.state<FormState>(find.byType(Form)).validate(), isFalse);
+      await tester.pump();
+      expect(find.text('올바른 결제일을 확인해주세요'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'retake opens camera and photo selection opens gallery directly; cancellation retains original',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final image =
+          'data:image/png;base64,${base64Encode(File('test/fixtures/receipt_en.png').readAsBytesSync())}';
+      final sources = <bool>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(receiptChannel, (call) async {
+            if (call.method == 'close') return null;
+            sources.add(call.arguments['gallery'] as bool);
+            return sources.length == 1 ? jsonEncode({'image': image}) : null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(receiptChannel, null),
+      );
+      final client = ReceiptClient(
+        client: MockClient(
+          (request) async => request.method == 'GET'
+              ? http.Response(
+                  '{"serverUrl":"${endpoint.origin}","provider":"gemini"}',
+                  200,
+                )
+              : http.Response('{}', 500),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
+          home: ReceiptScreen(client: client),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('재촬영'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('재촬영'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('사진 선택'));
+      await tester.pumpAndSettle();
+      expect(sources, [false, false, true]);
+      expect(find.bySemanticsLabel('촬영한 영수증 원본'), findsOneWidget);
+      expect(find.text('영수증 사진 확인'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
 
   testWidgets(
     'confirmed tax-free receipt auto-selects exemption and stores final amount once',
@@ -309,6 +470,10 @@ void main() {
         expect(t.spentKrw, 5000);
         await tester.scrollUntilVisible(find.text('부가세'), 150);
         expect(find.text('455 KRW\n결제금액에 포함'), findsOneWidget);
+        await tester.scrollUntilVisible(find.text('서비스료 · 추가금'), 100);
+        expect(find.text('+500 KRW'), findsOneWidget);
+        expect(find.text('쿠폰 할인 · 할인'), findsOneWidget);
+        expect(find.text('−500 KRW'), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );
@@ -402,6 +567,7 @@ void main() {
       await repo.saveExpense(t.id, t.expenses.single);
       final restored = (await repo.watchExpenses(t.id).first).single;
       expect(restored.receiptTaxes.single.amount, 455);
+      expect(restored.receiptAdjustments!.details.first.label, '서비스료');
       t.expenses
         ..clear()
         ..add(restored);
@@ -419,6 +585,10 @@ void main() {
       expect(t.expenses.single.receiptTaxes.single.included, isTrue);
       expect(t.spentKrw, 5000);
       expect(t.expenses.single.receiptItems.single.name, 'Americano');
+      expect(
+        t.expenses.single.receiptAdjustments!.details.last.isDiscount,
+        isTrue,
+      );
     },
   );
 
@@ -434,7 +604,29 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           theme: buildAppTheme(),
+          home: TripHomeScreen(trip: t),
+        ),
+      );
+      final homeTop = tester.getTopLeft(
+        find.byKey(const ValueKey('home-budget-card')),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildAppTheme(),
           home: LedgerScreen(trip: t),
+        ),
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('ledger-budget-card'))),
+        homeTop,
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('ledger-list-heading'))).dy,
+        greaterThan(
+          tester
+              .getBottomLeft(find.byKey(const ValueKey('ledger-filter-menu')))
+              .dy,
         ),
       );
       await tester.tap(find.byTooltip('오늘 예산'));
