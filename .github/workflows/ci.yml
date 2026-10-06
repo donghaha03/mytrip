@@ -11,7 +11,8 @@ on:
 
 jobs:
   analyze-and-test:
-    runs-on: ubuntu-latest
+    # The local receipt runtime and its credential tests require Windows DPAPI.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - run: node tool/update_rates.mjs --check
