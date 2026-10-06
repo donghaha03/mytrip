@@ -107,6 +107,15 @@ class TripStore extends ChangeNotifier {
                 ? expense.amount <= 0
                 : expense.amount.truncate() <= 0)) ||
         expense.memo.length > 300 ||
+        (expense.receiptAdjustments != null &&
+            ReceiptAdjustments.fromJson(expense.receiptAdjustments!.toJson()) ==
+                null) ||
+        expense.receiptTaxes.length > 10 ||
+        expense.receiptTaxes.any(
+          (tax) =>
+              ReceiptTax.fromJson(tax.toJson()) == null ||
+              countryByCode(tax.currency) == null,
+        ) ||
         expense.receiptItems.length > 100 ||
         expense.receiptItems.any(
           (item) => ReceiptItem.fromJson(item.toJson()) == null,

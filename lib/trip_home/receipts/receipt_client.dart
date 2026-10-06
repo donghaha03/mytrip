@@ -181,5 +181,66 @@ class ReceiptClient {
     }
   }
 
+  Future<List<String>> translate(
+    ReceiptConnection connection,
+    List<String> names,
+    String language,
+  ) async {
+    if (_busy) throw const ReceiptConnectionException('처리 중이에요. 잠시 기다려주세요.');
+    if (!connection.isGemini ||
+        !['ko', 'en'].contains(language) ||
+        names.isEmpty ||
+        names.length > 100 ||
+        names.any((name) => name.trim().isEmpty || name.length > 100)) {
+      throw const ReceiptConnectionException('품목 번역 연결을 확인해주세요.');
+    }
+    _busy = true;
+    try {
+      if (await receiptConsent(connection.url) != true) {
+        throw const ReceiptConnectionException('영수증 전송에 먼저 동의해주세요.');
+      }
+      final response = await _client
+          .post(
+            connection.url.resolve('/receipt/translate'),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Receipt-Consent': receiptConsentVersion,
+            },
+            body: jsonEncode({'names': names, 'language': language}),
+          )
+          .timeout(const Duration(seconds: 90));
+      if (response.statusCode != 200) {
+        throw ReceiptConnectionException(
+          response.statusCode == 429
+              ? '무료 사용 한도에 도달했어요. 잠시 후 번역을 다시 시도해주세요.'
+              : '번역하지 못했어요. 연결과 전송 동의를 확인하고 다시 시도해주세요.',
+        );
+      }
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      final translated = data is Map ? data['names'] : null;
+      if (translated is! List ||
+          translated.length != names.length ||
+          translated.any(
+            (name) =>
+                name is! String || name.trim().isEmpty || name.length > 300,
+          )) {
+        throw const FormatException();
+      }
+      return translated.cast<String>().map((name) => name.trim()).toList();
+    } on ReceiptConnectionException {
+      rethrow;
+    } on TimeoutException {
+      throw const ReceiptConnectionException(
+        '번역 시간이 초과됐어요. 원문은 그대로예요. 다시 시도해주세요.',
+      );
+    } on FormatException {
+      throw const ReceiptConnectionException('번역 결과를 읽지 못했어요. 원문은 그대로예요.');
+    } catch (_) {
+      throw const ReceiptConnectionException('번역 서버에 연결하지 못했어요. 다시 시도해주세요.');
+    } finally {
+      _busy = false;
+    }
+  }
+
   void close() => _client.close();
 }

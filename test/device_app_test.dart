@@ -66,6 +66,19 @@ void main() {
             unitPrice: 5000,
           ),
         ],
+        receiptTaxes: const [
+          ReceiptTax(
+            label: '부가세',
+            amount: 455,
+            currency: 'KRW',
+            included: true,
+          ),
+        ],
+        receiptAdjustments: const ReceiptAdjustments(
+          taxFree: true,
+          exemptedTax: 455,
+          currency: 'KRW',
+        ),
       );
       await repo.saveExpense(t.id, receipt);
       await Future.wait([
@@ -98,6 +111,11 @@ void main() {
       expect(e.receiptItems.single.name, 'Americano');
       expect(e.receiptItems.single.quantity, 1);
       expect(e.receiptItems.single.amount, 5000);
+      expect(e.receiptTaxes.single.amount, 455);
+      expect(e.receiptTaxes.single.included, isTrue);
+      expect(e.receiptAdjustments!.taxFree, isTrue);
+      expect(e.receiptAdjustments!.exemptedTax, 455);
+      expect(e.amount, 5000);
       expect(expenses.last.status, ExpenseStatus.cancelled);
       expect(expenses.last.originalAmount, 10);
       t.budgetKrw = 2000000;

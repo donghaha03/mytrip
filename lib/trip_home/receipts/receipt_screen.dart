@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 import '../widgets/screen_top_bar.dart';
 import '../widgets/receipt_items.dart';
 import '../models/receipt_item.dart';
@@ -375,6 +376,8 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
   bool _confirmed = false;
   String? _itemError;
   late var _items = [...widget.draft.items];
+  late var _taxes = [...widget.draft.taxes];
+  late var _adjustments = widget.draft.adjustments;
   DateTime? get _parsedDate {
     final input = _date.text.trim();
     if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(input)) return null;
@@ -405,6 +408,8 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
         category: _category,
         warnings: [],
         items: _items,
+        taxes: _taxes,
+        adjustments: _adjustments,
       ),
     );
   }
@@ -503,10 +508,48 @@ class _ReceiptReviewScreenState extends State<ReceiptReviewScreen> {
                       currency: _currency ?? '',
                       onChanged: (items) => setState(() => _items = items),
                     ),
+                  for (final tax in _taxes)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        '${tax.label} · ${formatNumber(tax.amount)} ${tax.currency}',
+                      ),
+                      subtitle: Text(tax.inclusionLabel),
+                    ),
+                  if (_taxes.isNotEmpty)
+                    TextButton(
+                      onPressed: () => setState(() => _taxes = []),
+                      child: const Text('세금 정보 제외'),
+                    ),
+                  if (_adjustments != null) ...[
+                    if (_adjustments!.taxFree != null)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('면세'),
+                        trailing: Text(_adjustments!.taxFree! ? '적용' : '미적용'),
+                      ),
+                    for (final entry in {
+                      '면세액': _adjustments!.exemptedTax,
+                      '면세 대상 금액': _adjustments!.taxFreeBase,
+                      '할인액': _adjustments!.discount,
+                    }.entries)
+                      if (entry.value != null)
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(entry.key),
+                          subtitle: Text(
+                            '${formatNumber(entry.value!)} ${_adjustments!.currency ?? '통화 확인 필요'}',
+                          ),
+                        ),
+                    TextButton(
+                      onPressed: () => setState(() => _adjustments = null),
+                      child: const Text('면세·할인 정보 제외'),
+                    ),
+                  ],
                   CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     value: _confirmed,
-                    title: const Text('상호명·날짜·최종 금액·통화를 원본과 비교했어요'),
+                    title: const Text('상호명·날짜·최종 금액·통화·세금을 원본과 비교했어요'),
                     onChanged: (value) =>
                         setState(() => _confirmed = value ?? false),
                   ),

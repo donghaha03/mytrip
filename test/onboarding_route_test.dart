@@ -43,6 +43,8 @@ void main() {
           ),
         );
         await tester.scrollUntilVisible(find.text('전송·보관·무료 사용 안내'), 100);
+        await tester.ensureVisible(find.text('전송·보관·무료 사용 안내'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('전송·보관·무료 사용 안내'));
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(find.text('동의하지 않고 직접 입력하기'), 150);
@@ -50,29 +52,19 @@ void main() {
       },
     );
   }
-  for (final accept in [true, false]) {
+  for (final accept in [null, true, false]) {
     testWidgets(
-      'first launch consent decision $accept remembered after guidance',
+      'startup never requests receipt consent (stored decision $accept)',
       (tester) async {
-        SharedPreferences.setMockInitialValues({});
+        SharedPreferences.setMockInitialValues({
+          receiptConsentKey(Uri.parse(receiptServerOrigin)): ?accept,
+        });
         await tester.pumpWidget(const TripApp());
         await tester.pumpAndSettle();
         expect(find.text('앱 사용방법'), findsOneWidget);
         await tester.tap(find.text('건너뛰기'));
         await tester.pumpAndSettle();
-        expect(find.text('영수증 인식 안내'), findsOneWidget);
-        expect(
-          tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-          isNull,
-        );
-        if (accept) {
-          await tester.tap(find.byType(CheckboxListTile));
-          await tester.pump();
-        }
-        final label = accept ? '동의하고 시작하기' : '동의하지 않고 직접 입력하기';
-        await tester.scrollUntilVisible(find.text(label), 150);
-        await tester.tap(find.text(label));
-        await tester.pumpAndSettle();
+        expect(find.text('영수증 인식 안내'), findsNothing);
         expect(await receiptConsent(Uri.parse(receiptServerOrigin)), accept);
         expect(find.text('첫 여행을 추가해 보세요'), findsOneWidget);
         await tester.pumpWidget(const SizedBox.shrink());

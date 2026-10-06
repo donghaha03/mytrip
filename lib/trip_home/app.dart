@@ -16,7 +16,6 @@ import 'services/session.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'receipts/receipt_platform.dart';
-import 'receipts/receipt_consent.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -136,7 +135,6 @@ class HomeRouter extends StatefulWidget {
 class _HomeRouterState extends State<HomeRouter> {
   bool _autoOpened = false;
   bool? _guideSeen;
-  bool? _consentDecided;
 
   @override
   void initState() {
@@ -146,20 +144,15 @@ class _HomeRouterState extends State<HomeRouter> {
 
   Future<void> _loadGuidePreference() async {
     var seen = false;
-    var consentDecided = false;
     try {
       final prefs = await SharedPreferences.getInstance();
       seen = prefs.getBool('trip_guide_seen') ?? false;
-      consentDecided = prefs.containsKey(
-        receiptConsentKey(Uri.parse(receiptServerOrigin)),
-      );
     } catch (_) {
       // Without storage, show guidance rather than bypassing it.
     }
     if (mounted) {
       setState(() {
         _guideSeen = seen;
-        _consentDecided = consentDecided;
       });
     }
   }
@@ -213,12 +206,6 @@ class _HomeRouterState extends State<HomeRouter> {
       return EmptyHomeScreen(
         key: const ValueKey('first-run-guide'),
         onGuideFinished: _completeGuide,
-      );
-    }
-    if (_consentDecided != true) {
-      return ReceiptConsentScreen(
-        url: Uri.parse(receiptServerOrigin),
-        onDecision: (_) => setState(() => _consentDecided = true),
       );
     }
     if (tripStore.isLoading) return const _Loading();

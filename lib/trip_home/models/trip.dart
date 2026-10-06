@@ -48,6 +48,8 @@ class Expense {
     this.originalAmount,
     this.receiptFingerprint,
     this.receiptItems = const [],
+    this.receiptTaxes = const [],
+    this.receiptAdjustments,
   });
 
   final String id;
@@ -66,6 +68,8 @@ class Expense {
   final double? originalAmount;
   final String? receiptFingerprint;
   final List<ReceiptItem> receiptItems;
+  final List<ReceiptTax> receiptTaxes;
+  final ReceiptAdjustments? receiptAdjustments;
 
   bool get isImported => source != null;
   String currencyOf(Trip trip) => currency ?? trip.country.currency;

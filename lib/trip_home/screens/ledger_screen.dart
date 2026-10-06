@@ -11,9 +11,11 @@ import '../widgets/app_sheet.dart';
 import '../widgets/expense_tile.dart';
 import '../widgets/ledger_filters_sheet.dart';
 import '../widgets/screen_top_bar.dart';
+import '../widgets/today_budget_sheet.dart';
 import 'expense_detail_screen.dart';
 import 'expense_form_screen.dart';
 import 'more_screen.dart';
+import 'trip_home_screen.dart';
 
 class LedgerScreen extends StatefulWidget {
   const LedgerScreen({super.key, required this.trip});
@@ -161,9 +163,34 @@ class _LedgerScreenState extends State<LedgerScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            '사용한 금액',
-                            style: TextStyle(color: AppColors.onPrimaryMuted),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  '사용한 금액',
+                                  style: TextStyle(
+                                    color: AppColors.onPrimaryMuted,
+                                  ),
+                                ),
+                              ),
+                              BudgetCardIcon(
+                                icon: Icons.today_rounded,
+                                tooltip: '오늘 예산',
+                                onTap: () => showAppSheet<void>(
+                                  context: context,
+                                  builder: (_) => TodayBudgetSheet(
+                                    trip: trip,
+                                    now: DateTime.now(),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              BudgetCardIcon(
+                                icon: Icons.edit_outlined,
+                                tooltip: '여행 편집',
+                                onTap: () => editTrip(context, trip),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           FittedBox(

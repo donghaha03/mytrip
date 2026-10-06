@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_colors.dart';
 import '../widgets/screen_top_bar.dart';
 
-const receiptConsentVersion = 'gemini-free-v1';
+const receiptConsentVersion = 'gemini-free-v2';
 const receiptServerOrigin = String.fromEnvironment(
   'RECEIPT_SERVER_URL',
   defaultValue: 'https://mytrip-receipt.mytrip-local-receipt.workers.dev',
@@ -74,11 +74,11 @@ class _ReceiptConsentScreenState extends State<ReceiptConsentScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  '확인한 영수증 사진을 Cloudflare를 통해 Google Gemini로 보내 상호명·금액·품목을 읽어요. 결과는 직접 확인하고 저장해요.',
+                  '확인한 영수증 사진을 Cloudflare를 통해 Google Gemini로 보내 상호명·금액·품목·세금을 읽어요. 번역 버튼을 누르면 품목명만 같은 서비스로 보내요. 결과는 직접 확인하고 저장해요.',
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'Gemini 무료 서비스는 사진과 결과를 제품 개선에 사용하거나 사람이 검토할 수 있어요. 카드번호·연락처 등 개인정보를 가린 사진만 사용해주세요.',
+                  'Gemini 무료 서비스는 사진·품목명·결과를 제품 개선에 사용하거나 사람이 검토할 수 있어요. 카드번호·연락처 등 개인정보를 가린 사진만 사용해주세요.',
                 ),
                 const SizedBox(height: 12),
                 const Text(
@@ -89,7 +89,7 @@ class _ReceiptConsentScreenState extends State<ReceiptConsentScreen> {
                   title: const Text('전송·보관·무료 사용 안내'),
                   children: [
                     Text(
-                      '중계 서버: ${widget.url.origin}\n중계 서버는 사진·인식 결과를 저장하거나 기록하지 않아요. 악용 방지를 위한 날짜별 익명 접속 해시와 사용량만 저장하며, Cloudflare 복구 기록에 최대 30일 남을 수 있어요. Google의 보관·사용 조건은 아래 정책을 확인해주세요.\n무료 한도 내에서 사용하며 한도 초과 시 중단해요. 자동 유료 전환은 없어요. 유럽 경제 지역·스위스·영국에서는 이 무료 인식을 제공하지 않아요.',
+                      '중계 서버: ${widget.url.origin}\n중계 서버는 사진·품목명·결과를 저장하거나 기록하지 않아요. 악용 방지를 위한 날짜별 익명 접속 해시와 사용량만 저장하며, Cloudflare 복구 기록에 최대 30일 남을 수 있어요. Google의 보관·사용 조건은 아래 정책을 확인해주세요.\n무료 한도 내에서 사용하며 한도 초과 시 중단해요. 자동 유료 전환은 없어요. 유럽 경제 지역·스위스·영국에서는 이 무료 인식을 제공하지 않아요.',
                     ),
                     TextButton(
                       onPressed: () => launchUrl(
@@ -103,7 +103,7 @@ class _ReceiptConsentScreenState extends State<ReceiptConsentScreen> {
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _adult,
-                  title: const Text('만 18세 이상이며, 위 사진 전송·처리에 동의해요'),
+                  title: const Text('만 18세 이상이며, 위 영수증 전송·처리에 동의해요'),
                   onChanged: _busy
                       ? null
                       : (value) => setState(() => _adult = value ?? false),

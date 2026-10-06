@@ -12,6 +12,8 @@ class ReceiptDraft {
     required this.category,
     required this.warnings,
     this.items = const [],
+    this.taxes = const [],
+    this.adjustments,
   });
   final String merchant;
   final DateTime? date;
@@ -20,6 +22,8 @@ class ReceiptDraft {
   final String category;
   final List<String> warnings;
   final List<ReceiptItem> items;
+  final List<ReceiptTax> taxes;
+  final ReceiptAdjustments? adjustments;
 
   factory ReceiptDraft.fromLlm(Map<String, dynamic> data) {
     final warnings = <String>[
@@ -85,6 +89,30 @@ class ReceiptDraft {
             .01) {
       warnings.add('품목 합계와 결제금액이 달라요. 할인·세금·누락 품목을 원본에서 확인해주세요.');
     }
+    final taxes = <ReceiptTax>[];
+    final adjustments = ReceiptAdjustments.fromJson(data['adjustments']);
+    if (data['adjustments'] != null && adjustments == null) {
+      warnings.add('면세·할인 정보 확인 필요');
+    }
+    if (adjustments != null &&
+        (adjustments.exemptedTax != null ||
+            adjustments.taxFreeBase != null ||
+            adjustments.discount != null) &&
+        countryByCode(adjustments.currency ?? '') == null) {
+      warnings.add('면세·할인 금액의 통화 확인 필요');
+    }
+    final taxRows = data['taxes'] is List ? data['taxes'] as List : const [];
+    if (taxRows.length > 10) {
+      throw const FormatException('Too many receipt taxes');
+    }
+    for (final row in taxRows) {
+      final tax = ReceiptTax.fromJson(row);
+      if (tax == null || countryByCode(tax.currency) == null) {
+        warnings.add('세금 금액·통화 확인 필요: 원본을 확인해주세요.');
+      } else {
+        taxes.add(tax);
+      }
+    }
     final category = expenseCategoryIcons.containsKey(data['category'])
         ? data['category'] as String
         : _suggestCategory(
@@ -98,6 +126,8 @@ class ReceiptDraft {
       category: category,
       warnings: warnings.toSet().toList(),
       items: items,
+      taxes: taxes,
+      adjustments: adjustments?.hasInformation == true ? adjustments : null,
     );
   }
 

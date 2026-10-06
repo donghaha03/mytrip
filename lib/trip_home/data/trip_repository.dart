@@ -113,6 +113,8 @@ class FirestoreTripRepository implements TripRepository {
         'originalAmount': e.originalAmount,
         'receiptFingerprint': e.receiptFingerprint,
         'receiptItems': e.receiptItems.map((item) => item.toJson()).toList(),
+        'receiptTaxes': e.receiptTaxes.map((tax) => tax.toJson()).toList(),
+        'receiptAdjustments': e.receiptAdjustments?.toJson(),
       }, SetOptions(merge: true));
 
   @override
@@ -168,6 +170,12 @@ class FirestoreTripRepository implements TripRepository {
           ExpenseStatus.approved,
       originalAmount: (m['originalAmount'] as num?)?.toDouble(),
       receiptFingerprint: m['receiptFingerprint'] as String?,
+      receiptAdjustments: ReceiptAdjustments.fromJson(m['receiptAdjustments']),
+      receiptTaxes:
+          (m['receiptTaxes'] is List ? m['receiptTaxes'] as List : const [])
+              .map(ReceiptTax.fromJson)
+              .nonNulls
+              .toList(),
       receiptItems:
           (m['receiptItems'] is List ? m['receiptItems'] as List : const [])
               .map(ReceiptItem.fromJson)

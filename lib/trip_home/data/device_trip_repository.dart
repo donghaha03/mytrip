@@ -102,6 +102,8 @@ class DeviceTripRepository implements TripRepository {
       'originalAmount': e.originalAmount,
       'receiptFingerprint': e.receiptFingerprint,
       'receiptItems': e.receiptItems.map((item) => item.toJson()).toList(),
+      'receiptTaxes': e.receiptTaxes.map((tax) => tax.toJson()).toList(),
+      'receiptAdjustments': e.receiptAdjustments?.toJson(),
     };
   });
   @override
@@ -139,6 +141,17 @@ class DeviceTripRepository implements TripRepository {
         status: ExpenseStatus.values.byName(m['status'] as String),
         originalAmount: (m['originalAmount'] as num?)?.toDouble(),
         receiptFingerprint: m['receiptFingerprint'] as String?,
+        receiptAdjustments: m['receiptAdjustments'] == null
+            ? null
+            : ReceiptAdjustments.fromJson(m['receiptAdjustments']) ??
+                  (throw const FormatException('Invalid receipt adjustments')),
+        receiptTaxes: (m['receiptTaxes'] as List? ?? const [])
+            .map(
+              (tax) =>
+                  ReceiptTax.fromJson(tax) ??
+                  (throw const FormatException('Invalid receipt tax')),
+            )
+            .toList(),
         receiptItems: (m['receiptItems'] as List)
             .map(
               (item) =>

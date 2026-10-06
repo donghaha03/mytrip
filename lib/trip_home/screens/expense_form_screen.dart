@@ -6,6 +6,7 @@ import '../data/trip_store.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
 import '../receipts/receipt_draft.dart';
+import '../receipts/receipt_client.dart';
 import '../receipts/receipt_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -21,11 +22,13 @@ class ExpenseFormScreen extends StatefulWidget {
     required this.trip,
     this.expense,
     this.startWithReceipt = false,
+    this.receiptClient,
   });
 
   final Trip trip;
   final Expense? expense;
   final bool startWithReceipt;
+  final ReceiptClient? receiptClient;
 
   @override
   State<ExpenseFormScreen> createState() => _ExpenseFormScreenState();
@@ -51,7 +54,9 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     if (_busy || _scanning) return;
     _scanning = true;
     final draft = await Navigator.of(context).push<ReceiptDraft>(
-      MaterialPageRoute(builder: (_) => const ReceiptScreen()),
+      MaterialPageRoute(
+        builder: (_) => ReceiptScreen(client: widget.receiptClient),
+      ),
     );
     _scanning = false;
     if (draft == null || !mounted) return;
@@ -66,7 +71,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               builder: (context) => AlertDialog(
                 title: const Text('영수증 내용으로 바꿀까요?'),
                 content: const Text(
-                  '입력 중인 사용처·금액·통화·날짜·카테고리가 바뀌어요. 결제수단·면세·메모는 유지해요.',
+                  '사용처·금액·통화·날짜·카테고리가 바뀌어요. 면세는 영수증에 명시된 경우 반영하고 결제수단·메모는 유지해요.',
                 ),
                 actions: [
                   TextButton(
@@ -95,6 +100,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         _date.minute,
       );
       _category = draft.category;
+      _isTaxFree = draft.adjustments?.taxFree ?? _isTaxFree;
     });
   }
 
@@ -260,6 +266,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
           receiptFingerprint: fingerprint,
           receiptItems:
               _receipt?.items ?? widget.expense?.receiptItems ?? const [],
+          receiptTaxes:
+              _receipt?.taxes ?? widget.expense?.receiptTaxes ?? const [],
+          receiptAdjustments: _receipt == null
+              ? widget.expense?.receiptAdjustments
+              : _receipt!.adjustments,
         ),
       );
       if (mounted) Navigator.of(context).pop();

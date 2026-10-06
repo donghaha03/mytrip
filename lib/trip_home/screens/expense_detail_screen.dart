@@ -4,6 +4,9 @@ import '../../api/api.dart';
 import '../data/trip_store.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
+import '../receipts/receipt_client.dart';
+import '../receipts/receipt_consent.dart';
+import '../receipts/receipt_platform.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/quick_converter.dart';
@@ -16,9 +19,11 @@ class ExpenseDetailScreen extends StatefulWidget {
     super.key,
     required this.trip,
     required this.expenseId,
+    this.receiptClient,
   });
   final Trip trip;
   final String expenseId;
+  final ReceiptClient? receiptClient;
 
   @override
   State<ExpenseDetailScreen> createState() => _ExpenseDetailScreenState();
@@ -27,6 +32,39 @@ class ExpenseDetailScreen extends StatefulWidget {
 class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
   bool _busy = false;
   String? _error;
+  ReceiptClient? _receiptClient;
+  ReceiptClient get _client =>
+      _receiptClient ??= widget.receiptClient ?? ReceiptClient();
+
+  @override
+  void dispose() {
+    _receiptClient?.close();
+    super.dispose();
+  }
+
+  Future<List<String>?> _translate(Expense expense, String language) async {
+    final connection = await _client.connection(configUrl: receiptConfigUrl);
+    if (connection?.isGemini != true) {
+      throw const ReceiptConnectionException('품목 번역 서버가 연결되지 않았어요.');
+    }
+    if (await receiptConsent(connection!.url) != true) {
+      if (!mounted) return null;
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (context) => ReceiptConsentScreen(
+            url: connection.url,
+            onDecision: (value) => Navigator.of(context).pop(value),
+          ),
+        ),
+      );
+      if (!mounted || await receiptConsent(connection.url) != true) return null;
+    }
+    return _client.translate(
+      connection,
+      expense.receiptItems.map((item) => item.name).toList(),
+      language,
+    );
+  }
 
   Future<void> _delete(Expense expense) async {
     setState(() => _busy = true);
@@ -68,6 +106,10 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
       final currency = countryByCode(code);
       final quote = RateApi.quotedKrw(code);
       final amount = e.status.countsAsSpending ? e.amount : 0;
+      final adjustments = e.receiptAdjustments;
+      String adjustmentAmount(double? value) => value == null
+          ? '확인된 금액 없음'
+          : '${formatNumber(value)} ${adjustments?.currency ?? '통화 확인 필요'}';
       return Scaffold(
         body: SafeArea(
           child: Column(
@@ -138,7 +180,11 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                     ),
                     const SizedBox(height: 20),
                     if (e.receiptItems.isNotEmpty)
-                      ReceiptItems(items: e.receiptItems, currency: code),
+                      ReceiptItems(
+                        items: e.receiptItems,
+                        currency: code,
+                        onTranslate: (language) => _translate(e, language),
+                      ),
                     _Info(
                       '날짜 · 시각',
                       '${formatDate(e.date)} ${e.date.hour.toString().padLeft(2, '0')}:${e.date.minute.toString().padLeft(2, '0')}',
@@ -158,11 +204,32 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
                             : '카드 자동 기록',
                       ),
                     _Info('면세', e.isTaxFree ? '적용 · 실제 결제액 기준' : '미적용'),
+                    for (final tax in e.receiptTaxes)
+                      _Info(
+                        tax.label,
+                        '${formatNumber(tax.amount)} ${tax.currency}\n${tax.inclusionLabel}',
+                      ),
+                    if (e.receiptFingerprint != null && e.receiptTaxes.isEmpty)
+                      const _Info('소비세 · 부가세', '저장된 세금 정보 없음'),
+                    if (e.receiptFingerprint != null ||
+                        adjustments != null) ...[
+                      _Info('면세액', adjustmentAmount(adjustments?.exemptedTax)),
+                      if (adjustments?.taxFreeBase != null)
+                        _Info(
+                          '면세 대상 금액',
+                          adjustmentAmount(adjustments!.taxFreeBase),
+                        ),
+                      _Info('할인액', adjustmentAmount(adjustments?.discount)),
+                    ],
                     if (e.status == ExpenseStatus.partiallyCancelled)
                       _Info(
                         '취소 후 결제액',
                         '${currency?.formatForeign(e.amount) ?? formatNumber(e.amount)} $code',
                       ),
+                    _Info(
+                      '최종 금액',
+                      '${currency?.formatForeign(amount) ?? formatNumber(amount)} $code',
+                    ),
                     const Divider(height: 32),
                     const Text(
                       '기록 당시와 현재 환율',

@@ -3,6 +3,80 @@ import 'package:tripapp/trip_home/models/receipt_item.dart';
 import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
 
 void main() {
+  test(
+    'explicit exemption and discount are metadata, not another deduction',
+    () {
+      final data = {
+        'merchant': 'SAMPLE TAX FREE',
+        'date': '2026-10-04',
+        'currency': 'KRW',
+        'amount': 9500,
+        'items': [],
+        'warnings': [],
+        'adjustments': {
+          'taxFree': true,
+          'exemptedTax': 1000,
+          'taxFreeBase': null,
+          'discount': 500,
+          'currency': 'KRW',
+        },
+      };
+      final draft = ReceiptDraft.fromLlm(data);
+      expect(draft.adjustments!.taxFree, isTrue);
+      expect(draft.adjustments!.exemptedTax, 1000);
+      expect(draft.adjustments!.taxFreeBase, isNull);
+      expect(draft.adjustments!.discount, 500);
+      expect(draft.amount, 9500);
+      expect(
+        ReceiptDraft.fromLlm({
+          ...data,
+          'adjustments': {'taxFree': null},
+        }).adjustments,
+        isNull,
+      );
+      expect(
+        ReceiptDraft.fromLlm({
+          ...data,
+          'adjustments': {'discount': -500},
+        }).adjustments,
+        isNull,
+      );
+    },
+  );
+  test(
+    'only explicit valid taxes survive; total is not inflated and missing tax is not zero',
+    () {
+      final data = {
+        'merchant': 'TEST CAFE',
+        'date': '2026-10-04',
+        'currency': 'KRW',
+        'amount': 5000,
+        'items': [],
+        'warnings': [],
+      };
+      final draft = ReceiptDraft.fromLlm({
+        ...data,
+        'taxes': [
+          {'label': '부가세', 'amount': 455, 'currency': 'KRW', 'included': true},
+          {'label': '소비세', 'amount': 0, 'currency': 'JPY', 'included': null},
+          {'label': '세금', 'amount': null, 'currency': 'KRW', 'included': null},
+        ],
+      });
+      expect(draft.amount, 5000);
+      expect(draft.taxes.map((tax) => tax.amount), [455, 0]);
+      expect(ReceiptTax.fromJson(draft.taxes.first.toJson())!.label, '부가세');
+      expect(draft.warnings.any((warning) => warning.contains('세금')), isTrue);
+      expect(ReceiptDraft.fromLlm(data).taxes, isEmpty);
+      expect(
+        ReceiptTax.fromJson({
+          'label': '세금',
+          'amount': double.nan,
+          'currency': 'KRW',
+        }),
+        isNull,
+      );
+    },
+  );
   test('category uses item content and validated model recommendation', () {
     for (final pair in {
       'Americano': '식비',

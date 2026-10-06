@@ -16,37 +16,37 @@ import 'ledger_entry.dart';
 import 'more_screen.dart';
 import 'spending_overview_screen.dart';
 
+Future<void> editTrip(BuildContext context, Trip trip) async {
+  final result = await showAppSheet<TripEditResult>(
+    context: context,
+    builder: (_) => TripEditSheet(trip: trip),
+  );
+  if (result == null || !context.mounted) return;
+  switch (result.action) {
+    case TripEditAction.save:
+      tripStore.update(
+        trip.id,
+        name: result.name,
+        start: result.range!.start,
+        end: result.range!.end,
+        budgetKrw: result.budgetKrw,
+      );
+    case TripEditAction.delete:
+      if (!await confirmTripDeletion(context, trip) || !context.mounted) {
+        return;
+      }
+      // 지운 여행 화면에 남아 있으면 안 되니 리스트로 먼저 돌아간다
+      Navigator.of(context).pop();
+      tripStore.remove(trip.id);
+  }
+}
+
 /// 여행별 예산·지출 요약과 환산 화면.
 /// 전체 장부와 지출 입력은 ledger_entry.dart에서 연결한다.
 class TripHomeScreen extends StatelessWidget {
   const TripHomeScreen({super.key, required this.trip});
 
   final Trip trip;
-
-  Future<void> _edit(BuildContext context) async {
-    final result = await showAppSheet<TripEditResult>(
-      context: context,
-      builder: (_) => TripEditSheet(trip: trip),
-    );
-    if (result == null || !context.mounted) return;
-    switch (result.action) {
-      case TripEditAction.save:
-        tripStore.update(
-          trip.id,
-          name: result.name,
-          start: result.range!.start,
-          end: result.range!.end,
-          budgetKrw: result.budgetKrw,
-        );
-      case TripEditAction.delete:
-        if (!await confirmTripDeletion(context, trip) || !context.mounted) {
-          return;
-        }
-        // 지운 여행 화면에 남아 있으면 안 되니 리스트로 먼저 돌아간다
-        Navigator.of(context).pop();
-        tripStore.remove(trip.id);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +72,7 @@ class TripHomeScreen extends StatelessWidget {
                     children: [
                       _SpendingCard(
                         trip: trip,
-                        onEdit: () => _edit(context),
+                        onEdit: () => editTrip(context, trip),
                         onToday: () => showAppSheet<void>(
                           context: context,
                           builder: (_) =>
@@ -207,13 +207,13 @@ class _SpendingCard extends StatelessWidget {
                   ],
                 ),
               ),
-              _CardIcon(
+              BudgetCardIcon(
                 icon: Icons.today_rounded,
                 tooltip: '오늘 예산',
                 onTap: onToday,
               ),
               const SizedBox(width: 4),
-              _CardIcon(
+              BudgetCardIcon(
                 icon: Icons.edit_outlined,
                 tooltip: '여행 편집',
                 onTap: onEdit,
@@ -298,8 +298,9 @@ class _SpendingCard extends StatelessWidget {
 }
 
 /// 요약 카드의 오늘 예산·편집 버튼.
-class _CardIcon extends StatelessWidget {
-  const _CardIcon({
+class BudgetCardIcon extends StatelessWidget {
+  const BudgetCardIcon({
+    super.key,
     required this.icon,
     required this.tooltip,
     required this.onTap,
