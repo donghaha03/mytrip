@@ -9,14 +9,20 @@ const source = await readFile(new URL('../web/receipt.js', import.meta.url), 'ut
 test('a new release loads matching receipt and Flutter scripts instead of cached app code', async () => {
   const index = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
   const bootstrap = await readFile(new URL('../web/flutter_bootstrap.js', import.meta.url), 'utf8');
-  assert.match(index, /receipt\.js\?v=\{\{flutter_service_worker_version\}\}/);
   assert.match(index, /\{\{flutter_bootstrap_js\}\}/);
-  let loaded = 0;
+  let loaded = 0, receiptScript;
   const config = { builds: [{ mainJsPath: 'main.dart.js' }, { mainWasmPath: 'main.dart.wasm' }] };
-  const executable = bootstrap.replace('{{flutter_js}}', '').replace('{{flutter_build_config}}', '').replaceAll('{{flutter_service_worker_version}}', 'release-2');
-  vm.runInNewContext(executable, { _flutter: { buildConfig: config, loader: { load: () => loaded++ } } });
+  // The Flutter template expands to a JS expression, including quotes/comment.
+  const executable = bootstrap.replace('{{flutter_js}}', '').replace('{{flutter_build_config}}', '').replaceAll('{{flutter_service_worker_version}}', '"release-2" /* deprecated service worker token */');
+  vm.runInNewContext(executable, {
+    _flutter: { buildConfig: config, loader: { load: () => loaded++ } },
+    document: { createElement: () => ({}), head: { appendChild: script => { receiptScript = script; } } },
+  });
   assert.equal(config.builds[0].mainJsPath, 'main.dart.js?v=release-2');
   assert.equal(config.builds[1].mainWasmPath, 'main.dart.wasm');
+  assert.equal(receiptScript.src, 'receipt.js?v=release-2');
+  assert.equal(loaded, 0, 'Camera script must load before Flutter starts');
+  receiptScript.onload();
   assert.equal(loaded, 1);
 });
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
