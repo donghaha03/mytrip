@@ -3,11 +3,17 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Security
 $taskCodeDir = Join-Path $env:LOCALAPPDATA 'mytrip-receipt'
 $taskCodePath = Join-Path $taskCodeDir 'gemini-access.dpapi'
+# The Store-installed Codex app redirects LocalAppData writes to its package cache.
+# Reuse that encrypted file when copying from an ordinary, unpackaged PowerShell.
+if (-not (Test-Path -LiteralPath $taskCodePath)) {
+  $taskCachedCodePath = Join-Path $env:LOCALAPPDATA 'Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local\mytrip-receipt\gemini-access.dpapi'
+  if (Test-Path -LiteralPath $taskCachedCodePath) { $taskCodePath = $taskCachedCodePath }
+}
 if (Test-Path -LiteralPath $taskCodePath) {
   $taskCode = [Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect(
     [IO.File]::ReadAllBytes($taskCodePath), $null, [Security.Cryptography.DataProtectionScope]::CurrentUser))
 } else {
-  if ($Copy) { throw 'Run preparation before copying the code.' }
+  if ($Copy) { throw "Access code file not found: $taskCodePath. Do not create a replacement before checking the existing server setup." }
   $taskBytes = New-Object byte[] 32
   $taskRandom = [Security.Cryptography.RandomNumberGenerator]::Create()
   try { $taskRandom.GetBytes($taskBytes) } finally { $taskRandom.Dispose() }

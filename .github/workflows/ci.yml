@@ -24,6 +24,7 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: server/receipt
       - run: node --test server/receipt/*.test.mjs
+      - run: powershell -NoProfile -File server/receipt/access-path.test.ps1
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: server/card
       - run: npm test
