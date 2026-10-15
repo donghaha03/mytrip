@@ -1,16 +1,14 @@
-# 팀 장부 통합본
-
-`wannabb/tripledger`의 `main` (`b94f96c`, 로그인 통합 포함)을 기준으로 기존 mytrip 장부 기능을 이식했습니다. 공유 브랜치는 `donghaha03/mytrip`의 `codex/ledger-page-integration`입니다.
+# 장부 화면
 
 ```text
 lib/
-  main.dart                 팀 앱 시작 / 로그인 화면
-  login_screen.dart         팀 로그인
+  main.dart                 앱 시작 / 로그인 화면
+  login_screen.dart         로그인
   ledger_page.dart          장부 진입점: LedgerPage(tripId: trip.id)
   ledger/                   장부 화면 · 입력 · 상세 · 영수증 · 위젯 구현
-  api/                      팀 공용 API와 장부 저장 확장
-  models/                   팀 Trip / Expense와 영수증 필드
-  utils/                    팀 표시 함수
+  api/                      공용 API
+  models/                   Trip / Expense / 영수증 모델
+  utils/                    표시 함수
 ```
 
 여행을 선택한 화면에서 다음과 같이 장부를 엽니다.
@@ -22,12 +20,6 @@ Navigator.of(context).push(MaterialPageRoute<void>(
   builder: (_) => LedgerPage(tripId: trip.id),
 ));
 ```
-
-이 브랜치에는 내부 구현, API·모델, 패키지 설정, 웹 OCR 자산과 iOS 영수증 카메라 연결까지 포함되어 있습니다. `ledger_page.dart` 한 파일만 복사하면 동작하지 않습니다. API 사용법과 변경 범위는 [공용 API 사용법](lib/api/how%20to%20use.md)의 5–6절을 참고하세요.
-
-장부는 팀의 `users/{uid}/trips/{tripId}/expenses` 경로를 사용합니다. 개인 mytrip의 로컬 데이터나 `records` 데이터는 자동으로 이전하지 않습니다. 팀 로그인 화면에는 아직 여행 선택 화면으로 이동하는 처리가 없으므로, 해당 화면 담당자가 선택한 여행 ID로 위 진입점을 호출해야 합니다.
-
-검증 명령: `flutter analyze --no-pub`, `flutter test --no-pub`, `node --test test/receipt_camera_test.mjs`, `flutter build web --no-pub`. Windows에서 플러그인 심볼릭 링크 오류가 나면 개발자 모드를 켠 뒤 `flutter pub get`을 실행하세요. 실제 계정·운영 DB 저장과 네이티브 카메라는 별도 환경에서 확인해야 합니다.
 
 ---
 
