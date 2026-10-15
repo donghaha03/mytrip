@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:tripapp/AppColors.dart';
+import 'login_screen.dart';
 
 import '/api/api.dart';
 import 'firebase_options.dart';
 
 //flutter pub add PLUGIN_NAME
-//flutterfire configure -> flutter rebuild 필요
+//flutterfire configure -> flutter rebuild ?꾩슂
 void main()async{
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await AuthApi.initSocial();   // 구글 로그인 준비
+  await AuthApi.initSocial();   // 援ш? 濡쒓렇??以鍮?
   await RateApi.load();
   runApp(const MyApp());
 }
@@ -27,7 +28,7 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Pretendard',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const LoginScreen(),
     );
   }
 }
