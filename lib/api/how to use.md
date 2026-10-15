@@ -454,6 +454,57 @@ await TripApi.update(trip.copyWith(name: _name.text, budget: ..., start: ..., en
 
 ### 5-6. 장부 화면
 
+기존 장부 UI와 영수증 입력은 `lib/ledger_page.dart`에 연결되어 있습니다.
+로그인과 `main()`의 Firebase/환율 초기화 후 다음과 같이 엽니다.
+
+```dart
+import 'package:tripapp/ledger_page.dart';
+
+Navigator.of(context).push(MaterialPageRoute<void>(
+  builder: (_) => LedgerPage(tripId: trip.id),
+));
+```
+
+팀 설정 화면의 연결 함수가 있으면 `onMore:`로 전달합니다. 화면 구현은
+`lib/ledger/`에 있으며 `main.dart`나 별도 Firebase 프로젝트를 대체하지 않습니다.
+여행/지출 스트림은 화면 수명 동안 유지되고, 로딩·구독 오류·여행 삭제·로그아웃을 처리합니다.
+
+장부는 기존 `Expense` 필드와 함께 다음 선택 필드를 보존합니다. 예전 문서는 기본값으로 읽습니다.
+
+- `icon`, `paymentMethod` (`cash`/`card`/미지정), `isTaxFree`, `memo`
+- `recordedQuote`, `source`, `status`, `originalAmount`
+- `receiptFingerprint`, `receiptItems`, `receiptTaxes`, `receiptAdjustments`
+
+`ExpenseApi.newId(tripId)`는 DB 문서 ID를 먼저 발급합니다.
+`ExpenseApi.save(tripId, expense)`는 입력을 검증하고 같은 ID에 병합 저장하므로
+저장 재시도 시 중복 문서를 만들지 않으며, 다른 화면이 추가한 필드도 보존합니다.
+기존 `add/update/delete/restore` 호출 방식도 유지됩니다.
+`ExpenseApi.validate(expense)`는 저장 전에 금액·환율·메모·영수증 필드를 검증합니다.
+
+원화 합계와 예산 그래프는 각 지출의 저장 당시 `rate`를 사용합니다.
+`amount`는 실제 결제액이며, 할인·면세·세금 정보는 설명용으로 보존하고 다시 가감하지 않습니다.
+취소/거절 건은 합계에서 제외하고 부분 취소는 남은 결제액을 사용합니다.
+메모/분류 수정 시 기존 환율을 유지하며, 결제 통화를 바꾸면 새 통화의 현재 환율을 저장합니다.
+새 기록과 수정 입력은 소수점 금액을 지원합니다. 빠른 환산과 원화 합계 표시는 기존 화면처럼 원 미만을 버립니다.
+
+카메라/영수증 연결에는 `image_picker`, `url_launcher`, `web/receipt.js`,
+`web/ocr/`, iOS 카메라 브리지 및 권한 설명이 함께 필요합니다.
+서버 연결은 기존 `web/receipt-config.json`을 사용하며, 모바일 기본 주소도 기존 mytrip 설정입니다.
+서버를 변경할 때는 `--dart-define=RECEIPT_SERVER_URL=https://...`와
+`--dart-define=RECEIPT_PROVIDER=gemini` 또는 `openai`를 지정합니다.
+사진은 기존 동의/검토 절차를 거치고, 인식 결과는 사용자가 확인해 저장합니다.
+
+장부 관련 검증:
+
+```sh
+flutter pub get
+flutter analyze --no-pub lib/ledger_page.dart lib/ledger lib/models/expense.dart lib/models/receipt_item.dart lib/api/expense_api.dart lib/api/rate_api.dart test
+flutter test --no-pub
+node --test test/receipt_camera_test.mjs
+```
+
+아래는 API를 사용해 별도 화면을 작성할 때의 기본 예시입니다.
+
 ```dart
 class _LedgerPageState extends State<LedgerPage> {
   late final Stream<Trip?> _trip = TripApi.watch(widget.tripId);

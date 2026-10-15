@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../constants.dart';
-
 /// 환율 API
 /// - 마지막 호출 날짜를 저장해서, 오늘 이미 불렀다면 다시 호출하지 않음
 /// - 호출 실패 시 이전에 저장된 값으로 계속 동작
@@ -38,7 +36,7 @@ class RateApi {
   static String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
 
   /// [force]=true면 오늘 이미 호출했어도 다시 호출
-  static Future<void> load({bool force = false}) async {
+  static Future<void> load({bool force = false, http.Client? client}) async {
     final p = await SharedPreferences.getInstance();
     final cached = p.getString('rates');
     lastFetched = DateTime.tryParse(p.getString('rates_time') ?? '');
@@ -54,16 +52,21 @@ class RateApi {
     if (fresh && !force) return; // 오늘 이미 호출함
 
     try {
-      final res = await http
-          .get(Uri.parse(_url))
-          .timeout(const Duration(seconds: 6));
+      final res =
+          await (client?.get(Uri.parse(_url)) ?? http.get(Uri.parse(_url)))
+              .timeout(const Duration(seconds: 6));
       if (res.statusCode != 200) throw Exception('status ${res.statusCode}');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (data['result'] != 'success') throw Exception('result fail');
       final rates = data['rates'] as Map<String, dynamic>;
       _perKrw = {
-        for (final c in currencies)
-          if (rates[c] != null) c: (rates[c] as num).toDouble(),
+        for (final entry in rates.entries)
+          if (RegExp(r'^[A-Z]{3}$').hasMatch(entry.key) &&
+              entry.value is num &&
+              (entry.value as num).isFinite &&
+              entry.value > 0 &&
+              (1 / entry.value).isFinite)
+            entry.key: (entry.value as num).toDouble(),
       };
       lastFetched = DateTime.now();
       await p.setString('rates', jsonEncode(_perKrw));
