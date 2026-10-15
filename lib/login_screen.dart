@@ -350,7 +350,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       debugPrint('카카오 서버 응답 코드: ${response.statusCode}');
 
-      debugPrint('카카오 서버 응답: ${response.body}');
 
 
 
