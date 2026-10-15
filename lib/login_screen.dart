@@ -1,22 +1,7 @@
 
 
-import 'dart:convert';
-
-
-
 import 'package:flutter/material.dart';
-
-import 'package:firebase_auth/firebase_auth.dart';
-
-import 'package:google_sign_in/google_sign_in.dart';
-
-import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
-
-import 'package:naver_login_flutter/naver_login_flutter.dart';
-
-import 'package:http/http.dart' as http;
-
-
+import 'api/api.dart';
 
 import 'password_reset_screen.dart';
 
@@ -53,18 +38,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool passwordVisible = false;
 
   bool isLoading = false;
-
-
-
-  static const String serverUrl =
-
-      'https://triper-l8ty.onrender.com';
-
-
-
-  static const String googleServerClientId =
-
-      '600150474690-6ve4oich2faph02ppn7l9sj5nct9fanl.apps.googleusercontent.com';
 
 
 
@@ -108,366 +81,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
 
 
-  // 이메일 로그인
-
   Future<void> _login() async {
-
     if (isLoading) return;
-
-
-
     final email = emailController.text.trim();
-
     final password = passwordController.text;
-
-
-
-    if (email.isEmpty || password.isEmpty) {
-
-      _showMessage('이메일과 비밀번호를 입력해주세요.');
-
+    final error = AuthApi.validateEmail(email) ?? AuthApi.validatePassword(password);
+    if (error != null) {
+      _showMessage(error);
       return;
-
     }
-
-
-
     setState(() => isLoading = true);
-
-
-
     try {
-
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-
-        email: email,
-
-        password: password,
-
-      );
-
-
-
-      if (!mounted) return;
-
-      _showMessage('로그인 성공!');
-
-    } on FirebaseAuthException catch (e) {
-
-      debugPrint('이메일 로그인 오류: ${e.code} ${e.message}');
-
-
-
-      if (!mounted) return;
-
-      _showMessage('로그인 실패: ${e.message ?? e.code}');
-
+      await AuthApi.signIn(email, password);
+      if (mounted) _showMessage('로그인 성공!');
     } catch (e) {
-
-      debugPrint('이메일 로그인 오류: $e');
-
-
-
-      if (!mounted) return;
-
-      _showMessage('로그인 중 오류가 발생했습니다.');
-
+      _showMessage(AuthApi.errorMessage(e));
     } finally {
-
       if (mounted) setState(() => isLoading = false);
-
     }
-
   }
 
-
-
-  // Google 로그인
-
-  Future<void> _googleLogin() async {
-
+  Future<void> _socialLogin(Future<bool> Function() authenticate, String message) async {
     if (isLoading) return;
-
-
-
     setState(() => isLoading = true);
-
-
-
     try {
-
-      await GoogleSignIn.instance.initialize(
-
-        serverClientId: googleServerClientId,
-
-      );
-
-
-
-      final GoogleSignInAccount account =
-
-          await GoogleSignIn.instance.authenticate();
-
-
-
-      final GoogleSignInAuthentication authentication =
-
-          account.authentication;
-
-
-
-      final String? idToken = authentication.idToken;
-
-
-
-      if (idToken == null || idToken.isEmpty) {
-
-        throw Exception('Google ID 토큰을 받지 못했습니다.');
-
-      }
-
-
-
-      final OAuthCredential credential =
-
-          GoogleAuthProvider.credential(idToken: idToken);
-
-
-
-      await FirebaseAuth.instance.signInWithCredential(credential);
-
-
-
-      if (!mounted) return;
-
-      _showMessage('Google 로그인 성공!');
-
-    } on FirebaseAuthException catch (e) {
-
-      debugPrint('Google Firebase 오류: ${e.code} ${e.message}');
-
-
-
-      if (!mounted) return;
-
-      _showMessage('Google 로그인 실패: ${e.message ?? e.code}');
-
-    } on GoogleSignInException catch (e) {
-
-      debugPrint('Google 로그인 오류: ${e.code} ${e.description}');
-
-
-
-      if (!mounted) return;
-
-      _showMessage('Google 로그인 실패: ${e.description ?? e.code}');
-
+      if (await authenticate() && mounted) _showMessage(message);
     } catch (e) {
-
-      debugPrint('Google 로그인 오류: $e');
-
-
-
-      if (!mounted) return;
-
-      _showMessage('Google 로그인 중 오류가 발생했습니다.');
-
-    } finally {
-
-      if (mounted) setState(() => isLoading = false);
-
-    }
-
-  }
-
-
-
-  // 카카오 로그인 → Render 서버 → Firebase
-
-  Future<void> _kakaoLogin() async {
-
-    if (isLoading) return;
-
-
-
-    setState(() => isLoading = true);
-
-
-
-    try {
-
-      OAuthToken kakaoToken;
-
-
-
-      if (await isKakaoTalkInstalled()) {
-
-        try {
-
-          kakaoToken =
-
-              await UserApi.instance.loginWithKakaoTalk();
-
-        } catch (e) {
-
-          debugPrint('카카오톡 로그인 전환: $e');
-
-          kakaoToken =
-
-              await UserApi.instance.loginWithKakaoAccount();
-
-        }
-
-      } else {
-
-        kakaoToken =
-
-            await UserApi.instance.loginWithKakaoAccount();
-
-      }
-
-
-
-      final response = await http
-
-          .post(
-
-            Uri.parse('$serverUrl/auth/kakao'),
-
-            headers: {'Content-Type': 'application/json'},
-
-            body: jsonEncode({
-
-              'accessToken': kakaoToken.accessToken,
-
-            }),
-
-          )
-
-          .timeout(const Duration(seconds: 60));
-
-
-
-      debugPrint('카카오 서버 응답 코드: ${response.statusCode}');
-
-
-
-
-      if (response.statusCode != 200) {
-
-        throw Exception(
-
-          '카카오 서버 인증 실패: ${response.statusCode}',
-
-        );
-
-      }
-
-
-
-      final Map<String, dynamic> data =
-
-          jsonDecode(response.body) as Map<String, dynamic>;
-
-
-
-      final String? customToken =
-
-          data['customToken'] as String?;
-
-
-
-      if (customToken == null || customToken.isEmpty) {
-
-        throw Exception('Firebase 인증 토큰을 받지 못했습니다.');
-
-      }
-
-
-
-      await FirebaseAuth.instance.signInWithCustomToken(customToken);
-
-
-
-      if (!mounted) return;
-
-      _showMessage('카카오 로그인 성공!');
-
-    } on FirebaseAuthException catch (e) {
-
-      debugPrint('카카오 Firebase 오류: ${e.code} ${e.message}');
-
-
-
-      if (!mounted) return;
-
-      _showMessage('카카오 로그인 실패: ${e.message ?? e.code}');
-
-    } catch (e) {
-
-      debugPrint('카카오 로그인 오류: $e');
-
-
-
-      if (!mounted) return;
-
-      _showMessage('카카오 로그인 실패: $e');
-
-    } finally {
-
-      if (mounted) setState(() => isLoading = false);
-
-    }
-
-  }
-
-
-
-  // 네이버 로그인 진단
-  // 현재는 네이버 인증 및 토큰 수신까지 확인합니다.
-  // Render 서버/Firebase 연동은 다음 단계에서 연결합니다.
-  Future<void> _naverLogin() async {
-    if (isLoading) return;
-
-    setState(() => isLoading = true);
-
-    try {
-      debugPrint('===== 네이버 로그인 시작 =====');
-
-      final NaverLoginResult result = await FlutterNaverLogin.logIn();
-
-      debugPrint('네이버 로그인 상태: ${result.status}');
-      debugPrint('네이버 계정 정보 수신 여부: ${result.account != null}');
-      debugPrint('네이버 토큰 수신 여부: ${result.accessToken != null}');
-
-      if (result.status != NaverLoginStatus.loggedIn) {
-        final message = result.errorMessage ?? result.status.toString();
-        debugPrint('네이버 로그인 실패 또는 취소: $message');
-        if (!mounted) return;
-        _showMessage('네이버 로그인 실패: $message');
-        return;
-      }
-
-      final NaverToken? token = result.accessToken;
-      if (token == null || !token.isValid() || token.accessToken.isEmpty) {
-        throw Exception('유효한 네이버 액세스 토큰을 받지 못했습니다.');
-      }
-
-      debugPrint('네이버 인증 성공');
-      debugPrint('네이버 액세스 토큰 수신 여부: ${token.accessToken.isNotEmpty}');
-
-      if (!mounted) return;
-      _showMessage('네이버 인증 성공! 서버 연결은 다음 단계에서 확인합니다.');
-    } catch (e, stackTrace) {
-      debugPrint('===== 네이버 로그인 오류 =====');
-      debugPrint('오류 내용: $e');
-      debugPrint('오류 위치: $stackTrace');
-      if (!mounted) return;
-      _showMessage('네이버 로그인 오류: $e');
+      _showMessage(AuthApi.errorMessage(e));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
+
+  Future<void> _googleLogin() => _socialLogin(AuthApi.signInWithGoogle, 'Google 로그인 성공!');
+  Future<void> _kakaoLogin() => _socialLogin(AuthApi.signInWithKakao, '카카오 로그인 성공!');
+  Future<void> _naverLogin() => _socialLogin(AuthApi.authenticateWithNaver, '네이버 인증 성공!');
 
   @override
 

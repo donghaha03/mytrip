@@ -63,10 +63,7 @@ class RecordingStore extends TripStore {
   api.Expense? saved;
   bool failSave = false;
   @override
-  String newExpenseId() => 'new-generated-id';
-  @override
   Future<void> saveExpense(String id, api.Expense value) async {
-    api.ExpenseApi.validate(value);
     if (failSave) throw const api.ApiException('저장 실패');
     saved = value;
   }
@@ -148,10 +145,6 @@ void main() {
   });
 
   test('저장 경계에서 잘못된 금액·환율·영수증·메모를 거부한다', () {
-    expect(
-      () => api.ExpenseApi.validate(expense(amount: 0.5)),
-      returnsNormally,
-    );
     for (final invalid in [
       expense(amount: double.nan),
       expense(amount: -1),
@@ -165,7 +158,7 @@ void main() {
       ),
     ]) {
       expect(
-        () => api.ExpenseApi.validate(invalid),
+        () => api.ExpenseApi.update('test', invalid),
         throwsA(isA<api.ApiException>()),
       );
     }

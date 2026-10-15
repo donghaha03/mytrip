@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../api/api.dart'
+    show AuthApi, ReceiptClient, ReceiptConnectionException;
+
 import '../data/rates.dart';
 import '../data/trip_store.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
-import '../receipts/receipt_client.dart';
 import '../receipts/receipt_consent.dart';
 import '../receipts/receipt_platform.dart';
 import '../theme/app_colors.dart';
@@ -78,8 +80,10 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
         widget.store,
       );
       if (deleted && mounted) Navigator.of(context).pop();
-    } catch (_) {
-      if (mounted) setState(() => _error = '삭제하지 못했어요. 기록은 그대로 유지됩니다.');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = '${AuthApi.errorMessage(e)}. 기록은 그대로 유지됩니다.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

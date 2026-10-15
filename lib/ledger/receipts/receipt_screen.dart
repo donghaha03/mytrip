@@ -13,7 +13,8 @@ import '../models/country.dart';
 import '../models/trip.dart';
 import 'receipt_draft.dart';
 import 'receipt_platform.dart';
-import 'receipt_client.dart';
+import '../../api/api.dart'
+    show AuthApi, ReceiptClient, ReceiptConnection, ReceiptConnectionException;
 import 'receipt_consent.dart';
 
 class ReceiptScreen extends StatefulWidget {
@@ -166,7 +167,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       if (mounted) {
         setState(
           () => _error = error is ReceiptConnectionException
-              ? error.message
+              ? AuthApi.errorMessage(error)
               : error is PlatformException
               ? error.message ?? '촬영하지 못했어요. 권한을 확인하거나 사진을 선택해주세요.'
               : '사진을 열지 못했어요. 다시 촬영하거나 사진 선택·수동 입력을 이용해주세요.',
@@ -207,7 +208,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
       if (mounted) {
         setState(
           () => _error = error is ReceiptConnectionException
-              ? error.message
+              ? AuthApi.errorMessage(error)
               : '인식하지 못했어요. 다시 시도하거나 수동으로 입력해주세요.',
         );
       }

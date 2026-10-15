@@ -191,6 +191,8 @@ users/{uid}/trips/{tripId}/expenses/{expenseId}
 | `await AuthApi.signUp(email, password, {name, sendVerification = true})` | 이메일 가입. 성공하면 **자동 로그인**되고 인증 메일이 발송된다. 이름 저장/메일 발송이 실패해도 가입은 성공 처리 |
 | `await AuthApi.signIn(email, password)` | 이메일 로그인 |
 | `final ok = await AuthApi.signInWithGoogle()` | 구글 로그인. **`false` = 사용자가 취소** (오류창 띄우지 말 것) |
+| `final ok = await AuthApi.signInWithKakao()` | 카카오 인증 후 Firebase 로그인. 취소하면 `false` |
+| `final ok = await AuthApi.authenticateWithNaver()` | 네이버 계정 인증. Firebase 로그인은 수행하지 않음. 취소하면 `false` |
 | `await AuthApi.signOut()` | 로그아웃 (구글 세션도 정리) |
 
 #### 이메일 인증 / 비밀번호 재설정
@@ -249,6 +251,8 @@ await AccountApi.deleteAccount();
 | `ExpenseApi.update(tripId, expense)` | `Future<void>` | 지출 수정. `expense.copyWith(...)` 결과 전달. **저장 당시 환율/날짜는 그대로 유지** |
 | `ExpenseApi.delete(tripId, expenseId)` | `Future<void>` | 지출 삭제 |
 | `ExpenseApi.restore(tripId, expense)` | `Future<void>` | 삭제 취소 (같은 ID로 복원, "되돌리기" 스낵바용) |
+
+`add`의 선택 인자: `icon`, `paymentMethod`, `isTaxFree`, `memo`, `recordedQuote`, `source`, `status`, `originalAmount`, `receiptFingerprint`, `receiptItems`, `receiptTaxes`, `receiptAdjustments`. 생략하면 모델의 기본값을 사용합니다. ID와 환율은 API가 정하며, `date`는 생략 시 현재 시각을 사용합니다.
 
 ```dart
 // 추가
@@ -319,6 +323,10 @@ try {
 Stream 오류는 `snap.hasError`일 때 `AuthApi.errorMessage(snap.error!)`로 같은 방식으로 표시한다.
 
 ---
+
+### 4-9. 영수증
+
+`api.dart`에서 `ReceiptClient`를 가져옵니다. `connection(configUrl: ...)`으로 연결을 읽고, `recognize(connection, image)`로 영수증을 인식하며, `translate(...)`로 품목을 번역합니다. 오류 문구는 `AuthApi.errorMessage(e)`로 표시합니다.
 
 ## 5. 화면별 사용 레시피
 
@@ -613,7 +621,7 @@ await AccountApi.deleteAccount(password: AuthApi.isPasswordUser ? pw : null);
 - 지출 목록 페이징 (한 여행의 지출을 전부 불러옴 – MVP 규모에서는 문제없음)
 - 카테고리 직접 추가/삭제 (6개 고정)
 - 신용카드 결제 내역 API 연동 (선택 기능, 미구현)
-- 카카오 로그인 (제외됨)
+- 네이버 인증 결과를 Firebase 로그인으로 교환하는 서버 연결
 
 ---
 

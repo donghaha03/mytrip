@@ -4,6 +4,7 @@
 //
 // ┌ 로그인    AuthApi.signIn / signUp / signOut / sendPasswordReset
 // │          AuthApi.signInWithGoogle (취소하면 false)
+// │          AuthApi.signInWithKakao / authenticateWithNaver
 // │          AuthApi.initSocial (main에서 1회) / loginMethodLabel
 // │          AuthApi.user / displayName / email / changes / errorMessage
 // │          AuthApi.validateEmail / validatePassword / validateNewPassword
@@ -12,8 +13,9 @@
 // ├ 계정      AuthApi.updateDisplayName / changePassword / sendEmailVerification
 // │          AccountApi.deleteAccount (회원 탈퇴: 데이터 + 계정 삭제)
 // ├ 여행      TripApi.watchAll / watch / get / add / update / updateBudget / delete
-// ├ 지출      ExpenseApi.watchAll / add / update / delete / restore / newId / save / validate
+// ├ 지출      ExpenseApi.watchAll / add / update / delete / restore
 // ├ 환율      RateApi.load / krwPer / toKrw / fromKrw / lastFetched
+// ├ 영수증    ReceiptClient.connection / recognize / translate
 // ├ 계산      LedgerCalc.spentKrw / remainingKrw / usedRatio / byCategory ...
 // └ 표시      won() / localAmt() / dateShort() / dayOnly()
 //
@@ -21,6 +23,9 @@
 // =============================================================================
 
 export '../constants.dart';
+
+export 'package:firebase_auth/firebase_auth.dart' show User;
+
 export '../models/expense.dart';
 export '../models/receipt_item.dart';
 export '../models/trip.dart';
@@ -31,4 +36,5 @@ export 'auth_api.dart';
 export 'expense_api.dart';
 export 'ledger_calc.dart';
 export 'rate_api.dart';
+export 'receipt_api.dart';
 export 'trip_api.dart';

@@ -1,7 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart' as kakao;
+import 'package:naver_login_flutter/naver_login_flutter.dart' as naver;
 
 import 'api_exception.dart';
 import 'social_config.dart';
@@ -65,7 +69,6 @@ class AuthApi {
 
   /// 로그인/로그아웃 + 프로필(이름, 인증 여부) 변경까지 감지.
   static Stream<User?> get userChanges => _auth.userChanges();
-
 
   static String _normalizeEmail(String v) => v.trim().toLowerCase();
 
@@ -184,8 +187,16 @@ class AuthApi {
   static Future<bool> signInWithGoogle() async {
     await initSocial();
     if (kIsWeb) {
-      await _auth.signInWithPopup(GoogleAuthProvider());
-      return true;
+      try {
+        await _auth.signInWithPopup(GoogleAuthProvider());
+        return true;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'popup-closed-by-user' ||
+            e.code == 'cancelled-popup-request') {
+          return false;
+        }
+        rethrow;
+      }
     }
     final cred = await _googleCredential();
     if (cred == null) return false;
@@ -206,6 +217,58 @@ class AuthApi {
       if (e.code == GoogleSignInExceptionCode.canceled) return null;
       rethrow;
     }
+  }
+
+  static Future<bool> signInWithKakao() async {
+    kakao.OAuthToken token;
+    try {
+      if (await kakao.isKakaoTalkInstalled()) {
+        try {
+          token = await kakao.UserApi.instance.loginWithKakaoTalk();
+        } on kakao.KakaoClientException catch (e) {
+          if (e.reason == kakao.ClientErrorCause.cancelled) return false;
+          token = await kakao.UserApi.instance.loginWithKakaoAccount();
+        } catch (_) {
+          token = await kakao.UserApi.instance.loginWithKakaoAccount();
+        }
+      } else {
+        token = await kakao.UserApi.instance.loginWithKakaoAccount();
+      }
+    } on kakao.KakaoClientException catch (e) {
+      if (e.reason == kakao.ClientErrorCause.cancelled) return false;
+      throw const ApiException('카카오 인증 설정을 확인해주세요');
+    }
+    final response = await http
+        .post(
+          Uri.parse('${SocialConfig.kakaoServerUrl}/auth/kakao'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'accessToken': token.accessToken}),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode != 200) {
+      throw const ApiException('카카오 인증 서버에 연결하지 못했어요');
+    }
+    final data = jsonDecode(response.body);
+    final customToken = data is Map ? data['customToken'] : null;
+    if (customToken is! String || customToken.isEmpty) {
+      throw const ApiException('카카오 인증 정보를 가져오지 못했어요');
+    }
+    await _auth.signInWithCustomToken(customToken);
+    return true;
+  }
+
+  /// 네이버 계정 인증. Firebase 로그인과는 별개다.
+  static Future<bool> authenticateWithNaver() async {
+    final result = await naver.FlutterNaverLogin.logIn();
+    if (result.status == naver.NaverLoginStatus.loggedOut) return false;
+    if (result.status != naver.NaverLoginStatus.loggedIn) {
+      throw const ApiException('네이버 인증 설정을 확인해주세요');
+    }
+    final token = result.accessToken;
+    if (token == null || !token.isValid() || token.accessToken.isEmpty) {
+      throw const ApiException('유효한 네이버 인증 정보를 가져오지 못했어요');
+    }
+    return true;
   }
 
   // ---------------------------------------------------------------------------

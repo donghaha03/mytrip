@@ -1,4 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'api/api.dart';
+
 import 'package:flutter/material.dart';
 
 import 'terms_screen.dart';
@@ -29,104 +30,41 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _signup() async {
+    if (isLoading) return;
     final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-    final passwordConfirm =
-        passwordConfirmController.text.trim();
-
-    if (email.isEmpty) {
-      _showMessage('이메일을 입력해주세요.');
+    final password = passwordController.text;
+    final error =
+        AuthApi.validateEmail(email) ??
+        AuthApi.validateNewPassword(password) ??
+        AuthApi.validatePasswordMatch(() => password)(
+          passwordConfirmController.text,
+        );
+    if (error != null) {
+      _showMessage(error);
       return;
     }
-
-    if (password.isEmpty) {
-      _showMessage('비밀번호를 입력해주세요.');
-      return;
-    }
-
-    if (password.length < 6) {
-      _showMessage('비밀번호는 6자 이상 입력해주세요.');
-      return;
-    }
-
-    if (password != passwordConfirm) {
-      _showMessage('비밀번호가 일치하지 않습니다.');
-      return;
-    }
-
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
+      await AuthApi.signUp(email, password);
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('회원가입이 완료되었습니다!'),
-        ),
-      );
-
+      _showMessage('회원가입이 완료되었습니다!');
       Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
-      String message;
-
-      switch (e.code) {
-        case 'email-already-in-use':
-          message = '이미 가입된 이메일입니다.';
-          break;
-
-        case 'invalid-email':
-          message = '올바른 이메일 형식이 아닙니다.';
-          break;
-
-        case 'weak-password':
-          message = '비밀번호가 너무 약합니다.';
-          break;
-
-        case 'operation-not-allowed':
-          message = '현재 이메일 회원가입을 사용할 수 없습니다.';
-          break;
-
-        default:
-          message = '회원가입 중 오류가 발생했습니다.';
-      }
-
-      if (mounted) {
-        _showMessage(message);
-      }
     } catch (e) {
-      if (mounted) {
-        _showMessage('알 수 없는 오류가 발생했습니다.');
-      }
+      if (mounted) _showMessage(AuthApi.errorMessage(e));
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openTerms() async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(
-        builder: (context) => const TermsScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const TermsScreen()),
     );
 
     if (result != true || !mounted) {
@@ -184,10 +122,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
               const Text(
                 '이메일과 비밀번호를 입력해주세요.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF6B7280),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
               ),
 
               const SizedBox(height: 32),
@@ -212,15 +147,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE5E7EB),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE5E7EB),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -266,15 +197,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE5E7EB),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE5E7EB),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -314,22 +241,17 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     onPressed: () {
                       setState(() {
-                        passwordConfirmVisible =
-                            !passwordConfirmVisible;
+                        passwordConfirmVisible = !passwordConfirmVisible;
                       });
                     },
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE5E7EB),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFE5E7EB),
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -356,9 +278,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFE5E7EB),
-                    ),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
                   child: const Row(
                     children: [
@@ -396,8 +316,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2F6FED),
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor:
-                        const Color(0xFFD4E0F9),
+                    disabledBackgroundColor: const Color(0xFFD4E0F9),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -427,10 +346,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const Center(
                 child: Text(
                   '회원가입 시 TRIPER 서비스 약관에 동의하게 됩니다.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF9EA6B3),
-                  ),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF9EA6B3)),
                 ),
               ),
             ],

@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/rates.dart';
-import '../../api/api.dart' show localAmt;
+import '../../api/api.dart' show localAmt, AuthApi, ReceiptClient;
 import '../data/trip_store.dart';
 import '../models/country.dart';
 import '../models/trip.dart';
 import '../receipts/receipt_draft.dart';
-import '../receipts/receipt_client.dart';
 import '../receipts/receipt_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -115,7 +114,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
     _memo = TextEditingController(text: e?.memo ?? '');
     _currency = countryByCode(e?.currency ?? '') ?? widget.trip.country;
     _amount = TextEditingController(text: e == null ? '' : localAmt(e.amount));
-    _id = e?.id ?? widget.store.newExpenseId();
+    _id = e?.id ?? '';
     _category = e?.category == '숙소' ? '숙박' : e?.category ?? '식비';
     if (!expenseCategoryIcons.containsKey(_category)) _category = '기타';
     _date = e?.date ?? DateTime.now();
@@ -282,9 +281,11 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
         ),
       );
       if (mounted) Navigator.of(context).pop();
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
-        setState(() => _error = '저장하지 못했어요. 입력 내용을 유지했으니 다시 시도해주세요.');
+        setState(
+          () => _error = '${AuthApi.errorMessage(e)}. 입력 내용을 유지했으니 다시 시도해주세요.',
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

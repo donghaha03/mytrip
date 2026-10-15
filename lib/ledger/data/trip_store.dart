@@ -86,15 +86,33 @@ class TripStore extends ChangeNotifier {
     }
   }
 
-  String newExpenseId() {
-    _checkActive();
-    return api.ExpenseApi.newId(tripId);
-  }
-
   Future<void> saveExpense(String id, Expense expense) async {
     _checkActive();
     if (id != tripId) throw const api.ApiException('여행 정보가 변경됐어요');
-    await api.ExpenseApi.save(tripId, expense);
+    if (expense.id.isEmpty) {
+      await api.ExpenseApi.add(
+        tripId,
+        category: expense.category,
+        place: expense.place,
+        amount: expense.amount,
+        currency: expense.currency,
+        date: expense.date,
+        icon: expense.icon,
+        paymentMethod: expense.paymentMethod,
+        isTaxFree: expense.isTaxFree,
+        memo: expense.memo,
+        recordedQuote: expense.recordedQuote,
+        source: expense.source,
+        status: expense.status,
+        originalAmount: expense.originalAmount,
+        receiptFingerprint: expense.receiptFingerprint,
+        receiptItems: expense.receiptItems,
+        receiptTaxes: expense.receiptTaxes,
+        receiptAdjustments: expense.receiptAdjustments,
+      );
+      return;
+    }
+    await api.ExpenseApi.update(tripId, expense);
     _checkActive();
     final index = trip!.expenses.indexWhere((e) => e.id == expense.id);
     if (index < 0) {

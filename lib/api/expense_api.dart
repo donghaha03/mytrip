@@ -14,20 +14,8 @@ class ExpenseApi {
   static CollectionReference<Map<String, dynamic>> _col(String tripId) =>
       Paths.expenses(tripId);
 
-  /// 입력 화면이 재시도해도 중복 기록을 만들지 않도록 ID를 먼저 발급한다.
-  static String newId(String tripId) => _col(tripId).doc().id;
-
-  /// 장부의 영수증/메모를 포함한 저장. 기존 문서의 다른 파트 필드는 보존한다.
-  static Future<void> save(String tripId, Expense expense) {
-    validate(expense);
-    return _col(tripId)
-        .doc(expense.id)
-        .set(expense.toMap(), SetOptions(merge: true));
-  }
-
-  static void validate(Expense expense) {
-    if (expense.id.isEmpty ||
-        expense.id.contains('/') ||
+  static void _validate(Expense expense) {
+    if (expense.id.contains('/') ||
         expense.place.trim().isEmpty ||
         !categoryIcons.containsKey(expense.category) ||
         !expense.amount.isFinite ||
@@ -72,29 +60,53 @@ class ExpenseApi {
     required double amount,
     required String currency,
     DateTime? date,
+    String icon = '💸',
+    PaymentMethod? paymentMethod,
+    bool isTaxFree = false,
+    String memo = '',
+    int? recordedQuote,
+    String? source,
+    ExpenseStatus status = ExpenseStatus.approved,
+    double? originalAmount,
+    String? receiptFingerprint,
+    List<ReceiptItem> receiptItems = const [],
+    List<ReceiptTax> receiptTaxes = const [],
+    ReceiptAdjustments? receiptAdjustments,
   }) async {
     final rate = RateApi.krwPer(currency);
     if (rate <= 0) {
       throw const ApiException('환율 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요');
     }
-    await save(
-      tripId,
-      Expense(
-        id: newId(tripId),
-        category: category,
-        place: place.trim(),
-        amount: amount,
-        currency: currency,
-        rate: rate,
-        date: date ?? DateTime.now(),
-      ),
+    final expense = Expense(
+      id: '',
+      category: category,
+      place: place.trim(),
+      amount: amount,
+      currency: currency,
+      rate: rate,
+      date: date ?? DateTime.now(),
+      icon: icon,
+      paymentMethod: paymentMethod,
+      isTaxFree: isTaxFree,
+      memo: memo,
+      recordedQuote: recordedQuote,
+      source: source,
+      status: status,
+      originalAmount: originalAmount,
+      receiptFingerprint: receiptFingerprint,
+      receiptItems: receiptItems,
+      receiptTaxes: receiptTaxes,
+      receiptAdjustments: receiptAdjustments,
     );
+    _validate(expense);
+    await _col(tripId).add(expense.toMap());
   }
 
   /// 지출 수정. 저장 당시 환율/날짜는 expense에 들어있는 값 그대로 유지됩니다.
   /// (현재 환율로 다시 계산하려면 expense.copyWith(rate: RateApi.krwPer(...)))
   static Future<void> update(String tripId, Expense expense) {
-    validate(expense);
+    if (expense.id.isEmpty) throw const ApiException('지출을 다시 열어주세요');
+    _validate(expense);
     return _col(tripId).doc(expense.id).update(expense.toMap());
   }
 
@@ -102,6 +114,11 @@ class ExpenseApi {
       _col(tripId).doc(expenseId).delete();
 
   /// 삭제 취소(되돌리기)용: 같은 ID로 복원
-  static Future<void> restore(String tripId, Expense expense) =>
-      save(tripId, expense);
+  static Future<void> restore(String tripId, Expense expense) {
+    if (expense.id.isEmpty) throw const ApiException('지출을 다시 열어주세요');
+    _validate(expense);
+    return _col(tripId)
+        .doc(expense.id)
+        .set(expense.toMap(), SetOptions(merge: true));
+  }
 }

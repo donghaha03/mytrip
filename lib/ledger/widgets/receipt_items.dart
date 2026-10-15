@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/receipt_item.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_colors.dart';
-import '../receipts/receipt_client.dart';
+import '../../api/api.dart' show AuthApi, ReceiptConnectionException;
 
 class ReceiptItems extends StatefulWidget {
   const ReceiptItems({
@@ -74,7 +74,7 @@ class _ReceiptItemsState extends State<ReceiptItems> {
       if (mounted) {
         setState(
           () => _error = error is ReceiptConnectionException
-              ? error.message
+              ? AuthApi.errorMessage(error)
               : '번역하지 못했어요. 원문은 그대로예요. 다시 시도해주세요.',
         );
       }
