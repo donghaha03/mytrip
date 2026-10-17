@@ -7,7 +7,8 @@ import 'ledger/screens/ledger_screen.dart';
 import 'ledger/theme/app_theme.dart';
 import 'ledger/widgets/screen_top_bar.dart';
 
-/// 팀 메인 화면에서 LedgerPage(tripId: trip.id)로 연다.
+/// 선택한 여행의 장부. 로그인과 여행 선택은 호출 화면에서 담당한다.
+/// LedgerPage(tripId: trip.id)로 연다.
 class LedgerPage extends StatefulWidget {
   const LedgerPage({super.key, required this.tripId, this.onMore});
   final String tripId;

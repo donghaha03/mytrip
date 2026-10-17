@@ -4,7 +4,6 @@
 //
 // ┌ 로그인    AuthApi.signIn / signUp / signOut / sendPasswordReset
 // │          AuthApi.signInWithGoogle (취소하면 false)
-// │          AuthApi.signInWithKakao / authenticateWithNaver
 // │          AuthApi.initSocial (main에서 1회) / loginMethodLabel
 // │          AuthApi.user / displayName / email / changes / errorMessage
 // │          AuthApi.validateEmail / validatePassword / validateNewPassword

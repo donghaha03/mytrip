@@ -13,7 +13,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(SnackBar),
-        matching: find.text('이메일을 입력해주세요'),
+        matching: find.text('이메일과 비밀번호를 입력해주세요.'),
       ),
       findsOneWidget,
     );

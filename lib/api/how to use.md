@@ -191,8 +191,6 @@ users/{uid}/trips/{tripId}/expenses/{expenseId}
 | `await AuthApi.signUp(email, password, {name, sendVerification = true})` | 이메일 가입. 성공하면 **자동 로그인**되고 인증 메일이 발송된다. 이름 저장/메일 발송이 실패해도 가입은 성공 처리 |
 | `await AuthApi.signIn(email, password)` | 이메일 로그인 |
 | `final ok = await AuthApi.signInWithGoogle()` | 구글 로그인. **`false` = 사용자가 취소** (오류창 띄우지 말 것) |
-| `final ok = await AuthApi.signInWithKakao()` | 카카오 인증 후 Firebase 로그인. 취소하면 `false` |
-| `final ok = await AuthApi.authenticateWithNaver()` | 네이버 계정 인증. Firebase 로그인은 수행하지 않음. 취소하면 `false` |
 | `await AuthApi.signOut()` | 로그아웃 (구글 세션도 정리) |
 
 #### 이메일 인증 / 비밀번호 재설정
@@ -621,7 +619,7 @@ await AccountApi.deleteAccount(password: AuthApi.isPasswordUser ? pw : null);
 - 지출 목록 페이징 (한 여행의 지출을 전부 불러옴 – MVP 규모에서는 문제없음)
 - 카테고리 직접 추가/삭제 (6개 고정)
 - 신용카드 결제 내역 API 연동 (선택 기능, 미구현)
-- 네이버 인증 결과를 Firebase 로그인으로 교환하는 서버 연결
+- 카카오 로그인 (제외됨)
 
 ---
 

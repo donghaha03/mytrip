@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:tripapp/AppColors.dart';
-import 'auth_gate.dart';
+import 'login_screen.dart';
 
 import '/api/api.dart';
 import 'firebase_options.dart';
@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Pretendard',
         colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
       ),
-      home: const AuthGate(home: TripSelectionPage()),
+      home: const LoginScreen(),
     );
   }
 }

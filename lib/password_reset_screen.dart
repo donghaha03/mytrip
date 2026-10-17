@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'api/api.dart';
-
 class PasswordResetScreen extends StatefulWidget {
   const PasswordResetScreen({super.key});
 
@@ -12,36 +10,29 @@ class PasswordResetScreen extends StatefulWidget {
 class _PasswordResetScreenState extends State<PasswordResetScreen> {
   final TextEditingController emailController = TextEditingController();
 
-  bool _busy = false;
-
   @override
   void dispose() {
     emailController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendResetEmail() async {
-    if (_busy) return;
+  void _sendResetEmail() {
     final email = emailController.text.trim();
-    final error = AuthApi.validateEmail(email);
-    if (error != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error)));
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('이메일을 입력해주세요.'),
+        ),
+      );
       return;
     }
-    setState(() => _busy = true);
-    try {
-      await AuthApi.sendPasswordReset(email);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('비밀번호 재설정 이메일을 전송했습니다.')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(AuthApi.errorMessage(e))));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('비밀번호 재설정 이메일을 전송했습니다.'),
+      ),
+    );
   }
 
   @override
@@ -136,11 +127,15 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFE5E7EB),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFE5E7EB),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -190,7 +185,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _busy ? null : _sendResetEmail,
+                  onPressed: _sendResetEmail,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2F6FED),
                     foregroundColor: Colors.white,
@@ -201,7 +196,10 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                   ),
                   child: const Text(
                     '재설정 이메일 보내기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),

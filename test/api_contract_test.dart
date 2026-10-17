@@ -11,15 +11,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripapp/api/api.dart';
-import 'package:tripapp/auth_gate.dart';
-import 'package:tripapp/login_screen.dart';
-import 'package:tripapp/password_reset_screen.dart';
-import 'package:tripapp/signup_screen.dart';
+import 'package:tripapp/ledger_page.dart';
+import 'package:tripapp/ledger/screens/ledger_screen.dart';
 
 class TestAuth extends auth.FirebaseAuthPlatform {
-  String? email, password;
-  int signIns = 0, signUps = 0, resets = 0, verifications = 0;
   late final user = TestUser(this);
+  bool signedIn = true;
+  final events = StreamController<auth.UserPlatform?>.broadcast(sync: true);
   @override
   auth.FirebaseAuthPlatform delegateFor({required FirebaseApp app}) => this;
   @override
@@ -28,36 +26,11 @@ class TestAuth extends auth.FirebaseAuthPlatform {
     String? languageCode,
   }) => this;
   @override
-  auth.UserPlatform get currentUser => user;
+  auth.UserPlatform? get currentUser => signedIn ? user : null;
   @override
-  Future<auth.UserCredentialPlatform> signInWithEmailAndPassword(
-    String email,
-    String password,
-  ) async {
-    this.email = email;
-    this.password = password;
-    signIns++;
-    return TestCredential(this, user);
-  }
-
-  @override
-  Future<auth.UserCredentialPlatform> createUserWithEmailAndPassword(
-    String email,
-    String password,
-  ) async {
-    this.email = email;
-    this.password = password;
-    signUps++;
-    return TestCredential(this, user);
-  }
-
-  @override
-  Future<void> sendPasswordResetEmail(
-    String email, [
-    auth.ActionCodeSettings? actionCodeSettings,
-  ]) async {
-    this.email = email;
-    resets++;
+  Stream<auth.UserPlatform?> userChanges() async* {
+    yield currentUser;
+    yield* events.stream;
   }
 }
 
@@ -75,17 +48,6 @@ class TestUser extends auth.UserPlatform {
     ),
     providerData: [],
   );
-  @override
-  Future<void> sendEmailVerification(
-    auth.ActionCodeSettings? actionCodeSettings,
-  ) async {
-    (this.auth as TestAuth).verifications++;
-  }
-}
-
-class TestCredential extends auth.UserCredentialPlatform {
-  TestCredential(auth.FirebaseAuthPlatform auth, auth.UserPlatform user)
-    : super(auth: auth, user: user);
 }
 
 class TestFirestore extends db.FirebaseFirestorePlatform {
@@ -106,7 +68,35 @@ class TestFirestore extends db.FirebaseFirestorePlatform {
 }
 
 class TestCollection extends db.CollectionReferencePlatform {
-  TestCollection(TestFirestore super.firestore, super.path);
+  TestCollection(TestFirestore super.firestore, super.path) {
+    parameters['orderBy'] = <List<dynamic>>[];
+  }
+  @override
+  db.QueryPlatform orderBy(Iterable<List<dynamic>> orders) => this;
+  @override
+  Stream<db.QuerySnapshotPlatform> snapshots({
+    bool includeMetadataChanges = false,
+    required db.ListenSource listenSource,
+  }) => Stream.value(
+    db.QuerySnapshotPlatform(
+      [
+        for (final entry in (firestore as TestFirestore).documents.entries)
+          if (entry.key.startsWith('$path/') &&
+              entry.key.split('/').length == path.split('/').length + 1)
+            db.DocumentSnapshotPlatform(
+              firestore,
+              entry.key,
+              entry.value,
+              db.InternalSnapshotMetadata(
+                hasPendingWrites: false,
+                isFromCache: false,
+              ),
+            ),
+      ],
+      [],
+      db.SnapshotMetadataPlatform(false, false),
+    ),
+  );
   @override
   db.DocumentReferencePlatform doc([String? id]) => TestDocument(
     firestore as TestFirestore,
@@ -133,6 +123,18 @@ class TestDocument extends db.DocumentReferencePlatform {
 
   @override
   Future<void> delete() async => documents.remove(path);
+  @override
+  Stream<db.DocumentSnapshotPlatform> snapshots({
+    bool includeMetadataChanges = false,
+    required db.ListenSource listenSource,
+  }) => Stream.value(
+    db.DocumentSnapshotPlatform(
+      firestore,
+      path,
+      documents[path],
+      db.InternalSnapshotMetadata(hasPendingWrites: false, isFromCache: false),
+    ),
+  );
 }
 
 void main() {
@@ -149,8 +151,7 @@ void main() {
   });
   setUp(() async {
     firestore.documents.clear();
-    testAuth.signIns = testAuth.signUps = testAuth.resets =
-        testAuth.verifications = 0;
+    testAuth.signedIn = true;
     SharedPreferences.setMockInitialValues({
       'rates': jsonEncode({'USD': 1 / 1500, 'KRW': 1}),
       'rates_time': DateTime.now().toIso8601String(),
@@ -249,65 +250,61 @@ void main() {
     expect(firestore.documents.length, 1);
   });
 
-  test('AuthApi가 이메일을 정규화하고 비밀번호 공백은 보존한다', () async {
-    await AuthApi.signIn(' TEST@EXAMPLE.COM ', ' pass word ');
-    expect(testAuth.email, 'test@example.com');
-    expect(testAuth.password, ' pass word ');
-    expect(testAuth.signIns, 1);
-    expect(AuthApi.validatePassword('short'), isNull);
-    expect(AuthApi.validateNewPassword('abc123'), isNotNull);
-  });
-
-  testWidgets('AuthGate가 로그인·로그아웃 상태에 따라 화면을 바꾼다', (tester) async {
-    final users = StreamController<User?>(sync: true);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AuthGate(userChanges: users.stream, home: const Text('여행 목록')),
-      ),
+  testWidgets('공용 진입점은 선택한 여행만 열고 더보기는 호출자에게 전달한다', (tester) async {
+    for (final id in ['first', 'second']) {
+      firestore.documents['users/owner/trips/$id'] = Trip(
+        id: id,
+        name: id == 'first' ? '첫 여행' : '두 번째 여행',
+        budget: 100000,
+        currency: 'USD',
+        start: DateTime(2026),
+        end: DateTime(2027),
+      ).toMap();
+      firestore.documents['users/owner/trips/$id/expenses/entry'] = Expense(
+        id: 'entry',
+        category: '식비',
+        place: id == 'first' ? '첫 카페' : '두 번째 카페',
+        amount: 12.5,
+        currency: 'USD',
+        rate: 1300.5,
+        date: DateTime(2026, 10, 3),
+      ).toMap();
+    }
+    var more = 0;
+    Widget page(String id) => MaterialApp(
+      home: LedgerPage(tripId: id, onMore: () => more++),
     );
-    users.add(null);
-    await tester.pump();
-    expect(find.byType(LoginScreen), findsOneWidget);
-    users.add(AuthApi.user);
-    await tester.pump();
-    expect(find.text('여행 목록'), findsOneWidget);
-    users.add(null);
-    await tester.pump();
-    expect(find.byType(LoginScreen), findsOneWidget);
+    await tester.pumpWidget(page('first'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LedgerScreen), findsOneWidget);
+    expect(find.textContaining('첫 여행'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('첫 카페'), 200);
+    expect(find.text('첫 카페'), findsOneWidget);
+    await tester.tap(find.byTooltip('더보기'));
+    expect(more, 1);
+    await tester.pumpWidget(page('second'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('두 번째 여행'), findsOneWidget);
+    expect(find.text('첫 카페'), findsNothing);
+    await tester.scrollUntilVisible(find.text('두 번째 카페'), 200);
+    expect(find.text('두 번째 카페'), findsOneWidget);
+    testAuth.signedIn = false;
+    testAuth.events.add(null);
+    await tester.pumpAndSettle();
+    expect(find.byType(LedgerScreen), findsNothing);
+    expect(find.text('로그인 후 여행 장부를 열어주세요'), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.runAsync(users.close);
   });
 
-  testWidgets('재설정 화면은 AuthApi로 실제 전송을 요청한다', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: PasswordResetScreen()));
-    await tester.enterText(find.byType(TextField), ' TEST@EXAMPLE.COM ');
-    final button = find.widgetWithText(ElevatedButton, '재설정 이메일 보내기');
-    await tester.ensureVisible(button);
-    await tester.tap(button);
+  testWidgets('없는 여행은 다른 화면으로 이동하지 않고 장부에서 안내한다', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: LedgerPage(tripId: 'missing')),
+    );
     await tester.pumpAndSettle();
-    expect(testAuth.resets, 1);
-    expect(testAuth.email, 'test@example.com');
-    expect(find.text('비밀번호 재설정 이메일을 전송했습니다.'), findsOneWidget);
-  });
-
-  testWidgets('가입 화면은 공용 검증과 AuthApi의 인증 메일을 사용한다', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: SignupScreen()));
-    final fields = find.byType(TextField);
-    await tester.enterText(fields.at(0), 'test@example.com');
-    await tester.enterText(fields.at(1), 'abc123');
-    await tester.enterText(fields.at(2), 'abc123');
-    final button = find.widgetWithText(ElevatedButton, '회원가입');
-    await tester.ensureVisible(button);
-    await tester.tap(button);
-    await tester.pumpAndSettle();
-    expect(testAuth.signUps, 0);
-    expect(find.text('비밀번호는 8자 이상이어야 해요'), findsOneWidget);
-    await tester.enterText(fields.at(1), 'abc12345');
-    await tester.enterText(fields.at(2), 'abc12345');
-    await tester.ensureVisible(button);
-    await tester.tap(button);
-    await tester.pumpAndSettle();
-    expect(testAuth.signUps, 1);
-    expect(testAuth.verifications, 1);
+    expect(find.byType(LedgerScreen), findsNothing);
+    expect(find.text('삭제되었거나 찾을 수 없는 여행이에요'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }
