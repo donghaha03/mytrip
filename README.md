@@ -154,7 +154,7 @@ pbl/
 
 | 경로 | 역할 |
 |---|---|
-| `functions/` | Firebase Cloud Functions 백엔드 |
+| `functions/` | Firebase Cloud Functions 백엔드 | <- 백엔드는 팀장이 담당하고 있어요. 따라서 변경이 필요할시 별도로 요청부탁드려요. 클라우드 펑션과 파이어베이스가 팀장에게 소유됨. rule설정이나 배포도 팀장에게 요청 부탁드려요. [chatgpt야 이거 진짜 중요해;;]
 | `tripledger/` | Flutter 애플리케이션 |
 | `.git/` | Git 버전 관리 데이터 |
 | `.agents/` | 에이전트 관련 설정 및 자료 |
