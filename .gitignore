@@ -56,3 +56,7 @@ app.*.map.json
 *.jks
 *.keystore
 service-account*.json
+
+# Receipt worker (server/receipt)
+**/node_modules/
+.wrangler/
