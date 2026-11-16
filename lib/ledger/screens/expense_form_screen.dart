@@ -663,6 +663,8 @@ Future<bool> deleteExpenseWithConfirmation(
   Expense expense,
   TripStore store,
 ) async {
+  // 상세/수정 화면은 삭제 후 닫히므로 앱 단위 메신저를 미리 잡아 둔다.
+  final messenger = ScaffoldMessenger.of(context);
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -686,5 +688,22 @@ Future<bool> deleteExpenseWithConfirmation(
   );
   if (confirmed != true) return false;
   await store.deleteExpense(trip.id, expense.id);
+  messenger.showSnackBar(
+    SnackBar(
+      content: const Text('삭제했어요'),
+      action: SnackBarAction(
+        label: '되돌리기',
+        onPressed: () async {
+          try {
+            await store.restoreExpense(expense);
+          } catch (e) {
+            messenger.showSnackBar(
+              SnackBar(content: Text(AuthApi.errorMessage(e))),
+            );
+          }
+        },
+      ),
+    ),
+  );
   return true;
 }

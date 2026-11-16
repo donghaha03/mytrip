@@ -132,6 +132,17 @@ class TripStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 삭제 되돌리기. 같은 ID로 복원한다.
+  Future<void> restoreExpense(Expense expense) async {
+    _checkActive();
+    await api.ExpenseApi.restore(tripId, expense);
+    _checkActive();
+    if (!trip!.expenses.any((e) => e.id == expense.id)) {
+      trip!.expenses.add(expense);
+      notifyListeners();
+    }
+  }
+
   Future<void> update({
     required String name,
     required DateTime start,
