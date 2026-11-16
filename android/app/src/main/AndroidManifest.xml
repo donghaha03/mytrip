@@ -26,6 +26,16 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- 카드 승인 알림 자동 입력: 사용자가 설정에서 "알림 접근"을 허용해야 동작한다. -->
+        <service
+            android:name=".CardNotificationListener"
+            android:label="카드 알림 자동 입력"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

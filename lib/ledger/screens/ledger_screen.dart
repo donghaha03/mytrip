@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../widgets/category_charts.dart';
 
+import '../card_message/card_inbox_banner.dart';
+
 import '../data/rates.dart';
 import '../data/trip_store.dart';
 import '../models/trip.dart';
@@ -140,6 +142,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
+                    CardInboxBanner(trip: trip, store: widget.store),
                     Container(
                       key: const ValueKey('ledger-budget-card'),
                       padding: const EdgeInsets.all(20),
