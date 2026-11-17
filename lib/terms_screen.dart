@@ -15,7 +15,8 @@ class _TermsScreenState extends State<TermsScreen> {
 
   void _updateAllAgree() {
     setState(() {
-      allAgree = serviceAgree && privacyAgree && marketingAgree;
+      allAgree =
+          serviceAgree && privacyAgree && marketingAgree;
     });
   }
 
@@ -30,9 +31,11 @@ class _TermsScreenState extends State<TermsScreen> {
 
   void _next() {
     if (!serviceAgree || !privacyAgree) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('필수 약관에 동의해주세요.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('필수 약관에 동의해주세요.'),
+        ),
+      );
       return;
     }
 
@@ -85,7 +88,10 @@ class _TermsScreenState extends State<TermsScreen> {
 
               const Text(
                 '서비스 이용을 위해 약관에 동의해주세요.',
-                style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                ),
               ),
 
               const SizedBox(height: 32),
@@ -100,7 +106,9 @@ class _TermsScreenState extends State<TermsScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  border: Border.all(
+                    color: const Color(0xFFE5E7EB),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -185,7 +193,10 @@ class _TermsScreenState extends State<TermsScreen> {
                   ),
                   child: const Text(
                     '동의하고 계속하기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -203,11 +214,16 @@ class _TermsScreenState extends State<TermsScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 8,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+        ),
       ),
       child: Row(
         children: [
@@ -226,7 +242,10 @@ class _TermsScreenState extends State<TermsScreen> {
               ),
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF9EA6B3)),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: Color(0xFF9EA6B3),
+          ),
         ],
       ),
     );
