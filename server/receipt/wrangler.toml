@@ -1,9 +1,9 @@
 name = "mytrip-receipt"
-main = "gemini.mjs"
+main = "worker.mjs"
 compatibility_date = "2026-10-06"
 workers_dev = true
 
-# Run close to a supported Google backend region, not the default global edge.
+# Send model requests from one fixed US region instead of whichever edge is nearest the user.
 [placement]
 region = "gcp:us-east4"
 
@@ -13,10 +13,8 @@ enabled = false
 
 [vars]
 RECEIPT_ALLOWED_ORIGINS = "https://donghaha03.github.io"
-# Claude Haiku (new consent) needs the ANTHROPIC_API_KEY secret; see README.
-# Set yes only after checking the actual Gemini project and Workers account plan.
-GEMINI_FREE_TIER_CONFIRMED = "no"
-RECEIPT_FREE_HOSTING_CONFIRMED = "no"
+# Secrets (wrangler secret put): ANTHROPIC_API_KEY, RECEIPT_ACCESS_CODE. See README.
+# yes = anyone who accepts the in-app consent may use it, within the usage limits.
 RECEIPT_PUBLIC_CONSENT = "yes"
 
 [[durable_objects.bindings]]

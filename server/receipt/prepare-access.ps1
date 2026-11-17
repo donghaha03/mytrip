@@ -25,7 +25,7 @@ if (Test-Path -LiteralPath $taskCodePath) {
 if ($Copy) {
   # Explicit user action only; the agent does not print or copy the private code.
   Set-Clipboard -Value $taskCode
-  Write-Output 'Server access code copied. It is not a Gemini API key.'
+  Write-Output 'Server access code copied. It is not an API key.'
 } else {
   Push-Location $PSScriptRoot
   try {

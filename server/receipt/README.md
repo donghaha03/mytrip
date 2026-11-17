@@ -1,74 +1,44 @@
 # 영수증 인식 연결
 
-## Claude Haiku 단계 전환 (현재 1단계)
+## Claude Haiku · 공개 웹과 앱
 
-공개 인식을 Google Gemini에서 Anthropic Claude Haiku(`claude-haiku-5-5`)로 옮기는 중입니다.
-같은 Worker(`gemini.mjs`)가 앱이 보내는 동의 버전으로 제공자를 고릅니다.
-
-| `X-Receipt-Consent` | 처리 | 대상 |
-|---|---|---|
-| `claude-haiku-v1` | Claude Haiku (`/receipt/recognize`, `/receipt/translate`) | 새 앱 |
-| `gemini-free-v2`, `gemini-free-v1` | Gemini (기존 동작 그대로) | 이미 배포된 앱 |
-
-- Google 동의로는 Anthropic에 아무것도 보내지 않고, 그 반대도 마찬가지입니다.
-- Claude 경로는 서버 시크릿 `ANTHROPIC_API_KEY`가 필요합니다. 없으면 503이며 Gemini로 대신 보내지 않습니다.
-- 비용은 운영자가 부담합니다. 공개 요청은 기존과 같은 사용량 제한(전체 하루 200건, 접속당 하루 50건·분당 5건)을 공유합니다.
-- 재시도·다른 제공자 대체는 없습니다. 거절·잘린 응답·형식이 틀린 응답은 검토 초안이 되지 않습니다.
-- `GET /receipt/status`의 `claude`가 `true`이면 Claude 경로가 준비된 것입니다.
-- `/receipt/claude`는 접속 코드로만 쓰는 운영자 비교용 경로입니다.
-
-배포 (저장소의 `wrangler.toml`은 확인 값이 `no`이므로 그대로 배포하면 기존 Gemini 경로가 꺼집니다):
-
-```powershell
-npm ci --ignore-scripts
-npx --yes wrangler@4.147.0 secret put ANTHROPIC_API_KEY   # 이미 등록했다면 생략
-npx --yes wrangler@4.147.0 deploy --var GEMINI_FREE_TIER_CONFIRMED:yes --var RECEIPT_FREE_HOSTING_CONFIRMED:yes
-```
-
-2단계(남은 일): 새 앱이 배포되어 Gemini 동의 요청이 더 오지 않는 것을 확인한 뒤
-Gemini 분기와 `GEMINI_*` 설정, 아래 Gemini 안내를 삭제합니다.
-
-## Gemini 무료 API · 공개 웹과 앱
-
-`gemini.mjs`를 Cloudflare **Workers Free**에 배포합니다. 촬영한 사진을 Google의
-`gemini-3.5-flash-lite` 이미지 이해 모델에 한 번 전달하고, 검증된 JSON을 기존 검토 화면으로
-돌려줍니다. 상호명·날짜·통화·최종 결제금액과 품목 이름·수량·단가·금액을 읽습니다.
-상호명과 구매 품목을 함께 보고 기존 6개 카테고리 중 하나를 추천합니다. 혼합 구매는 품목
+`worker.mjs`를 Cloudflare Workers에 배포합니다. 촬영한 사진을 Anthropic의
+`claude-haiku-5-5` 모델에 한 번 전달하고, 검증된 JSON을 검토 화면으로 돌려줍니다.
+상호명·날짜·통화·최종 결제금액과 품목 이름·수량·단가·금액을 읽습니다.
+상호명과 구매 품목을 함께 보고 6개 카테고리 중 하나를 추천합니다. 혼합 구매는 품목
 지출이 가장 큰 분류를 사용하고, 불명확하면 기타로 남깁니다. 검토 화면에서 바꿀 수 있습니다.
-Google 권장 Interactions API에 `store:false`로 요청하며 대화 이력·도구를 연결하지 않습니다.
-JSON 출력 모드를 사용하고 서버의 공통 영수증 검증기로 필드·날짜·금액·수량을 검사합니다.
-출력 스키마 옵션의 수용 여부와 별개로, 잘못된 결과를 검토 초안으로 전달하지 않습니다.
-이 설정은 Google 무료 서비스의 제품 개선·사람 검토 조건을 없애는 설정은 아닙니다.
+구조화 출력(JSON 스키마)을 사용하고 서버의 공통 영수증 검증기로 필드·날짜·금액·수량을 다시 검사합니다.
+거절·잘린 응답·형식이 틀린 결과는 검토 초안으로 전달하지 않습니다.
 품목·세금·소계를 총액에 다시 더하지 않으며, 모호한 값은 비워 확인을 요청합니다.
 사용자가 검토하고 지출 양식에 적용한 뒤 저장합니다.
 
-### 무료 조건과 데이터
+### 비용과 데이터
 
-- Gemini 키가 속한 **프로젝트의 Free Tier**를 확인합니다. 결제 계정이 연결된 프로젝트는
-  같은 모델을 호출해도 별도 과금될 수 있습니다. 코드만으로 결제 등급을 판별할 수 없습니다.
-- Cloudflare도 **Workers Free** 계정이어야 합니다. 유료 전환·결제수단 추가는 하지 않습니다.
-- Google 무료 한도는 프로젝트·모델에 따라 다릅니다. 429는 수동 재시도·수동 입력으로 안내합니다.
-  다른 모델·OpenAI API·유료 플랜으로 자동 전환하지 않습니다.
-- 사진 전체와 추출 프롬프트가 Cloudflare를 거쳐 Google에 전송됩니다. 이 Worker는 사진·응답을
-  저장하지 않고 관측 로그를 끕니다. Google의 무료 서비스는 입력·결과를 제품 개선에 사용하고
-  사람이 검토할 수 있습니다. 고정 삭제 기한이나 무보관을 보장하지 않습니다.
+- 인식·번역 호출 비용은 Anthropic API 키의 소유자(운영자)가 부담합니다. 사용자에게 청구하지 않습니다.
+- 한 요청에 한 번만 호출합니다. 실패해도 자동 재시도하거나 다른 모델·제공자로 보내지 않습니다.
+  429는 수동 재시도·수동 입력으로 안내합니다.
+- 사진 전체와 추출 프롬프트가 Cloudflare를 거쳐 Anthropic에 전송됩니다. 이 Worker는 사진·응답을
+  저장하지 않고 관측 로그를 끕니다. Anthropic의 처리·보관 조건은
+  [상용 약관](https://www.anthropic.com/legal/commercial-terms)을 따릅니다.
 - 개인정보 없는 테스트 사진을 사용합니다. 실제 사진은 카드번호·연락처·주소 등 개인/기밀 정보를
   먼저 가려야 합니다. 출력에서 제외하도록 지시하는 것만으로 원본 전송을 막을 수는 없습니다.
-- 발표 테스트는 성인 사용자와 [지원 지역](https://ai.google.dev/gemini-api/docs/available-regions)을
-  대상으로 합니다. EEA·스위스·영국 사용자에게 API 앱을 제공할 때는 무료 서비스 사용이 허용되지 않습니다.
-  Cloudflare의 요청 국가 정보로 해당 지역 호출을 차단하고 화면에서 성인 여부를 확인합니다.
-  일반 공개 서비스로 확장하기 전에 사용자별 인증과 더 강한 연령 확인이 필요합니다.
+- 화면에서 성인 여부를 확인합니다. 일반 공개 서비스로 확장하기 전에 사용자별 인증과 더 강한
+  연령 확인이 필요합니다.
 
 ### 서버 연결
 
 저장소 루트가 아니라 `server/receipt` 디렉터리에서 다음 명령을 사용합니다.
 
 ```powershell
+npm ci --ignore-scripts
 npx --yes wrangler@4.147.0 login --use-keyring --scopes account:read user:read workers_scripts:write
-npx --yes wrangler@4.147.0 deploy
-npx --yes wrangler@4.147.0 secret put GEMINI_API_KEY
+npx --yes wrangler@4.147.0 secret put ANTHROPIC_API_KEY
 npx --yes wrangler@4.147.0 secret put RECEIPT_ACCESS_CODE
+npx --yes wrangler@4.147.0 deploy
 ```
+
+이미 로그인했고 두 비밀값을 등록해 둔 Worker라면 `npm ci --ignore-scripts`와 마지막 `deploy`만 실행합니다.
+배포할 때 추가 `--var` 옵션은 필요하지 않습니다.
 
 배포가 Cloudflare 오류 `10034`로 막히면 가입 이메일의 인증 링크를 완료한 뒤 Wrangler에
 다시 로그인합니다. 프로필에서 이메일 주소를 바꿀 필요는 없습니다. 재인증 후에도 같은 오류가
@@ -77,39 +47,35 @@ npx --yes wrangler@4.147.0 secret put RECEIPT_ACCESS_CODE
 키는 비밀값 입력 프롬프트 또는 Cloudflare 대시보드의 Worker → Settings → Variables and Secrets에서
 **Secret** 형식으로 입력합니다. 명령 인수·채팅·GitHub·앱 코드에 넣지 않습니다.
 `RECEIPT_ACCESS_CODE`는 API 키와 다른 무작위 URL-safe 32~128자 서버 비밀값입니다.
-공개 Gemini 앱은 이 값을 입력받거나 포함하지 않습니다. 익명 사용량 해시의 서버 전용 키와
+공개 앱은 이 값을 입력받거나 포함하지 않습니다. 익명 사용량 해시의 서버 전용 키와
 운영자 검사 인증에만 사용합니다. 기존 값을 재사용할 수 있습니다.
 Windows에서는 `powershell -File prepare-access.ps1`로 무작위 접속 코드를 생성·등록할 수 있습니다.
-로컬 복사본은 `%LOCALAPPDATA%/mytrip-receipt/gemini-access.dpapi`에 현재 Windows 사용자 전용으로
-암호화합니다. 사용자가 직접 `powershell -File prepare-access.ps1 -Copy`를 실행하면 코드가
-클립보드에 복사됩니다. 코드나 Gemini 키를 채팅에 보내지 않습니다.
-
-실제 무료 등급을 확인한 뒤 `wrangler.toml`의 두 확인 값을 `yes`로 바꾸고 다시 배포합니다.
-기본 `no`는 실수로 호출되는 것을 막습니다. 나중에 계정에 결제를 연결하면 이 값을 다시 `no`로 바꿔야 합니다.
-저장소 기본값을 바꾸지 않으려면 배포할 때
-`--var GEMINI_FREE_TIER_CONFIRMED:yes --var RECEIPT_FREE_HOSTING_CONFIRMED:yes`로 확인 값을 지정합니다.
+로컬 복사본은 `%LOCALAPPDATA%/mytrip-receipt/gemini-access.dpapi`(이전부터 쓰던 파일 이름)에
+현재 Windows 사용자 전용으로 암호화합니다. 사용자가 직접 `powershell -File prepare-access.ps1 -Copy`를
+실행하면 코드가 클립보드에 복사됩니다. 코드나 API 키를 채팅에 보내지 않습니다.
 
 | 서버 설정 | 저장 위치 |
 | --- | --- |
-| `GEMINI_API_KEY` | Cloudflare Secret |
+| `ANTHROPIC_API_KEY` | Cloudflare Secret |
 | `RECEIPT_ACCESS_CODE` | Cloudflare Secret |
-| `GEMINI_FREE_TIER_CONFIRMED=yes` | 무료 Gemini 프로젝트 확인 후 서버 변수 |
-| `RECEIPT_FREE_HOSTING_CONFIRMED=yes` | Workers Free 확인 후 서버 변수 |
 | `RECEIPT_ALLOWED_ORIGINS` | 기본 `https://donghaha03.github.io` |
-| `RECEIPT_PUBLIC_CONSENT=yes` | 동의 기반 발표용 공개 인식, 영속 호출 제한 필수 |
-| `RECEIPT_USAGE` | Workers Free SQLite Durable Object, 익명 사용량만 저장 |
+| `RECEIPT_PUBLIC_CONSENT=yes` | 동의 기반 공개 인식, 영속 호출 제한 필수 |
+| `RECEIPT_USAGE` | SQLite Durable Object, 익명 사용량만 저장 |
 
-앱은 영수증 촬영에 처음 진입할 때 전송·무료 데이터 조건과 성인 여부를 확인합니다.
+예전에 등록한 `GEMINI_API_KEY` 비밀값은 더 이상 읽지 않습니다. 남겨 두어도 동작에는 영향이 없고,
+`npx --yes wrangler@4.147.0 secret delete GEMINI_API_KEY`로 지울 수 있습니다.
+
+앱은 영수증 촬영에 처음 진입할 때 전송 조건과 성인 여부를 확인합니다.
 앱 시작·사용 안내·일반 지출 기록에는 영수증 동의를 표시하지 않습니다.
 동의 여부는 기기/브라우저에 제공자·서버 주소·정책 버전별로 저장합니다. 이후에는 카메라의
 사진 확인 버튼을 누르면 자동 인식하고 결과 검토로 이동합니다. 데이터 초기화·기기 변경이나
 서버/정책 변경 시 다시 동의가 필요합니다. 거절해도 수동 입력은 가능하고 촬영 화면의
 ‘사진 전송 동의’에서 철회할 수 있습니다. 저장 실패나 미동의에는 업로드하지 않습니다.
 
-품목 상세의 한국어·English 버튼은 원문을 유지하고 품목명만 같은 Gemini 서비스에 보내
+품목 상세의 한국어·English 버튼은 원문을 유지하고 품목명만 같은 서비스에 보내
 번역합니다. 수량·금액은 번역하지 않으며 선택한 버튼을 다시 누르면 원문으로 돌아갑니다.
-같은 상세 화면 안에서는 언어별 결과를 재사용합니다. 번역 목적이 추가된 정책 버전(v2)에
-아직 동의하지 않은 기존 기록의 번역은 버튼을 누를 때 먼저 동의를 확인합니다.
+같은 상세 화면 안에서는 언어별 결과를 재사용합니다. 아직 동의하지 않았다면 버튼을 누를 때
+먼저 동의를 확인합니다.
 세금은 영수증에 명시된 부가세·소비세·기타 세금의 금액·통화·포함 여부만 별도 저장합니다.
 세율로 추정하지 않고 총 결제금액에 재합산하지 않습니다. 기존 기록의 세금 정보는 자동 복원하지 않습니다.
 면세 적용이 명시돼 있으면 지출 양식의 면세가 자동 선택됩니다. 공제된 세금과 면세 대상
@@ -124,27 +90,25 @@ Windows에서는 `powershell -File prepare-access.ps1`로 무작위 접속 코�
 그대로 저장합니다. 검토 화면에서 확인하거나 제외할 수 있습니다.
 
 `POST /receipt/translate`는 `{ "names": ["Americano"], "language": "ko" }` 또는 `en`을 받고
-동일 순서의 `{ "names": ["아메리카노"], "provider": "gemini", "model": "..." }`를 반환합니다.
+동일 순서의 `{ "names": ["아메리카노"], "provider": "claude", "model": "..." }`를 반환합니다.
 사진·전체 지출·결제 정보를 이 요청에 넣지 않습니다.
 
-`X-Receipt-Consent: gemini-free-v2`는 동의 흐름 표시이지 로그인/사용자 인증이 아닙니다.
-캐시된 v1 앱은 기존 사진 인식만 계속 사용할 수 있고 새 번역 호출에는 v2가 필요합니다.
-발표용 익명 공개 엔드포인트이며 CORS만으로 앱 외 호출을 막을 수 없습니다. 서버는 전체
-200회/UTC 일, 접속 IP별 50회/일·5회/분으로 인식과 번역의 실제 Google 호출을 함께 영속적으로 제한합니다.
-실패한 Google 호출도 포함하며 설정/카운터 장애 시 차단합니다. 동일 와이파이는 한 IP로
-집계될 수 있습니다. Google의 프로젝트 한도가 더 낮으면 먼저 중단될 수 있습니다.
+`X-Receipt-Consent: claude-haiku-v1`은 동의 흐름 표시이지 로그인/사용자 인증이 아닙니다.
+이전 제공자에 대한 동의 값(`gemini-free-v1`, `gemini-free-v2`)을 보내는 예전 앱의 요청은 401로 거절합니다.
+익명 공개 엔드포인트이며 CORS만으로 앱 외 호출을 막을 수 없습니다. 서버는 전체
+200회/UTC 일, 접속 IP별 50회/일·5회/분으로 인식과 번역의 실제 호출을 함께 영속적으로 제한합니다.
+실패한 호출도 포함하며 설정/카운터 장애 시 차단합니다. 동일 와이파이는 한 IP로
+집계될 수 있습니다.
 날짜별 HMAC IP 해시와 횟수만 SQLite Durable Object에 저장합니다. 현행 집계는 다음 날
 교체되지만 Cloudflare 복구 기록에는 최대 30일 남을 수 있습니다. 사진·결제내역·원본 IP는
 이 카운터에 저장하지 않습니다. 일반 서비스로 확장할 때는 사용자 인증/악용 방지를 강화해야 합니다.
 
-`GET https://서버주소/receipt/status`는 설정 유무·제공자·모델만 반환합니다. 키나 영수증을 반환하지
-않고 Google 호출도 하지 않습니다. `configured:true`는 변수 확인이며 실제 계정 결제 상태나
+`GET https://서버주소/receipt/status`는 설정 유무·제공자(`claude`)·모델만 반환합니다. 키나 영수증을
+반환하지 않고 모델 호출도 하지 않습니다. `configured:true`는 비밀값이 등록됐다는 뜻이며
 인식 성공의 증거는 아닙니다. 개인정보 없는 사진으로 실제 호출까지 확인해야 합니다.
 
-Google이 `LOCATION_UNSUPPORTED`로 거절하면 Cloudflare의 실행 위치를 확인합니다.
-`wrangler.toml`의 `placement.region`은 지원 지역 가까이 실행하도록 하는 힌트이며,
-실제 출구 IP 위치나 Google의 허용 여부를 보장하지 않습니다. 계정 무료 상태를 바꾸거나
-유료 서버로 자동 전환하지 않습니다.
+`wrangler.toml`의 `placement.region`은 모델 요청을 미국의 한 지역에서 보내도록 하는 힌트이며,
+실제 출구 위치를 보장하지는 않습니다.
 
 ### Tesseract.js와 실제 비교
 
@@ -158,14 +122,14 @@ flutter test tool/evaluate_receipt_benchmark.dart --reporter expanded
 ```
 
 `RECEIPT_SERVER_URL`과 비밀 접속 코드 `RECEIPT_ACCESS_CODE`를 환경에 지정하면 동일한
-개인정보 없는 테스트 사진 3장으로 실제 Gemini도 호출합니다. 재시도·유료 대체는 없습니다.
+개인정보 없는 테스트 사진으로 실제 서버 모델도 호출합니다. 재시도·다른 제공자 대체는 없습니다.
 결과는 Git에서 제외된 `.dart_tool/receipt-benchmark-scored.json`에만 저장합니다.
 상호·날짜·통화·총액 및 명시된 품목·수량을 앱의 실제 파서로 채점하며, 빈 이미지의 허위 추출은
 별도로 계산합니다. 호출 실패와 미실행은 인식 정확도로 환산하지 않습니다.
-선명한 합성 사진 2장의 결과를 실사용 성공률로 발표하면 안 됩니다. Node의 처리 시간 역시
+선명한 합성 사진의 결과를 실사용 성공률로 발표하면 안 됩니다. Node의 처리 시간 역시
 휴대폰 브라우저에서의 처리 시간과 구분합니다.
 선택적인 `RECEIPT_REFERENCE_FILE`은 기존 페이히어 예시 사진의 로컬 Tesseract 검사 전용입니다.
-이 원본 사진은 Gemini에 보내지 않습니다. 결과 파일에는 로컬 OCR 텍스트가 포함되므로 공유하지 않습니다.
+이 원본 사진은 서버에 보내지 않습니다. 결과 파일에는 로컬 OCR 텍스트가 포함되므로 공유하지 않습니다.
 
 저장소의 `web/receipt-config.json`은 공개 중계 서버와 제공자 `claude`를 기본값으로 사용합니다.
 다른 서버로 바꿀 때는 mytrip의 Actions 변수 `RECEIPT_SERVER_URL=https://서버주소`,
@@ -180,26 +144,23 @@ flutter build web --dart-define=RECEIPT_SERVER_URL=https://서버주소 --dart-d
 서버 주소가 `null`인 공개 배포는 연결 완료 상태가 아니며 기존 기기 OCR을 유지합니다.
 LLM 연결 후 오류에는 사진을 보존하고 다른 제공자로 자동 전송하지 않습니다.
 
-추가 SDK·여행 DB·파일 업로드 API·영수증 보관 서버를 사용하지 않습니다. 소규모 발표용이며
-사용량 카운터만 Cloudflare에 추가합니다. Workers Free의 CPU 제한(호출당 10ms)도 실제 사진 크기로 확인해야 하며,
-제한에 걸리면 사진 최적화 또는 수동 입력을 사용하고 유료 업그레이드는 하지 않습니다.
+여행 DB·파일 업로드 API·영수증 보관 서버를 사용하지 않습니다. 소규모 운영용이며
+사용량 카운터만 Cloudflare에 둡니다. Workers 무료 요금제의 CPU 제한도 실제 사진 크기로 확인해야 하며,
+제한에 걸리면 사진 최적화 또는 수동 입력을 사용합니다.
 
-공식 문서: [Gemini 가격](https://ai.google.dev/gemini-api/docs/pricing),
-[결제 등급](https://ai.google.dev/gemini-api/docs/billing),
-[Google 데이터 처리 약관](https://ai.google.dev/gemini-api/terms),
-[Gemini Interactions REST](https://ai.google.dev/api/interactions-api),
+공식 문서: [Anthropic 상용 약관](https://www.anthropic.com/legal/commercial-terms),
 [Cloudflare 무료 제한](https://developers.cloudflare.com/workers/platform/pricing/),
 [Durable Objects 무료 한도](https://developers.cloudflare.com/durable-objects/platform/pricing/),
 [복구 보관](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/),
 [서버 비밀값](https://developers.cloudflare.com/workers/configuration/secrets/).
 
 테스트: `node --test *.test.mjs`, `flutter analyze`, `flutter test`.
-Gemini 모의 응답 테스트와 실제 인식·무료 프로젝트·모바일 촬영 검증은 별도입니다.
-연결 후 `RECEIPT_SERVER_URL`을 설정하고
-`npm run test:live:gemini`를 실행하면 저장소의 개인정보 없는 세로·가로 영수증만 전송해
-상호명·날짜·통화·총액, 가로 영수증의 Americano 1개 5,000원을 실제 응답과 비교합니다.
-카테고리 추천도 실제 응답과 비교합니다. 실패한 실제 호출은 자동 재시도하지 않습니다.
-공개 동의 경로를 검사하므로 접속 코드와 Gemini 키는 이 검사 프로그램에 전달하지 않습니다.
+모의 응답 테스트와 실제 인식·모바일 촬영 검증은 별도입니다.
+배포 후 `RECEIPT_SERVER_URL`을 설정하고
+`npm run test:live`를 실행하면 저장소의 개인정보 없는 합성 영수증만 전송해
+상호명·날짜·통화·총액·품목·세금·카테고리와 품목 번역을 실제 응답과 비교합니다.
+실패한 실제 호출은 자동 재시도하지 않습니다. 이 검사는 실제 호출 비용이 들고 하루 한도를 씁니다.
+공개 동의 경로를 검사하므로 접속 코드와 API 키는 이 검사 프로그램에 전달하지 않습니다.
 
 ## 로컬 ChatGPT 구독 방식
 

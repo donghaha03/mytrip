@@ -1,11 +1,10 @@
-// Claude Haiku path: public requests that carry the Claude consent version, plus the
-// operator comparison path. Requests with the older Gemini consent never reach this file.
+// Claude Haiku requests and response checks for receipt recognition and item-name translation.
 import Anthropic from '@anthropic-ai/sdk';
 import { receiptSchema, receiptInstructions, receiptRequest, parseImage, validateDraft,
   checkTranslationRequest, translationInstructions } from './contract.mjs';
 
 export const CLAUDE_MODEL = 'claude-haiku-5-5';
-// Consent to send receipts to Anthropic. A Google (gemini-free-*) consent is never accepted for it.
+// The app's consent to send receipts to Anthropic. Changing provider or policy needs a new version.
 export const CLAUDE_CONSENT_VERSION = 'claude-haiku-v1';
 
 // Structured outputs reject length/count limits; validateDraft still enforces them.
@@ -50,7 +49,7 @@ export function readClaude(message, validate = validateDraft) {
 const reasons = { 400: 'INVALID_REQUEST', 401: 'UNAUTHENTICATED', 403: 'PERMISSION_DENIED', 404: 'NOT_FOUND',
   413: 'INVALID_REQUEST', 429: 'RESOURCE_EXHAUSTED', 529: 'UNAVAILABLE' };
 
-// Returns { result, usage } or { status, providerStatus?, reason }. No retries or fallback, same as Gemini.
+// Returns { result } or { status, providerStatus?, reason }. One attempt: no retries, no fallback.
 export async function askClaude(body, apiKey, signal, fetch, validate = validateDraft) {
   const client = new Anthropic({ apiKey, maxRetries: 0, fetch });
   let message;
@@ -61,8 +60,6 @@ export async function askClaude(body, apiKey, signal, fetch, validate = validate
     return { status: error.status === 429 ? 429 : 502, providerStatus: error.status,
       reason: reasons[error.status] ?? (error.status >= 500 ? 'UNAVAILABLE' : 'UPSTREAM_ERROR') };
   }
-  // Token counts only (no receipt data) so the operator can see real cost.
-  const usage = { input_tokens: message?.usage?.input_tokens, output_tokens: message?.usage?.output_tokens };
-  try { return { result: readClaude(message, validate), usage }; }
+  try { return { result: readClaude(message, validate) }; }
   catch (error) { return { status: 502, reason: error.message === 'refusal' ? 'REFUSAL' : 'INVALID_DRAFT' }; }
 }

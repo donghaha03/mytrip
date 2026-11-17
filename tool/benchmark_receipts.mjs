@@ -5,7 +5,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve, dirname } from 'node:path';
 import assert from 'node:assert/strict';
-import { GEMINI_MODEL } from '../server/receipt/gemini.mjs';
+import { CLAUDE_MODEL } from '../server/receipt/claude.mjs';
 const require = createRequire(import.meta.url);
 const modulePath = process.env.TESSERACT_MODULE;
 assert.ok(modulePath, 'Set TESSERACT_MODULE to a temporary installation of tesseract.js 6.0.1.');
@@ -15,7 +15,7 @@ const ocrRoot = resolve('web/ocr');
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const corePath = require.resolve('tesseract.js-core/tesseract-core-simd-lstm.wasm', { paths: [dirname(modulePath)] });
 assert.equal(sha256(await readFile(corePath)), sha256(await readFile(resolve(ocrRoot, 'core/tesseract-core-simd-lstm.wasm'))), 'Use the exact bundled WASM engine.');
-const output = { measuredAt: new Date().toISOString(), model: GEMINI_MODEL,
+const output = { measuredAt: new Date().toISOString(), model: CLAUDE_MODEL,
   runtime: 'Node.js real Tesseract.js 6.0.1; same bundled WASM and language data, not browser timing',
   fixtures: [] };
 const url = process.env.RECEIPT_SERVER_URL && new URL(process.env.RECEIPT_SERVER_URL);
@@ -24,7 +24,7 @@ if (url) {
   assert.ok(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash && url.pathname === '/');
   assert.ok(/^[A-Za-z0-9_-]{32,128}$/.test(code ?? '') && !/^(AIza|sk-)/.test(code));
   const health = await (await fetch(new URL('/receipt/status', url))).json();
-  assert.equal(health.configured, true); assert.equal(health.model, GEMINI_MODEL);
+  assert.equal(health.configured, true); assert.equal(health.model, CLAUDE_MODEL);
 }
 const started = Date.now();
 const worker = await createWorker(['eng', 'kor'], 1, { langPath: resolve(ocrRoot, 'lang'), gzip: false, cacheMethod: 'none', logger: () => {} });
@@ -56,11 +56,11 @@ try {
         body: JSON.stringify({ image: `data:image/png;base64,${bytes.toString('base64')}` }), signal: AbortSignal.timeout(90000),
       });
       const payload = await response.json().catch(() => ({}));
-      row.gemini = { httpStatus: response.status, elapsedMs: Date.now() - start,
+      row.claude = { httpStatus: response.status, elapsedMs: Date.now() - start,
         ...(response.ok ? { draft: payload.draft } : { reason: /^[A-Z_]{1,40}$/.test(payload.reason ?? '') ? payload.reason : 'UNKNOWN' }) };
     }
     output.fixtures.push(row);
-    console.log(`${file}: real Tesseract complete; Gemini ${row.gemini?.httpStatus ?? 'not run'}`);
+    console.log(`${file}: real Tesseract complete; Claude ${row.claude?.httpStatus ?? 'not run'}`);
   }
 } finally { await worker.terminate(); }
 await mkdir('.dart_tool', { recursive: true });
