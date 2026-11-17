@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../api/api.dart';
-import '../models/country.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
-import '../widgets/quick_converter.dart';
-import '../widgets/screen_top_bar.dart';
+import '../../ledger/data/rates.dart';
+import '../../ledger/models/country.dart';
+import '../../ledger/theme/app_colors.dart';
+import '../../ledger/theme/app_theme.dart';
+import '../../ledger/widgets/quick_converter.dart';
+import '../../ledger/widgets/screen_top_bar.dart';
 
 class RatesScreen extends StatefulWidget {
   const RatesScreen({super.key, required this.country});
@@ -33,7 +33,7 @@ class _RatesScreenState extends State<RatesScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                   children: [
                     const Text(
-                      '대한민국 원 기준 · 매일 06:00 KST 자동 갱신',
+                      '대한민국 원 기준 · 하루 한 번 자동 갱신',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     if (fetched != null)

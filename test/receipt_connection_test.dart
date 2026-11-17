@@ -8,11 +8,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:tripapp/trip_home/receipts/receipt_consent.dart';
-import 'package:tripapp/trip_home/receipts/receipt_client.dart';
-import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
-import 'package:tripapp/trip_home/receipts/receipt_platform_native.dart';
-import 'package:tripapp/trip_home/receipts/receipt_screen.dart';
+import 'package:tripapp/ledger/receipts/receipt_consent.dart';
+import 'package:tripapp/ledger/receipts/receipt_client.dart';
+import 'package:tripapp/ledger/receipts/receipt_draft.dart';
+import 'package:tripapp/ledger/receipts/receipt_platform_native.dart';
+import 'package:tripapp/ledger/receipts/receipt_screen.dart';
 
 const code = 'fixture-access-code-0123456789-abcd';
 const config = '{"serverUrl":"https://receipt.example.invalid"}';
@@ -39,9 +39,9 @@ void main() {
     }),
   );
   test(
-    'Gemini provider is shared by native/web configuration and unknown providers are rejected',
+    'Claude provider is shared by native/web configuration and unknown providers are rejected',
     () async {
-      var provider = 'gemini';
+      var provider = 'claude';
       final client = ReceiptClient(
         client: MockClient(
           (_) async => http.Response(
@@ -54,20 +54,26 @@ void main() {
         ),
       );
       addTearDown(client.close);
-      expect((await client.connection(configUrl: configUrl))!.isGemini, isTrue);
+      expect(
+        (await client.connection(configUrl: configUrl))!.usesConsent,
+        isTrue,
+      );
       expect(
         (await client.connection(
           configUrl: configUrl,
           serverUrl: 'https://receipt.example.invalid',
-          provider: 'gemini',
-        ))!.isGemini,
+          provider: 'claude',
+        ))!.usesConsent,
         isTrue,
       );
-      provider = 'unknown';
-      await expectLater(
-        client.connection(configUrl: configUrl),
-        throwsA(isA<ReceiptConnectionException>()),
-      );
+      // The Gemini provider is no longer supported by the app.
+      for (final rejected in ['unknown', 'gemini']) {
+        provider = rejected;
+        await expectLater(
+          client.connection(configUrl: configUrl),
+          throwsA(isA<ReceiptConnectionException>()),
+        );
+      }
     },
   );
   test(
@@ -260,7 +266,7 @@ void main() {
         client: MockClient((request) async {
           if (request.method == 'GET') {
             return http.Response(
-              '{"serverUrl":"https://receipt.example.invalid","provider":"gemini"}',
+              '{"serverUrl":"https://receipt.example.invalid","provider":"claude"}',
               200,
             );
           }
@@ -343,7 +349,7 @@ void main() {
   );
 
   test(
-    'Gemini needs scoped consent, never a secret; revocation blocks upload',
+    'Claude needs scoped consent, never a secret; revocation blocks upload',
     () async {
       var posts = 0;
       final client = ReceiptClient(
@@ -364,7 +370,7 @@ void main() {
       addTearDown(client.close);
       final connection = ReceiptConnection(
         Uri.parse('https://receipt.example.invalid/receipt/recognize'),
-        provider: 'gemini',
+        provider: 'claude',
       );
       expect(connection.needsAccessCode, isFalse);
       expect((await client.recognize(connection, tinyImage)).category, '식비');
@@ -374,12 +380,23 @@ void main() {
         client.recognize(connection, tinyImage),
         throwsA(isA<ReceiptConnectionException>()),
       );
+      // An earlier consent to the Google service does not carry over to Anthropic.
+      expect(receiptConsentVersion, 'claude-haiku-v1');
+      await prefs.remove(receiptConsentKey(connection.url));
+      await prefs.setBool(
+        'receipt_consent:gemini-free-v2:${connection.url.origin}',
+        true,
+      );
+      await expectLater(
+        client.recognize(connection, tinyImage),
+        throwsA(isA<ReceiptConnectionException>()),
+      );
       await prefs.setBool(receiptConsentKey(connection.url), true);
       await expectLater(
         client.recognize(
           ReceiptConnection(
             Uri.parse('https://changed.example/receipt/recognize'),
-            provider: 'gemini',
+            provider: 'claude',
           ),
           tinyImage,
         ),

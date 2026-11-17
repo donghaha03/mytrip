@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../api/api.dart';
-import '../models/country.dart';
-import '../models/spending_summary.dart';
-import '../models/trip.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
-import 'category_charts.dart';
-import 'expense_tile.dart';
-import 'quick_converter.dart';
+import '../../ledger/data/rates.dart';
+import '../../ledger/data/trip_store.dart';
+import '../../ledger/models/country.dart';
+import '../../ledger/models/spending_summary.dart';
+import '../../ledger/models/trip.dart';
+import '../../ledger/theme/app_colors.dart';
+import '../../ledger/theme/app_theme.dart';
+import '../../ledger/widgets/category_charts.dart';
+import '../../ledger/widgets/expense_tile.dart';
+import '../../ledger/widgets/quick_converter.dart';
 import 'trip_card.dart';
 
 /// Interactive examples use isolated data, never the user's trip store.
@@ -23,6 +24,12 @@ class OnboardingExample extends StatefulWidget {
 class _OnboardingExampleState extends State<OnboardingExample> {
   bool _done = false, _deleted = false, _edited = false;
   int _previewRun = 0, _receiptStage = 0;
+  // 예시용 스토어: 스트림을 직접 넣어 서버에 연결하지 않는다.
+  final _store = TripStore(
+    tripId: 'guide-trip',
+    tripStream: const Stream.empty(),
+    expenseStream: const Stream.empty(),
+  );
   late final _trip = Trip(
     id: 'guide-trip',
     name: '일본 여행',
@@ -38,6 +45,7 @@ class _OnboardingExampleState extends State<OnboardingExample> {
               place: '이치란 라멘',
               amount: 1200,
               currency: 'JPY',
+              rate: RateApi.krwPer('JPY'),
               category: '식비',
               date: DateTime(2027, 5, 1),
             ),
@@ -47,12 +55,19 @@ class _OnboardingExampleState extends State<OnboardingExample> {
               place: 'JR 패스',
               amount: 3500,
               currency: 'JPY',
+              rate: RateApi.krwPer('JPY'),
               category: '교통',
               date: DateTime(2027, 5, 1),
             ),
           ]
         : [],
   );
+
+  @override
+  void dispose() {
+    _store.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,12 +151,14 @@ class _OnboardingExampleState extends State<OnboardingExample> {
                   ] else
                     ExpenseTile(
                       trip: _trip,
+                      store: _store,
                       expense: Expense(
                         id: 'guide-expense',
                         icon: '🍜',
                         place: '이치란 라멘',
                         amount: 1200,
                         currency: 'JPY',
+                        rate: RateApi.krwPer('JPY'),
                         category: '식비',
                         paymentMethod: PaymentMethod.card,
                         date: DateTime(2027, 5, 1),

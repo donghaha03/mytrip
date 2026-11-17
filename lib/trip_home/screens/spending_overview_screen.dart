@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 
-import '../../api/api.dart';
-import '../data/trip_store.dart';
-import '../models/spending_summary.dart';
-import '../models/trip.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
-import '../widgets/category_charts.dart';
-import '../widgets/screen_top_bar.dart';
-import '../widgets/quick_converter.dart';
-import '../models/country.dart';
-import 'expense_form_screen.dart';
+import '../../ledger/data/rates.dart';
+import '../../ledger/data/trip_store.dart';
+import '../../ledger/models/spending_summary.dart';
+import '../../ledger/models/trip.dart';
+import '../../ledger/theme/app_colors.dart';
+import '../../ledger/theme/app_theme.dart';
+import '../../ledger/widgets/category_charts.dart';
+import '../../ledger/widgets/screen_top_bar.dart';
+import '../../ledger/widgets/quick_converter.dart';
+import '../../ledger/models/country.dart';
+import '../../ledger/screens/expense_form_screen.dart';
 
 class SpendingOverviewScreen extends StatelessWidget {
-  const SpendingOverviewScreen({super.key, required this.trip});
+  const SpendingOverviewScreen({
+    super.key,
+    required this.trip,
+    required this.store,
+  });
   final Trip trip;
+  final TripStore store;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([tripStore, RateApi.changes]),
+    animation: Listenable.merge([store, RateApi.changes]),
     builder: (context, _) {
       final summary = SpendingSummary(trip);
       return Scaffold(
@@ -31,7 +36,8 @@ class SpendingOverviewScreen extends StatelessWidget {
                   icon: const Icon(Icons.add),
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => ExpenseFormScreen(trip: trip),
+                      builder: (_) =>
+                          ExpenseFormScreen(trip: trip, store: store),
                     ),
                   ),
                 ),
@@ -125,7 +131,7 @@ class SpendingOverviewScreen extends StatelessWidget {
                     ],
                     const SizedBox(height: 12),
                     Text(
-                      '현재 환율 기준${RateApi.updatedAt == null ? '' : ' · ${formatDate(RateApi.updatedAt!)}'}',
+                      '기록 당시 환율 기준',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -149,7 +155,8 @@ class SpendingOverviewScreen extends StatelessWidget {
                       OutlinedButton(
                         onPressed: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => ExpenseFormScreen(trip: trip),
+                            builder: (_) =>
+                                ExpenseFormScreen(trip: trip, store: store),
                           ),
                         ),
                         child: const Text('지출 기록하기'),

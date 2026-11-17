@@ -1,26 +1,31 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
-import '../data/trip_store.dart';
-import '../models/trip.dart';
-import '../services/backend.dart';
-import '../services/card_sync_api.dart';
-import '../theme/app_colors.dart';
-import '../widgets/screen_top_bar.dart';
+import '../../api/api.dart' show AuthApi, CardSyncApi;
+import '../../ledger/models/trip.dart';
+import '../../ledger/theme/app_colors.dart';
+import '../../ledger/widgets/screen_top_bar.dart';
 
 class CardConnectionScreen extends StatefulWidget {
   const CardConnectionScreen({
     super.key,
     this.trip,
     this.client,
-    this.auth,
+    this.currentUid,
+    this.idToken,
+    this.userChanges,
     this.server,
   });
   final Trip? trip;
   final http.Client? client;
-  final FirebaseAuth? auth;
+
+  /// 테스트에서 로그인 상태를 끼울 때만 넘긴다. 기본은 팀 AuthApi.
+  final String? Function()? currentUid;
+  final Future<String?> Function()? idToken;
+  final Stream<Object?>? userChanges;
   final Uri? server;
 
   @override
@@ -47,30 +52,28 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
   bool _failed = false;
   String? _sessionUid;
 
-  bool get _configured =>
-      (widget.server != null || CardSyncApi.configured) &&
-      Backend.isFirebase &&
-      tripStore.isRemote;
-  String? get _uid => _configured
-      ? (widget.auth ?? FirebaseAuth.instance).currentUser?.uid
-      : null;
-  bool get _hasTrip =>
-      widget.trip != null &&
-      identical(tripStore.byId(widget.trip!.id), widget.trip);
+  StreamSubscription<Object?>? _session;
+
+  bool get _configured => widget.server != null || CardSyncApi.configured;
+  String? get _uid =>
+      _configured ? (widget.currentUid ?? () => AuthApi.user?.uid)() : null;
+  bool get _hasTrip => widget.trip != null;
 
   @override
   void initState() {
     super.initState();
     _sessionUid = _uid;
-    tripStore.addListener(_sessionChanged);
     if (_configured) {
+      _session = (widget.userChanges ?? AuthApi.userChanges).listen(
+        (_) => _sessionChanged(),
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) => _run(_refresh));
     }
   }
 
   @override
   void dispose() {
-    tripStore.removeListener(_sessionChanged);
+    unawaited(_session?.cancel());
     _loginId.dispose();
     _password.dispose();
     super.dispose();
@@ -95,8 +98,7 @@ class _CardConnectionScreenState extends State<CardConnectionScreen> {
 
   Future<String> _token() async {
     if (!_configured) throw StateError('실제 로그인과 HTTPS 연동 서버가 필요해요');
-    final token = await (widget.auth ?? FirebaseAuth.instance).currentUser
-        ?.getIdToken();
+    final token = await (widget.idToken ?? AuthApi.idToken)();
     if (token == null) throw StateError('더보기에서 mytrip에 먼저 로그인해주세요');
     return token;
   }

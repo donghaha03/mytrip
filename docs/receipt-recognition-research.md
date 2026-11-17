@@ -17,7 +17,7 @@
 | `ReceiptDraft.parse()`는 합계 표시와 금액이 같은 줄에 있고 금액 토큰이 하나일 때만 제안 | OCR이 `합계\n5,000`으로 줄을 나누면 글자를 읽어도 총액은 비어 있음 |
 | 품목은 `이름 [단가] 수량 행금액` 형태만 허용 | 열 순서 변경·품목명 줄바꿈·수량 생략은 제안에서 빠짐 |
 
-근거: [사진·OCR 처리](../web/receipt.js), [모델 다운로드](../scripts/vendor_ocr.ps1), [필드·품목 파서](../lib/trip_home/receipts/receipt_draft.dart). 이는 코드에서 확인한 제한과 원인 후보이며, 사용자가 겪은 개별 실패 원인은 해당 사진과 OCR 원문을 함께 확인해야 확정할 수 있습니다.
+근거: [사진·OCR 처리](../web/receipt.js), [모델 다운로드](../scripts/vendor_ocr.ps1), [필드·품목 파서](../lib/ledger/receipts/receipt_draft.dart). 이는 코드에서 확인한 제한과 원인 후보이며, 사용자가 겪은 개별 실패 원인은 해당 사진과 OCR 원문을 함께 확인해야 확정할 수 있습니다.
 
 ## 권장 순서
 

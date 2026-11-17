@@ -1,69 +1,23 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'data/trip_store.dart';
-import 'data/device_trip_repository.dart';
+import '../api/api.dart' show AuthApi;
+import '../auth_gate.dart';
+import '../ledger/theme/app_colors.dart';
+import '../ledger/theme/app_theme.dart';
+import 'data/trip_list_store.dart';
 import 'screens/empty_home_screen.dart';
 import 'screens/trip_home_screen.dart';
 import 'screens/trip_list_screen.dart';
-import 'services/auth_service.dart';
-import 'services/backend.dart';
-import '../api/api.dart';
-import 'services/session.dart';
-import 'theme/app_colors.dart';
-import 'theme/app_theme.dart';
-import 'receipts/receipt_platform.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  unawaited(recoverReceiptCamera().catchError((Object _) {}));
-
-  // 기본은 DB 없이 샘플 데이터로 화면을 확인한다.
-  if (await Backend.init() == BackendMode.firebase) {
-    // Firebase를 명시적으로 켠 경우 로그인한 사용자의 저장소에 연결한다.
-    authService = FirebaseAuthService();
-    bindTripStoreToAuth(authService, tripStore);
-  } else if (kIsWeb) {
-    // 이전 여행·지출이 있다고 가정한 예시 3건.
-    tripStore.seedMockTrips();
-  } else {
-    try {
-      tripStore.connect(await DeviceTripRepository.open(), remote: false);
-    } catch (_) {
-      runApp(
-        MaterialApp(
-          theme: buildAppTheme(),
-          home: const Scaffold(
-            body: SafeArea(
-              child: Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text(
-                    '저장된 여행을 열지 못했어요. 앱을 다시 실행해주세요. 기존 데이터는 삭제하지 않았어요.',
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      return;
-    }
-  }
-
-  runApp(const TripApp());
-  unawaited(RateApi.load());
-  // 서버가 06시에 갱신한다. 열려 있는 앱은 배포 지연도 포함해 최신 파일을 확인한다.
-  // 같은 06시 구간의 캐시가 있으면 load()는 네트워크를 호출하지 않는다.
-  Timer.periodic(const Duration(minutes: 5), (_) => unawaited(RateApi.load()));
-  AppLifecycleListener(onResume: () => unawaited(RateApi.load()));
-}
 
 class TripApp extends StatefulWidget {
-  const TripApp({super.key});
+  const TripApp({super.key, this.home});
+
+  /// 테스트에서 로그인 분기 없이 화면을 띄울 때만 넘긴다.
+  final Widget? home;
 
   @override
   State<TripApp> createState() => _TripAppState();
@@ -108,7 +62,8 @@ class _TripAppState extends State<TripApp> {
           ),
         ),
       ),
-      home: const HomeRouter(),
+      // 로그인 전에는 로그인 화면, 로그인하면 그 사용자의 여행 목록.
+      home: widget.home ?? const AuthGate(home: HomeRouter()),
     );
   }
 }
@@ -122,17 +77,19 @@ const kPhoneWidth = 440.0;
 /// 목록 위에 "쌓아서" 띄우기 때문에 좌측 상단 뒤로가기를 누르면 목록으로 간다.
 /// 앱을 켠 뒤 한 번만 자동으로 열고, 목록으로 나온 뒤에는 다시 열지 않는다.
 ///
-/// 로그인 담당: 로그인 화면을 앞에 세우려면 여기(또는 TripApp.home)를
-/// "authService.isSignedIn 이면 HomeRouter, 아니면 로그인 화면" 으로 감싸면 된다.
-/// authService 는 ChangeNotifier 라 AnimatedBuilder 로 감싸면 로그인 즉시 넘어간다.
+/// AuthGate 아래(로그인 상태)에서만 만든다. 여행 목록은 팀 API에서 읽는다.
 class HomeRouter extends StatefulWidget {
-  const HomeRouter({super.key});
+  const HomeRouter({super.key, this.store});
+
+  /// 테스트에서 가짜 목록을 끼울 때만 넘긴다. 넘긴 쪽이 dispose 한다.
+  final TripListStore? store;
 
   @override
   State<HomeRouter> createState() => _HomeRouterState();
 }
 
 class _HomeRouterState extends State<HomeRouter> {
+  late final TripListStore _store = widget.store ?? TripListStore();
   bool _autoOpened = false;
   bool? _guideSeen;
 
@@ -140,6 +97,12 @@ class _HomeRouterState extends State<HomeRouter> {
   void initState() {
     super.initState();
     _loadGuidePreference();
+  }
+
+  @override
+  void dispose() {
+    if (widget.store == null) _store.dispose();
+    super.dispose();
   }
 
   Future<void> _loadGuidePreference() async {
@@ -167,11 +130,12 @@ class _HomeRouterState extends State<HomeRouter> {
   }
 
   /// 여행 중인 여행이 있으면 그 화면을 목록 위에 띄운다.
-  /// Firebase 모드에서는 첫 스냅샷이 올 때까지 기다린다.
+  /// 첫 목록이 올 때까지 기다린다.
   void _openOngoingTripOnce() {
-    if (_autoOpened || tripStore.isLoading) return;
-    final trip = ongoingTrip(tripStore.trips, DateTime.now());
+    if (_autoOpened || _store.isLoading) return;
+    final trip = ongoingTrip(_store.trips, DateTime.now());
     if (trip == null) return;
+    final tripStore = _store.stores.firstWhere((s) => s.tripId == trip.id);
 
     _autoOpened = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -181,7 +145,7 @@ class _HomeRouterState extends State<HomeRouter> {
           // 앱을 켜자마자 뜨는 화면이라 넘어가는 애니메이션은 없앤다
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
-          pageBuilder: (_, _, _) => TripHomeScreen(trip: trip),
+          pageBuilder: (_, _, _) => TripHomeScreen(store: tripStore),
         ),
       );
     });
@@ -190,7 +154,7 @@ class _HomeRouterState extends State<HomeRouter> {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: tripStore,
+      animation: _store,
       builder: (context, _) => AnimatedSwitcher(
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
@@ -208,14 +172,31 @@ class _HomeRouterState extends State<HomeRouter> {
         onGuideFinished: _completeGuide,
       );
     }
-    if (tripStore.isLoading) return const _Loading();
+    if (_store.error != null) {
+      return Scaffold(
+        key: const ValueKey('trip-list-error'),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                AuthApi.errorMessage(_store.error!),
+                textAlign: TextAlign.center,
+              ),
+              TextButton(onPressed: _store.retry, child: const Text('다시 시도')),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_store.isLoading) return const _Loading();
     _openOngoingTripOnce();
-    return tripStore.isEmpty
+    return _store.isEmpty
         ? const EmptyHomeScreen(
             key: ValueKey('empty-welcome'),
             showGuide: false,
           )
-        : const TripListScreen();
+        : TripListScreen(store: _store);
   }
 }
 

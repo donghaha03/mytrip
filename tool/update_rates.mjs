@@ -60,7 +60,7 @@ async function collectRates(event, fetcher = fetch, at = new Date()) {
 }
 
 if (process.argv.includes('--check')) {
-  const countrySource = await readFile(new URL('../lib/trip_home/models/country.dart', import.meta.url), 'utf8');
+  const countrySource = await readFile(new URL('../lib/ledger/models/country.dart', import.meta.url), 'utf8');
   const screenCurrencies = [...countrySource.matchAll(/currency:\s*'([A-Z]{3})'/g)].map(m => m[1]);
   assert.deepEqual([...currencies, 'KRW'].sort(), screenCurrencies.sort(), '화면과 서버 지원 통화가 다릅니다');
   const at = new Date('2026-10-01T21:00:00Z'); // 한국 시간 다음 날 06시

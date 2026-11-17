@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../models/trip.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
-import 'expense_tile.dart';
+import '../../ledger/data/trip_store.dart';
+import '../../ledger/models/trip.dart';
+import '../../ledger/theme/app_colors.dart';
+import '../../ledger/theme/app_theme.dart';
+import '../../ledger/widgets/expense_tile.dart';
 
 /// 여행 홈의 "최근 지출" 카드.
 ///
@@ -17,6 +18,7 @@ class RecentExpensesCard extends StatefulWidget {
   const RecentExpensesCard({
     super.key,
     required this.trip,
+    required this.store,
     required this.now,
     required this.onOpenLedger,
     required this.onOpenOverview,
@@ -24,6 +26,7 @@ class RecentExpensesCard extends StatefulWidget {
   });
 
   final Trip trip;
+  final TripStore store;
   final DateTime now;
   final VoidCallback onOpenLedger;
   final VoidCallback onOpenOverview;
@@ -107,6 +110,7 @@ class _RecentExpensesCardState extends State<RecentExpensesCard> {
             for (final e in recent)
               ExpenseTile(
                 trip: trip,
+                store: widget.store,
                 expense: e,
                 interactive: false,
                 padding: const EdgeInsets.symmetric(vertical: 8),

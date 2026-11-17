@@ -1,13 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import '../widgets/category_charts.dart';
+import '../../ledger/widgets/category_charts.dart';
 
-import '../models/trip.dart';
+import '../../ledger/models/trip.dart';
 import '../screens/trip_home_screen.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
-import 'swipe_actions.dart';
+import '../../ledger/theme/app_colors.dart';
+import '../../ledger/theme/app_theme.dart';
+import '../../ledger/widgets/swipe_actions.dart';
 
 class TripCard extends StatelessWidget {
   const TripCard({

@@ -1,112 +1,108 @@
 import 'package:flutter/material.dart';
-import '../widgets/category_charts.dart';
+import '../../ledger/widgets/category_charts.dart';
 
-import '../data/trip_store.dart';
-import '../models/trip.dart';
-import '../../api/api.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
-import '../widgets/app_sheet.dart';
-import '../widgets/quick_converter.dart';
+import '../../ledger/data/trip_store.dart';
+import '../../ledger/models/trip.dart';
+import '../../ledger/data/rates.dart';
+import '../../ledger/theme/app_colors.dart';
+import '../../ledger/theme/app_theme.dart';
+import '../../ledger/widgets/app_sheet.dart';
+import '../../ledger/widgets/quick_converter.dart';
 import '../widgets/recent_expenses_card.dart';
-import '../widgets/screen_top_bar.dart';
-import '../widgets/sheets.dart';
-import '../widgets/today_budget_sheet.dart';
+import '../../ledger/widgets/screen_top_bar.dart';
+import '../../ledger/widgets/today_budget_sheet.dart';
+import '../../ledger/widgets/trip_edit.dart';
 import 'ledger_entry.dart';
 import 'more_screen.dart';
 import 'spending_overview_screen.dart';
 
-Future<void> editTrip(BuildContext context, Trip trip) async {
-  final result = await showAppSheet<TripEditResult>(
-    context: context,
-    builder: (_) => TripEditSheet(trip: trip),
-  );
-  if (result == null || !context.mounted) return;
-  switch (result.action) {
-    case TripEditAction.save:
-      tripStore.update(
-        trip.id,
-        name: result.name,
-        start: result.range!.start,
-        end: result.range!.end,
-        budgetKrw: result.budgetKrw,
-      );
-    case TripEditAction.delete:
-      if (!await confirmTripDeletion(context, trip) || !context.mounted) {
-        return;
-      }
-      // 지운 여행 화면에 남아 있으면 안 되니 리스트로 먼저 돌아간다
-      Navigator.of(context).pop();
-      tripStore.remove(trip.id);
-  }
-}
-
 /// 여행별 예산·지출 요약과 환산 화면.
 /// 전체 장부와 지출 입력은 ledger_entry.dart에서 연결한다.
 class TripHomeScreen extends StatelessWidget {
-  const TripHomeScreen({super.key, required this.trip});
+  const TripHomeScreen({super.key, required this.store});
 
-  final Trip trip;
+  /// 이 여행의 상태. 목록·장부와 같은 스토어를 쓴다.
+  final TripStore store;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([tripStore, RateApi.changes]),
-      builder: (context, _) => Scaffold(
+      animation: Listenable.merge([store, RateApi.changes]),
+      builder: (context, _) => _build(context, store.trip),
+    );
+  }
+
+  Widget _build(BuildContext context, Trip? trip) {
+    // 다른 기기에서 지웠거나 삭제 직후.
+    if (trip == null) {
+      return const Scaffold(
         body: SafeArea(
-          bottom: false,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TripTopBar(
-                trip: trip,
-                onMore: () => Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => const MoreScreen())),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _SpendingCard(
-                        trip: trip,
-                        onEdit: () => editTrip(context, trip),
-                        onToday: () => showAppSheet<void>(
-                          context: context,
-                          builder: (_) =>
-                              TodayBudgetSheet(trip: trip, now: DateTime.now()),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      RecentExpensesCard(
-                        trip: trip,
-                        now: DateTime.now(),
-                        onOpenLedger: () => openLedger(context, trip),
-                        onOpenOverview: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => SpendingOverviewScreen(trip: trip),
-                          ),
-                        ),
-                        onAddExpense: () => openLedger(
-                          context,
-                          trip,
-                          start: LedgerStart.addExpense,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      QuickConverter(country: trip.country),
-                    ],
-                  ),
-                ),
-              ),
+              ScreenTopBar(title: '여행'),
+              Expanded(child: Center(child: Text('삭제되었거나 찾을 수 없는 여행이에요'))),
             ],
           ),
         ),
-        // 스크롤 위치와 무관하게 장부와 지출 입력으로 이동한다.
-        bottomNavigationBar: _BottomBar(trip: trip),
+      );
+    }
+    return Scaffold(
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TripTopBar(
+              trip: trip,
+              onMore: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const MoreScreen())),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SpendingCard(
+                      trip: trip,
+                      onEdit: () => editTrip(context, trip, store),
+                      onToday: () => showAppSheet<void>(
+                        context: context,
+                        builder: (_) =>
+                            TodayBudgetSheet(trip: trip, now: DateTime.now()),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    RecentExpensesCard(
+                      trip: trip,
+                      store: store,
+                      now: DateTime.now(),
+                      onOpenLedger: () => openLedger(context, trip, store),
+                      onOpenOverview: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              SpendingOverviewScreen(trip: trip, store: store),
+                        ),
+                      ),
+                      onAddExpense: () => openLedger(
+                        context,
+                        trip,
+                        store,
+                        start: LedgerStart.addExpense,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    QuickConverter(country: trip.country),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+      // 스크롤 위치와 무관하게 장부와 지출 입력으로 이동한다.
+      bottomNavigationBar: _BottomBar(trip: trip, store: store),
     );
   }
 }
@@ -298,34 +294,6 @@ class _SpendingCard extends StatelessWidget {
   }
 }
 
-/// 요약 카드의 오늘 예산·편집 버튼.
-class BudgetCardIcon extends StatelessWidget {
-  const BudgetCardIcon({
-    super.key,
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onTap,
-      style: IconButton.styleFrom(
-        foregroundColor: AppColors.white,
-        minimumSize: const Size(44, 44),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      icon: Icon(icon, size: 18, color: AppColors.white),
-    );
-  }
-}
-
 class _Figure extends StatelessWidget {
   const _Figure({
     required this.label,
@@ -389,9 +357,10 @@ class _Figure extends StatelessWidget {
 /// 하단 버튼 한 줄. 모양은 02 "여행 만들기", 시트의 "선택 완료" 와 같은 계열
 /// (높이 54, 모서리 14) 이라 앱 전체 버튼과 톤이 맞는다.
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.trip});
+  const _BottomBar({required this.trip, required this.store});
 
   final Trip trip;
+  final TripStore store;
 
   @override
   Widget build(BuildContext context) {
@@ -411,8 +380,12 @@ class _BottomBar extends StatelessWidget {
                   icon: Icons.add_rounded,
                   label: '지출 기록',
                   filled: false,
-                  onTap: () =>
-                      openLedger(context, trip, start: LedgerStart.addExpense),
+                  onTap: () => openLedger(
+                    context,
+                    trip,
+                    store,
+                    start: LedgerStart.addExpense,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -421,8 +394,12 @@ class _BottomBar extends StatelessWidget {
                   icon: Icons.document_scanner_outlined,
                   label: '영수증 촬영',
                   filled: true,
-                  onTap: () =>
-                      openLedger(context, trip, start: LedgerStart.receipt),
+                  onTap: () => openLedger(
+                    context,
+                    trip,
+                    store,
+                    start: LedgerStart.receipt,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -431,7 +408,7 @@ class _BottomBar extends StatelessWidget {
                   icon: Icons.receipt_long_rounded,
                   label: '장부 보기',
                   filled: false,
-                  onTap: () => openLedger(context, trip),
+                  onTap: () => openLedger(context, trip, store),
                 ),
               ),
             ],

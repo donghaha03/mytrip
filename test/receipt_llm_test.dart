@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tripapp/trip_home/models/receipt_item.dart';
-import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
+import 'package:tripapp/ledger/models/receipt_item.dart';
+import 'package:tripapp/ledger/receipts/receipt_draft.dart';
 
 void main() {
   test(

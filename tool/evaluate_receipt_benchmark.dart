@@ -2,7 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tripapp/trip_home/receipts/receipt_draft.dart';
+import 'package:tripapp/ledger/receipts/receipt_draft.dart';
 
 void main() {
   test(
@@ -16,10 +16,10 @@ void main() {
       final scored = <Map<String, dynamic>>[];
       for (final row in input['fixtures'] as List) {
         final expected = row['expected'] as Map<String, dynamic>?;
-        for (final method in ['tesseract', 'gemini']) {
+        for (final method in ['tesseract', 'claude']) {
           final response = row[method] as Map<String, dynamic>?;
           if (response == null ||
-              (method == 'gemini' && response['httpStatus'] != 200)) {
+              (method == 'claude' && response['httpStatus'] != 200)) {
             scored.add({
               'file': row['file'],
               'method': method,

@@ -22,25 +22,25 @@
 
 ## 이용 안내
 
-- 웹은 샘플 여행 3건으로 시작하며 새로고침하면 초기화됩니다. iPhone 앱은 빈 목록으로 시작하고 여행·지출을 기기에 저장합니다.
-- 더보기는 내용이 없는 페이지입니다. 로그인·계정·카드 연결 메뉴는 제공하지 않습니다.
+- 이메일 또는 Google 계정으로 로그인한 뒤 사용합니다. 여행·지출은 로그인한 계정의 Firestore에 저장되어 웹과 앱에서 같은 내용을 봅니다.
+- 더보기에서 로그인한 계정을 확인하고 로그아웃합니다. 카드 연결 메뉴는 제공하지 않습니다.
 - 여행 목록의 도움말에서 사용 안내를 다시 볼 수 있습니다. 삭제는 아이콘을 누른 뒤 확인해야 적용됩니다.
 - 최근 지출의 `지출보기`는 장부 목록을, 그래프 아래 `한눈에 보기`는 카테고리별 요약·파이차트를 엽니다. 지출 상세·수정·삭제는 장부에서 합니다.
-- 모든 환산은 상단의 정수 환율을 기준으로 계산합니다. 입력과 결과의 소수점은 반올림 없이 버립니다.
+- 지출의 원화 금액은 기록 당시 환율로 고정됩니다. 빠른 환산과 예산의 현지 통화 표시는 현재 환율을 쓰고, 표시 금액의 원 미만은 버립니다.
 - 지출 금액은 실제 결제액입니다. 면세 적용 시 면세 처리 후 결제액을 입력하며, 체크만으로 세금을 자동 차감하지 않습니다.
 - 장부의 목록 설정에서 결제수단·보기 방식·정렬·기록 출처를 선택하고 적용합니다.
-- 현재 공개 웹은 Tesseract, iPhone은 Apple Vision으로 기기 안에서 영수증을 인식합니다. 공개 LLM 서버는 아직 연결되어 있지 않습니다. Android는 사진 촬영·선택과 수동 입력을 제공합니다.
-- [영수증 서버 설정](server/receipt/README.md) 후에는 웹·앱이 같은 LLM 요청·검토 흐름을 사용합니다. OpenAI 전송 동의 후 인식하고, 내용을 검토해 지출 양식에 적용한 뒤 저장합니다. 로컬 ChatGPT 구독 연결과 별도 과금되는 공개 API 연결은 구분됩니다.
+- 영수증 서버가 설정된 빌드는 사진 전송에 동의한 뒤 Anthropic Claude(Haiku)로 인식하고, 내용을 검토해 지출 양식에 적용한 뒤 저장합니다. 서버 설정이 없으면 기기 OCR(웹 Tesseract, iPhone Apple Vision)을 쓰고, Android는 사진 촬영·선택과 수동 입력을 제공합니다.
+- 공개 중계 서버·직접 운영 서버(접속 코드)·로컬 ChatGPT 구독 연결의 차이는 [영수증 서버 설정](server/receipt/README.md)을 참고하세요.
 - 실제 카드 연결은 제공자 신청·본인 인증·사용자 동의와 서버 배포가 필요합니다. 공개 테스트 앱에는 실계좌가 연결되어 있지 않습니다.
 - 실제 카드로 결제해도 현재 공개 앱에는 자동 반영되지 않습니다.
 
 ## 환율
 
-앱을 닫아도 매일 오전 6시(한국 시간)에 서버에서 갱신합니다.
-환율 기준일과 마지막 수집 시각은 여행 홈의 `ⓘ`에서 확인할 수 있습니다.
+팀 `RateApi`가 하루에 한 번 환율을 받아 기기에 저장합니다.
+마지막으로 받은 시각은 여행 홈의 `ⓘ`에서 확인할 수 있습니다.
 
-예약 실행과 배포는 지연될 수 있습니다. 갱신에 실패하면 이전 환율을 사용하며,
-저장된 환율이 없으면 환산할 수 없습니다. 카드사 수수료와 실제 결제 환율은 반영하지 않습니다.
+갱신에 실패하면 이전 환율을 사용하며, 저장된 환율이 없으면 환산과 지출 저장을 할 수 없습니다.
+카드사 수수료와 실제 결제 환율은 반영하지 않습니다.
 
 ## 로컬 실행
 
@@ -54,14 +54,14 @@ flutter run -d chrome
 ## iPhone 앱
 
 - iOS 15 이상, 앱 식별자 `io.github.donghaha03.mytrip`입니다.
-- Firebase 프로젝트 `mytrip-fddfb`에 iOS 앱을 등록했습니다. 기본 사용은 기기 저장이며, 로그인·클라우드 동기화는 아직 제공하지 않습니다.
+- Firebase 프로젝트 `mytrip-fddfb`에 iOS 앱을 등록했습니다. 여행·지출은 로그인한 계정의 Firestore에 저장합니다. iOS에서의 Google 로그인 설정은 기기에서 확인이 필요합니다.
 - GitHub Actions의 `iOS app build`가 서명 없는 iOS 앱을 빌드합니다. 이 결과물은 바로 iPhone에 설치할 수 있는 IPA가 아닙니다.
 - 실제 설치는 Mac에서 `flutter pub get` 후 `ios/Runner.xcworkspace`를 Xcode로 열고, Signing & Capabilities에서 자신의 Apple 개발 팀을 선택해 연결한 iPhone으로 실행합니다. 여러 사람에게 배포하려면 Apple Developer 계정과 TestFlight 설정이 필요합니다.
 - 실제 iPhone 촬영·권한·OCR 인식률은 기기 설치 후 확인해야 합니다. 영수증 사진은 저장하지 않고 검토 화면에서만 사용합니다.
 
 ## 출처
 
-- 환율: [Currency API](https://github.com/fawazahmed0/exchange-api) · [CC0](https://github.com/fawazahmed0/exchange-api/blob/main/LICENSE)
+- 환율: [ExchangeRate-API](https://www.exchangerate-api.com) (`open.er-api.com`, 팀 `RateApi`)
 - 글꼴: [Pretendard · SIL Open Font License 1.1](assets/fonts/OFL.txt)
 - 국가·통화·OCR: [데이터 출처와 라이선스](docs/data-sources.md)
 - 장부 기능 참고: [trip ledger_ledger page](https://www.figma.com/community/file/1683837889303275131/trip-ledger-ledger-page) · 기존 mytrip 디자인 사용
