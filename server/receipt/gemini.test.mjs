@@ -153,7 +153,7 @@ test('disabled Free Tier/hosting confirmation, bad origins and wrong codes never
   assert.equal((await handler(request(undefined, { 'Content-Length': '12100001' }), env)).status, 413);
   assert.equal((await handler(request(undefined, {}, 'POST', '/receipt/recognize?key=private'), env)).status, 404);
   const status = await handler(request(undefined, {}, 'GET', '/receipt/status'), env);
-  assert.deepEqual(await status.json(), { configured: true, provider: 'gemini', model: GEMINI_MODEL, placement: null });
+  assert.deepEqual(await status.json(), { configured: true, provider: 'gemini', model: GEMINI_MODEL, claude: false, placement: null });
   const preflight = await handler(request(undefined, {}, 'OPTIONS'), env);
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get('Access-Control-Allow-Headers'), 'Authorization, Content-Type, X-Receipt-Consent');

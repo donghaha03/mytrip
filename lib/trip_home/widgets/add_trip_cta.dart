@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
+import '../../ledger/theme/app_colors.dart';
 import 'dashed_border.dart';
 
 /// 점선 테두리 + 파란 원형 플러스가 붙은 여행 추가 버튼.
 /// 00 첫 화면과 01 여행 리스트에서 같은 컴포넌트를 쓴다.
 class AddTripCta extends StatelessWidget {
-  const AddTripCta({
-    super.key,
-    required this.label,
-    required this.onTap,
-  });
+  const AddTripCta({super.key, required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;

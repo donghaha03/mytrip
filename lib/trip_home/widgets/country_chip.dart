@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../models/country.dart';
-import '../theme/app_colors.dart';
+import '../../ledger/models/country.dart';
+import '../../ledger/theme/app_colors.dart';
 import 'dashed_border.dart';
 
 /// 국가 그리드 한 칸의 높이. 비율(childAspectRatio) 로 잡으면 화면이 넓어질수록

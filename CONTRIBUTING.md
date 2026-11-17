@@ -16,61 +16,47 @@ flutter build web --release --no-wasm-dry-run --base-href /mytrip/
 
 ## 코드 위치
 
-- `lib/trip_home/`: 화면·위젯·모델·여행 데이터
-- `lib/api/`: 환율 조회와 정수 환산
-- `tool/update_rates.mjs`: 서버 환율 수집과 검증
-- `test/`: 화면·계산·환율·Firebase 모의 테스트
-- `server/card/`: 인증된 사용자용 카드 승인내역 조회 서버와 테스트
+팀 저장소 [tripledger](https://github.com/wannabb/tripledger)와 같은 구조입니다.
+규칙은 [API 사용 가이드](lib/api/how%20to%20use.md)를 따릅니다.
 
-기본 실행은 메모리 데이터로 동작합니다. Firebase 모드는
-`--dart-define=LOCAL_MODE=false`로 실행하며 인증된 사용자에게만 원격 저장을 연결합니다.
-웹 설정은 개인 프로젝트 `mytrip-fddfb`를 사용합니다. 로그인 화면과 Android·iOS 설정은 준비 중입니다.
+- `lib/main.dart`: Firebase·구글 로그인·환율 초기화
+- `lib/auth_gate.dart`, `lib/login_screen.dart` 등: 로그인 여부에 따른 화면 분기와 로그인·가입 화면
+- `lib/api/`: 팀 API. 화면은 `api.dart` 하나만 import 합니다 (로그인·여행·지출·환율·계산·영수증·카드 연동)
+- `lib/models/`, `lib/utils/`, `lib/constants.dart`: 팀 공용 모델·표시 도우미·상수
+- `lib/ledger/`: 장부·지출 입력·영수증 화면과 공용 위젯·테마. `lib/ledger_page.dart`의 `LedgerPage(tripId:)`가 진입점입니다
+- `lib/trip_home/`: 여행 목록·여행 홈·여행 추가·환율·한눈에 보기·더보기 화면
+- `test/`: 팀 API 계약, 장부, 여행 목록·홈, 영수증 연결 테스트 (`test/support/fake_firebase.dart`의 가짜 Firebase 사용)
+- `server/receipt/`, `server/card/`: 영수증 인식 중계 서버와 카드 승인내역 서버
 
-## 팀 작업
+화면에서 Firestore·FirebaseAuth를 직접 호출하지 않습니다. 필요한 기능이 없으면 가이드 8장대로
+알맞은 `lib/api/*.dart`에 추가하고 `api.dart`의 목록 주석과 가이드를 함께 고칩니다.
+Firebase 설정은 개인 프로젝트 `mytrip-fddfb`(`lib/firebase_options.dart`)를 사용합니다.
 
-기준 문서: [tripledger](https://github.com/wannabb/tripledger) · [API 사용 가이드](https://github.com/wannabb/tripledger/blob/main/lib/api/how%20to%20use.md)
+## tripledger와의 차이
 
-- 개인 브랜치와 `lib/` 아래 담당 폴더에서 작업합니다. mytrip의 화면 폴더는 `lib/trip_home/`입니다.
-- YAML이나 공용 파일을 수정하기 전에 팀과 조율합니다.
-- DB 연결이 필요한 시점에 프로젝트 접근 권한을 요청합니다.
-- 화면 개발에는 샘플 데이터를 사용합니다.
+| 항목 | 내용 |
+|---|---|
+| 로그인 | 이메일·Google만 사용합니다. 팀 로그인 화면의 카카오·네이버 버튼은 넣지 않았습니다 |
+| 여행 국가 | 팀 `Trip`은 통화만 저장합니다. 같은 통화를 쓰는 다른 국가를 골라도 통화의 대표 국기로 표시되고, 국가 이름은 여행 이름에 남습니다 |
+| 카드 연동 | `CardSyncApi`와 `AuthApi.idToken`은 mytrip에서 추가한 API입니다 |
 
-## tripledger 통합
-
-1. 팀 저장소의 최신 `main`에서 개인 브랜치를 만듭니다.
-2. `lib/trip_home/`의 필요한 화면과 위젯만 가져옵니다. 같은 경로에 기존 작업이 있으면 파일별로 비교합니다.
-3. 모델과 데이터 호출을 팀의 `lib/api/api.dart`에 맞춥니다.
-4. 로그인·장부·계정·설정 화면의 연결 지점을 조원들과 맞춥니다.
-5. 검사 후 PR로 통합합니다.
-
-| 항목 | mytrip | tripledger |
-|---|---|---|
-| 예산 | `Trip.budgetKrw` | `Trip.budget` |
-| 통화 | `Trip.country.currency` | `Trip.currency` |
-| 지출 경로 | `trips/{tripId}/records` | `trips/{tripId}/expenses` |
-| 환산 기준 | 현재 상단 정수 환율 | 기록 당시 `Expense.rate`·`amountKrw` |
-
-화면에서 팀의 `AuthApi`·`TripApi`·`ExpenseApi`·`RateApi`·`LedgerCalc`를 재사용합니다.
-개인 저장 계층을 중복 연결하거나 팀의 `main.dart`·API·Firebase 설정·보안 규칙을 덮어쓰지 않습니다.
-정수 환산과 과거 지출 처리 정책은 API 담당자와 먼저 맞춥니다.
-`paymentMethod`(현금·카드)와 `isTaxFree`(면세 표시)는 개인 추가 필드이므로 팀 API에 합칠 때 함께 조율합니다. `amount`는 면세 처리 후 실제 결제액입니다.
-통화·메모·기록 당시 환율·자동 기록 출처·취소 상태 필드도 팀 모델과 조율합니다. 기존 필드가 없는 문서는 여행 통화와 정상 지출로 읽습니다.
-
-장부 연결은 `screens/ledger_entry.dart`, 계정·설정 연결은 `screens/more_screen.dart`에서 담당합니다.
+`lib/ledger/`의 장부 화면은 `TripStore`(여행 하나의 상태)를 받고, `lib/trip_home/`은
+`TripListStore`가 여행마다 같은 `TripStore`를 만들어 목록·홈·장부가 같은 값을 보게 합니다.
+두 스토어 모두 저장은 팀 API만 사용합니다.
 
 ## 카드 연동
 
 공개 앱은 실카드에 연결되어 있지 않으며 카드 인증정보를 입력받지 않습니다.
 실제 연결용 서버의 권한·제공자 설정·실행 안내는 [카드 서버](server/card/README.md)를 참고하세요.
-서버는 여행의 기존 `records` 경로에 저장하며 앱은 Firestore 구독으로 갱신합니다.
+카드 연결 화면(`lib/trip_home/screens/card_connection_screen.dart`)은 메뉴에 연결되어 있지 않습니다.
+서버는 아직 예전 `trips/{tripId}/records` 경로에 저장하므로, 팀 구조의 장부(`expenses`)에는
+카드 승인내역이 나타나지 않습니다. 서버의 저장 경로·필드를 팀 `Expense`에 맞추는 일이 남아 있습니다.
 카드 기록의 삭제는 숨김 처리이며 실제 결제를 취소하지 않습니다.
 
 ## 환율 운영
 
-`pages.yml`의 예약 실행은 매일 06:00 KST에 새 환율을 수집합니다.
-일반 배포는 기존 환율과 수집 시각을 유지하며, 공개 파일이 없는 최초 배포만 즉시 수집합니다.
-조회 실패 시 마지막 정상 데이터를 보존합니다.
-
-앱은 시작·다시 활성화할 때 서버를 확인하고, 실행 중에는 5분마다 확인합니다.
+앱은 팀 `RateApi`(`lib/api/rate_api.dart`)로 하루에 한 번 `open.er-api.com`에서 환율을 받습니다.
+`pages.yml`의 예약 실행과 `tool/update_rates.mjs`가 만드는 `rates.json`은 이전 구조에서 쓰던 것으로,
+현재 앱은 읽지 않습니다.
 공개 저장소가 60일간 비활성 상태이면 예약 실행이 중지될 수 있습니다
 ([GitHub 예약 실행 안내](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)).

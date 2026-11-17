@@ -13,6 +13,7 @@ enabled = false
 
 [vars]
 RECEIPT_ALLOWED_ORIGINS = "https://donghaha03.github.io"
+# Claude Haiku (new consent) needs the ANTHROPIC_API_KEY secret; see README.
 # Set yes only after checking the actual Gemini project and Workers account plan.
 GEMINI_FREE_TIER_CONFIRMED = "no"
 RECEIPT_FREE_HOSTING_CONFIRMED = "no"

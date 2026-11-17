@@ -1,5 +1,33 @@
 # 영수증 인식 연결
 
+## Claude Haiku 단계 전환 (현재 1단계)
+
+공개 인식을 Google Gemini에서 Anthropic Claude Haiku(`claude-haiku-5-5`)로 옮기는 중입니다.
+같은 Worker(`gemini.mjs`)가 앱이 보내는 동의 버전으로 제공자를 고릅니다.
+
+| `X-Receipt-Consent` | 처리 | 대상 |
+|---|---|---|
+| `claude-haiku-v1` | Claude Haiku (`/receipt/recognize`, `/receipt/translate`) | 새 앱 |
+| `gemini-free-v2`, `gemini-free-v1` | Gemini (기존 동작 그대로) | 이미 배포된 앱 |
+
+- Google 동의로는 Anthropic에 아무것도 보내지 않고, 그 반대도 마찬가지입니다.
+- Claude 경로는 서버 시크릿 `ANTHROPIC_API_KEY`가 필요합니다. 없으면 503이며 Gemini로 대신 보내지 않습니다.
+- 비용은 운영자가 부담합니다. 공개 요청은 기존과 같은 사용량 제한(전체 하루 200건, 접속당 하루 50건·분당 5건)을 공유합니다.
+- 재시도·다른 제공자 대체는 없습니다. 거절·잘린 응답·형식이 틀린 응답은 검토 초안이 되지 않습니다.
+- `GET /receipt/status`의 `claude`가 `true`이면 Claude 경로가 준비된 것입니다.
+- `/receipt/claude`는 접속 코드로만 쓰는 운영자 비교용 경로입니다.
+
+배포 (저장소의 `wrangler.toml`은 확인 값이 `no`이므로 그대로 배포하면 기존 Gemini 경로가 꺼집니다):
+
+```powershell
+npm ci --ignore-scripts
+npx --yes wrangler@4.147.0 secret put ANTHROPIC_API_KEY   # 이미 등록했다면 생략
+npx --yes wrangler@4.147.0 deploy --var GEMINI_FREE_TIER_CONFIRMED:yes --var RECEIPT_FREE_HOSTING_CONFIRMED:yes
+```
+
+2단계(남은 일): 새 앱이 배포되어 Gemini 동의 요청이 더 오지 않는 것을 확인한 뒤
+Gemini 분기와 `GEMINI_*` 설정, 아래 Gemini 안내를 삭제합니다.
+
 ## Gemini 무료 API · 공개 웹과 앱
 
 `gemini.mjs`를 Cloudflare **Workers Free**에 배포합니다. 촬영한 사진을 Google의
@@ -139,14 +167,14 @@ flutter test tool/evaluate_receipt_benchmark.dart --reporter expanded
 선택적인 `RECEIPT_REFERENCE_FILE`은 기존 페이히어 예시 사진의 로컬 Tesseract 검사 전용입니다.
 이 원본 사진은 Gemini에 보내지 않습니다. 결과 파일에는 로컬 OCR 텍스트가 포함되므로 공유하지 않습니다.
 
-저장소의 `web/receipt-config.json`은 검증된 공개 Gemini 서버를 기본값으로 사용합니다.
+저장소의 `web/receipt-config.json`은 공개 중계 서버와 제공자 `claude`를 기본값으로 사용합니다.
 다른 서버로 바꿀 때는 mytrip의 Actions 변수 `RECEIPT_SERVER_URL=https://서버주소`,
-`RECEIPT_PROVIDER=gemini`를 설정하고 Pages를 배포합니다.
+`RECEIPT_PROVIDER=claude`를 설정하고 Pages를 배포합니다.
 `receipt-config.json`에는 공개 주소와 제공자만 들어갑니다. 웹·iOS·Android는
 같은 설정과 호출 계약을 사용합니다. 개발 빌드에서는 다음처럼 지정할 수 있습니다.
 
 ```powershell
-flutter build web --dart-define=RECEIPT_SERVER_URL=https://서버주소 --dart-define=RECEIPT_PROVIDER=gemini
+flutter build web --dart-define=RECEIPT_SERVER_URL=https://서버주소 --dart-define=RECEIPT_PROVIDER=claude
 ```
 
 서버 주소가 `null`인 공개 배포는 연결 완료 상태가 아니며 기존 기기 OCR을 유지합니다.

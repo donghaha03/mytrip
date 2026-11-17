@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../data/trip_store.dart';
-import '../models/country.dart';
-import '../models/trip.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
-import '../widgets/app_sheet.dart';
-import '../widgets/calendar_range_picker.dart';
+import '../../api/api.dart' show AuthApi, TripApi;
+import '../../ledger/models/country.dart';
+import '../../ledger/theme/app_colors.dart';
+import '../../ledger/theme/app_theme.dart';
+import '../../ledger/widgets/app_sheet.dart';
+import '../../ledger/widgets/calendar_range_picker.dart';
 import '../widgets/country_chip.dart';
-import '../widgets/screen_top_bar.dart';
-import '../widgets/sheets.dart';
-import '../widgets/won_input_formatter.dart';
+import '../widgets/more_country_sheet.dart';
+import '../../ledger/widgets/screen_top_bar.dart';
+import '../../ledger/widgets/sheets.dart';
+import '../../ledger/widgets/won_input_formatter.dart';
 
 /// 02. 새 여행 추가.
 class AddTripScreen extends StatefulWidget {
@@ -25,6 +25,7 @@ class _AddTripScreenState extends State<AddTripScreen> {
   Country? _fromMoreSheet; // 더보기에서 고른 국가
   DateRange? _range;
   final _budgetController = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -33,7 +34,10 @@ class _AddTripScreenState extends State<AddTripScreen> {
   }
 
   bool get _canSubmit =>
-      _selected != null && _range?.isValid == true && _budgetValue > 0;
+      !_busy &&
+      _selected != null &&
+      _range?.isValid == true &&
+      _budgetValue > 0;
 
   int get _budgetValue =>
       int.tryParse(_budgetController.text.replaceAll(',', '')) ?? 0;
@@ -59,19 +63,26 @@ class _AddTripScreenState extends State<AddTripScreen> {
     setState(() => _range = picked);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_canSubmit) return;
-    tripStore.add(
-      Trip(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
+    setState(() => _busy = true);
+    try {
+      // 여행은 통화로 저장된다. 국가 이름은 여행 이름에 남는다.
+      await TripApi.add(
         name: '${_selected!.name} 여행',
-        country: _selected!,
+        budget: _budgetValue,
+        currency: _selected!.currency,
         start: _range!.start,
         end: _range!.end,
-        budgetKrw: _budgetValue,
-      ),
-    );
-    Navigator.of(context).pop();
+      );
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AuthApi.errorMessage(e))));
+    }
   }
 
   @override

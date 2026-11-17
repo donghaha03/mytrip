@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/onboarding_example.dart';
-import '../widgets/screen_top_bar.dart';
-import '../theme/app_colors.dart';
+import '../../ledger/widgets/screen_top_bar.dart';
+import '../../ledger/theme/app_colors.dart';
 import '../widgets/add_trip_cta.dart';
 import 'add_trip_screen.dart';
 import 'more_screen.dart';
