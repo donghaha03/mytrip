@@ -50,8 +50,6 @@ lib/
    ├─ expense_api.dart     지출
    ├─ rate_api.dart        환율
    ├─ ledger_calc.dart     계산
-   ├─ receipt_api.dart     영수증 인식·번역
-   ├─ card_sync_api.dart   카드 연동 서버 호출
    ├─ api_exception.dart   사용자용 문구가 담긴 예외
    ├─ paths.dart           Firestore 경로 (API 내부용)
    └─ social_config.dart   구글 웹 클라이언트 ID
@@ -171,7 +169,6 @@ users/{uid}/trips/{tripId}/expenses/{expenseId}
 | `AuthApi.needsEmailVerification` | `bool` | 이메일 가입자인데 **아직 인증 안 함** |
 | `AuthApi.changes` | `Stream` | 로그인/로그아웃 변화 |
 | `AuthApi.userChanges` | `Stream` | 위 + **이름/인증 상태 변경**까지 (**AuthGate와 프로필 화면은 이걸 구독**) |
-| `await AuthApi.idToken()` | `String?` | 우리 서버(카드 연동 등)에 보내는 로그인 토큰. 로그아웃 상태면 `null` |
 
 #### 입력 검증 – `TextFormField(validator: ...)` 에 바로 연결
 
@@ -253,8 +250,6 @@ await AccountApi.deleteAccount();
 | `ExpenseApi.delete(tripId, expenseId)` | `Future<void>` | 지출 삭제 |
 | `ExpenseApi.restore(tripId, expense)` | `Future<void>` | 삭제 취소 (같은 ID로 복원, "되돌리기" 스낵바용) |
 
-`add`의 선택 인자: `icon`, `paymentMethod`, `isTaxFree`, `memo`, `recordedQuote`, `source`, `status`, `originalAmount`, `receiptFingerprint`, `receiptItems`, `receiptTaxes`, `receiptAdjustments`. 생략하면 모델의 기본값을 사용합니다. ID와 환율은 API가 정하며, `date`는 생략 시 현재 시각을 사용합니다.
-
 ```dart
 // 추가
 await ExpenseApi.add(trip.id,
@@ -324,16 +319,6 @@ try {
 Stream 오류는 `snap.hasError`일 때 `AuthApi.errorMessage(snap.error!)`로 같은 방식으로 표시한다.
 
 ---
-
-### 4-9. 영수증
-
-`api.dart`에서 `ReceiptClient`를 가져옵니다. `connection(configUrl: ...)`으로 연결을 읽고, `recognize(connection, image)`로 영수증을 인식하며, `translate(...)`로 품목을 번역합니다. 오류 문구는 `AuthApi.errorMessage(e)`로 표시합니다.
-
-영수증 사진과 품목명은 사용자가 동의한 뒤에만 공개 중계 서버(Claude Haiku)로 보냅니다. 동의 화면과 동의 버전은 `lib/ledger/receipts/receipt_consent.dart`에 있습니다.
-
-### 4-10. 카드 연동
-
-`CardSyncApi.connection(action:, idToken:, ...)`으로 카드 연결 상태 조회·인증·선택·해제를, `CardSyncApi.synchronize(tripId:, idToken:)`으로 승인내역 조회를 요청합니다. 서버 주소는 빌드할 때 `--dart-define=CARD_SERVER_URL=...`로 넣고, 토큰은 `AuthApi.idToken()`을 씁니다.
 
 ## 5. 화면별 사용 레시피
 
@@ -468,18 +453,6 @@ await TripApi.update(trip.copyWith(name: _name.text, budget: ..., start: ..., en
 > **이미 지출이 있는 여행은 통화를 바꾸지 마세요.** 지출은 각자 기록 당시 통화로 저장되어 있어서, 통화를 바꾸면 한 여행에 서로 다른 통화가 섞입니다. 수정 화면에서는 통화 선택을 비활성화하세요.
 
 ### 5-6. 장부 화면
-
-로그인과 `main()`의 Firebase/환율 초기화 후 다음과 같이 엽니다.
-
-```dart
-import 'package:tripapp/ledger_page.dart';
-
-Navigator.of(context).push(MaterialPageRoute<void>(
-  builder: (_) => LedgerPage(tripId: trip.id),
-));
-```
-
-아래는 API를 사용해 별도 화면을 작성할 때의 기본 예시입니다.
 
 ```dart
 class _LedgerPageState extends State<LedgerPage> {
@@ -627,7 +600,7 @@ await AccountApi.deleteAccount(password: AuthApi.isPasswordUser ? pw : null);
 
 - 지출 목록 페이징 (한 여행의 지출을 전부 불러옴 – MVP 규모에서는 문제없음)
 - 카테고리 직접 추가/삭제 (6개 고정)
-- 신용카드 결제 내역의 장부 반영 (카드 서버가 아직 팀 `expenses` 구조로 저장하지 않음)
+- 신용카드 결제 내역 API 연동 (선택 기능, 미구현)
 - 카카오 로그인 (제외됨)
 
 ---

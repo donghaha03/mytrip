@@ -47,19 +47,12 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# 개인 에디터/도구 설정
-.claude/
-
-# 카드 서버의 인증정보와 설치 파일
-**/node_modules/
+# Local machine settings and secrets
+/android/local.properties
+/android/key.properties
 .env
 .env.*
-*.service-account.json
-
-# Local receipt login state must never be published.
-*.dpapi
-*.dpapi.tmp
-runtime.lock
-.wrangler/
-.dev.vars
-.dev.vars.*
+!.env.example
+*.jks
+*.keystore
+service-account*.json

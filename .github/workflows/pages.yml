@@ -1,14 +1,13 @@
 name: Deploy to GitHub Pages
 
-# main 에 합쳐지면 자동으로 빌드해서 https://<계정>.github.io/<repo>/ 에 올린다.
+# main 에 합쳐지면 웹으로 빌드해서 https://<계정>.github.io/<repo>/ 에 올린다.
+#   /<repo>/      본 앱 (팀 화면 그대로)
+#   /<repo>/ocr/  영수증 인식 단독 화면 (lib/OCR)
 # 처음 한 번: repo Settings -> Pages -> Source 를 "GitHub Actions" 로 바꿀 것.
 on:
   push:
     branches: [main]
   workflow_dispatch: # Actions 탭에서 수동 실행
-  # ponytail: 무료 예약은 지연·60일 무활동 중지 가능; 정각/상시 운영 필요 시 전용 스케줄러.
-  schedule:
-    - cron: '0 21 * * *' # UTC 21:00 = 한국 시간 다음 날 06:00. 실행·배포 지연 가능.
 
 permissions:
   contents: read
@@ -28,17 +27,16 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.47.5
+          flutter-version: 3.50.0 # pubspec 의 Dart ^3.13.2 / Flutter >=3.47.0 충족
           channel: stable
           cache: true
 
-      - run: flutter pub get
+      # 팀 파일(lib/firebase_options.dart)은 저장소에서 그대로 두고, 이 빌드 폴더에서만
+      # 개인 Firebase 프로젝트(mytrip-fddfb) 설정으로 바꿔 끼운다. 커밋하지 않는다.
+      - name: Use my Firebase project for this build only
+        run: cp deploy/firebase_options_mytrip.dart lib/firebase_options.dart
 
-      # 깨진 채로 배포되지 않게 여기서도 한 번 더 막는다
-      - run: flutter analyze --fatal-infos --fatal-warnings
-      - run: flutter test
-      - run: node tool/update_rates.mjs --check
-      - run: node --test test/receipt_camera_test.mjs
+      - run: flutter pub get
 
       # <계정>.github.io/<repo>/ 처럼 하위 경로에 뜨므로 base-href 를 repo 이름으로.
       # repo 이름이 <계정>.github.io 이면 루트(/)에 뜬다.
@@ -48,16 +46,9 @@ jobs:
           if [[ "$REPO" == *.github.io ]]; then BASE="/"; else BASE="/$REPO/"; fi
           echo "base-href: $BASE"
           flutter build web --release --no-wasm-dry-run --base-href "$BASE"
-
-      - name: Configure receipt server
-        run: node tool/configure_receipts.mjs
-        env:
-          RECEIPT_SERVER_URL: ${{ vars.RECEIPT_SERVER_URL }}
-          RECEIPT_PROVIDER: ${{ vars.RECEIPT_PROVIDER }}
-
-      # 실패하면 배포를 중단하므로 마지막 정상 환율과 앱이 그대로 남는다.
-      - name: Update daily rates
-        run: node tool/update_rates.mjs
+          flutter build web --release --no-wasm-dry-run -t lib/OCR/main_ocr.dart \
+            --base-href "${BASE}ocr/" -o build/ocr
+          cp -r build/ocr build/web/ocr
 
       - uses: actions/upload-pages-artifact@v3
         with:

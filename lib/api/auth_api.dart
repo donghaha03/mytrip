@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
@@ -59,14 +60,12 @@ class AuthApi {
     return '알 수 없음';
   }
 
-  /// 우리 서버(카드 연동 등)에 보내는 로그인 토큰. 로그아웃 상태면 null
-  static Future<String?> idToken() async => user?.getIdToken();
-
   /// 로그인/로그아웃 변화 스트림 (앱 최상단 화면 분기용)
   static Stream<User?> get changes => _auth.authStateChanges();
 
   /// 로그인/로그아웃 + 프로필(이름, 인증 여부) 변경까지 감지.
   static Stream<User?> get userChanges => _auth.userChanges();
+
 
   static String _normalizeEmail(String v) => v.trim().toLowerCase();
 

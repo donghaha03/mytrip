@@ -1,45 +1,45 @@
 name: tripapp
-description: "환율 여행 장부앱 프로토타입"
-publish_to: 'none'
+description: "A new Flutter project."
+publish_to: 'none' 
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.8.0 <4.0.0'
+  sdk: ^3.13.2
 
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
 dependencies:
-  cloud_firestore: ^6.10.0
-  firebase_auth: ^6.7.0
-  firebase_core: ^4.15.0
-  google_sign_in: ^7.2.0
-  http: ^1.2.1
-  image_picker: ^1.2.4
-  intl: ^0.20.3
-  shared_preferences: ^2.5.5
-  url_launcher: ^6.3.3
   flutter:
     sdk: flutter
+  shared_preferences: ^2.5.5
+  cupertino_icons: ^1.0.8
+  http: ^1.2.1
+  firebase_core: ^4.15.0
+  cloud_firestore: ^6.10.0
+  firebase_auth: ^6.7.0
+  intl: ^0.20.3
+  google_sign_in: ^7.2.0
+  kakao_flutter_sdk_user: ^2.0.1
+  naver_login_flutter: ^4.0.0
+  image_picker: ^1.2.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  cloud_firestore_platform_interface: ^8.0.7
-  firebase_auth_platform_interface: ^9.1.0
-  firebase_core_platform_interface: ^8.1.1
 
 flutter:
   uses-material-design: true
-
   assets:
     - assets/images/
-
-  # Pretendard (SIL Open Font License 1.1, assets/fonts/OFL.txt)
-  # 앱이 쓰는 굵기만 넣는다: 400/500/600/700
   fonts:
     - family: Pretendard
       fonts:
         - asset: assets/fonts/Pretendard-Regular.otf
-          weight: 400
         - asset: assets/fonts/Pretendard-Medium.otf
           weight: 500
         - asset: assets/fonts/Pretendard-SemiBold.otf

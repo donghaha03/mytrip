@@ -1,11 +1,11 @@
 {
-    "name": "여행 장부",
-    "short_name": "여행 장부",
+    "name": "tripapp",
+    "short_name": "tripapp",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "환율 걱정 없는 여행 장부",
+    "description": "A new Flutter project.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

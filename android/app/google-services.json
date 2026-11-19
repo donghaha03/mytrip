@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "104119772783",
+    "project_id": "tripledger-ebc18",
+    "storage_bucket": "tripledger-ebc18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:104119772783:android:9db791b026a93a36b24f9a",
+        "android_client_info": {
+          "package_name": "com.example.tripapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNjuHa34buLWoow79a5Di8-E0o6rnCh2c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
