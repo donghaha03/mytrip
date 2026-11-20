@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "104119772783",
+    "project_id": "tripledger-ebc18",
+    "storage_bucket": "tripledger-ebc18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:104119772783:android:9db791b026a93a36b24f9a",
+        "android_client_info": {
+          "package_name": "com.example.tripapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "104119772783-1qaoiq8cr8noinsddqdbeu80mn6h1mqd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.tripapp",
+            "certificate_hash": "8ce8db22f8a4109b7992ce5f88787bab336eb571"
+          }
+        },
+        {
+          "client_id": "104119772783-bqcea48u9c2r7l02d4lbajlqet54smd4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCNjuHa34buLWoow79a5Di8-E0o6rnCh2c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "104119772783-bqcea48u9c2r7l02d4lbajlqet54smd4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "104119772783-l3jgnsnd5nd6ripi3i2pk5k42hjlqd3h.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.tripapp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
