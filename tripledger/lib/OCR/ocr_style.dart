@@ -44,6 +44,23 @@ const ocrButtonSpinner = SizedBox(
   child: CircularProgressIndicator(color: AppColors.white, strokeWidth: 2),
 );
 
+/// 입력칸 모양 (기존 지출 입력 화면과 같은 둥근 테두리).
+InputDecoration ocrInput({String? hint, Widget? suffix}) {
+  final border = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: const BorderSide(color: AppColors.border),
+  );
+  return InputDecoration(
+    hintText: hint,
+    suffix: suffix,
+    filled: true,
+    fillColor: AppColors.bg,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 16),
+    border: border,
+    enabledBorder: border,
+  );
+}
+
 void showOcrMessage(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()

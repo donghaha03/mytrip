@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../api/api_exception.dart';
 import '../models/ocr_receipt.dart';
 
+export '../models/expense_draft.dart';
 export '../models/ocr_receipt.dart';
 
 /// 영수증 인식 중계 서버(Claude Haiku). 다른 서버로 바꾸려면 빌드할 때

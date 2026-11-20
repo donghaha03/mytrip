@@ -1,10 +1,15 @@
 # OCR (영수증 인식)
 
 영수증 사진을 찍거나 골라 상호·날짜·총액·품목·세금·할인을 읽어 보여주는 기능입니다.
-기존 앱 화면과 연결하지 않고 단독으로 실행하며, 인식 결과를 저장하지 않습니다.
+
+쓰는 곳은 두 군데입니다.
+
+- 장부 아래쪽 버튼: 기존 "지출 추가하기" 옆에 같은 모양의 "영수증 OCR" 버튼이 있습니다.
+  영수증을 인식한 내용을 확인·수정한 뒤 `ExpenseApi.add`로 지금 열린 여행에 저장합니다.
+- 단독 실행(`main_ocr.dart`): 결과만 보여주고 저장하지 않습니다.
 
 저장소 README의 "파일 생성 시 구조도와 관련 문서를 함께 수정" 규칙은 이 문서로 대신합니다.
-OCR은 기존 파일을 고치지 않고 추가만 하는 조건으로 만들었기 때문에, 루트 `README.md`와
+OCR은 기존 파일을 거의 고치지 않는 조건(장부 버튼 영역만 예외)으로 만들었기 때문에, 루트 `README.md`와
 `api_howtouse.md`는 그대로 두었습니다.
 
 ## 실행
@@ -23,23 +28,49 @@ Firebase 초기화나 로그인은 필요 없습니다.
 tripledger/
 ├── lib/OCR/
 │   ├── api/
-│   │   └── ocr_api.dart        # OcrApi: 사진 선택, 전송 동의, 인식, 번역 (외부 의존성은 여기만)
+│   │   └── ocr_api.dart             # OcrApi: 사진 선택, 전송 동의, 인식, 번역 (외부 의존성은 여기만)
 │   ├── models/
-│   │   └── ocr_receipt.dart    # OcrReceipt 등 인식 결과 모델
-│   ├── main_ocr.dart           # 단독 실행 진입점 (OcrApp)
-│   ├── ocr_screen.dart         # 인식 화면
-│   ├── consent_screen.dart     # 사진 전송 동의 화면
-│   ├── ocr_style.dart          # 앱바·버튼·카드 공통 모양 (AppColors 사용)
+│   │   ├── ocr_receipt.dart         # OcrReceipt 등 인식 결과 모델
+│   │   └── expense_draft.dart       # ExpenseDraft: 인식 결과 → 지출 초안
+│   ├── ocr_screen.dart              # 인식 화면 + 장부 버튼이 부르는 openReceiptOcr
+│   ├── receipt_expense_screen.dart  # 영수증 내용 확인·수정 후 저장
+│   ├── consent_screen.dart          # 사진 전송 동의 화면
+│   ├── ocr_style.dart               # 앱바·버튼·카드·입력칸 공통 모양 (AppColors 사용)
+│   ├── main_ocr.dart                # 단독 실행 진입점 (OcrApp)
 │   └── README.md
 └── test/OCR/
-    └── ocr_test.dart
+    ├── ocr_test.dart
+    └── expense_draft_test.dart
 ```
+
+## 지출 추가 흐름
+
+```text
+LedgerPage 아래쪽 버튼 [ 지출 추가하기 | 영수증 OCR ]
+  ├ 지출 추가하기 → AddExpenseSheet (기존 그대로)
+  └ 영수증 OCR   → openReceiptOcr(context, trip)
+                    → OcrScreen(trip): 사진 → 동의 → 인식
+                    → "이 내용으로 지출 추가" → ReceiptExpenseScreen → ExpenseApi.add
+                    → 저장되면 장부로 돌아와 "지출이 추가되었습니다." 표시
+```
+
+기존 파일에서 바꾼 곳은 `lib/ledger_page.dart`의 버튼 영역 한 곳과 import 한 줄입니다.
+버튼 하나를 `Row` 안의 `Expanded` 두 개로 나눴고, 기존 버튼의 동작과 모양은 그대로입니다.
+
+인식 결과를 지출로 옮기는 규칙(`ExpenseDraft.fromReceipt`)은 다음과 같습니다.
+
+- 금액: 영수증의 최종 결제액. 못 읽었으면 비워 두고 사용자가 입력합니다.
+- 통화: 영수증 통화가 `KRW`이거나 `currencies`에 있으면 그대로, 아니면 여행 통화로 채우고 알려줍니다.
+  여행 통화와 달라도 기존 방식대로 지출마다 자기 통화와 저장 시점 환율로 기록됩니다.
+- 날짜: 영수증 날짜 + 지금 시각. 날짜가 없거나 미래면 지금으로 채우고 알려줍니다.
+- 가맹점 → 사용처(최대 50자), 카테고리는 인식된 값, 결제수단은 기본값 현금.
+- `Expense` 모델에 출처(source) 필드가 없어 영수증으로 추가했다는 표시는 저장하지 않습니다.
 
 ## 지킨 규칙
 
 | 저장소 규칙 | OCR에서 |
 |---|---|
-| 화면에서 Firebase SDK 직접 호출 금지 | OCR 화면은 Firebase를 쓰지 않습니다. |
+| 화면에서 Firebase SDK 직접 호출 금지 | 저장은 `ExpenseApi.add`만 부릅니다. OCR 화면은 Firebase SDK를 직접 쓰지 않습니다. |
 | 화면은 `lib/api/api.dart`로 접근 | 화면은 `api/api.dart`와 `OCR/api/ocr_api.dart`만 import합니다. |
 | 외부 서비스 의존성은 API 계층 | HTTP 호출, `image_picker`, `SharedPreferences`는 `OcrApi` 안에만 있습니다. |
 | 모델은 분리 | `OCR/models/ocr_receipt.dart` |
@@ -93,7 +124,7 @@ try {
 - 다른 서버를 쓰려면 `--dart-define=RECEIPT_SERVER_URL=https://...`
 - 요청 헤더 `X-Receipt-Consent: claude-haiku-v1`. 사용자가 동의하기 전에는 아무것도 보내지 않습니다.
 - 사용 한도: 전체 하루 200건, 기기당 하루 50건·분당 5건
-- 팀 Firebase(Functions, Firestore, 규칙)는 쓰지도 바꾸지도 않습니다.
+- 인식에는 Firebase를 쓰지 않습니다. 지출 저장만 기존 `ExpenseApi`(Firestore)를 거칩니다.
 
 ## 제약
 
