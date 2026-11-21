@@ -1,0 +1,39 @@
+name: Update exchange rates
+
+# 내 Firebase(mytrip-fddfb)의 Firestore rates/current 를 3시간마다 채운다.
+# 팀 프로젝트는 Cloud Function(functions/index.js 의 updateExchangeRates)이 하는 일인데,
+# 내 프로젝트에는 그 함수가 없어서 이 workflow 가 같은 출처·같은 형식으로 대신 쓴다.
+#
+# 처음 한 번 (키는 본인만 다루고, 채팅·이슈·커밋에 붙여넣지 않는다):
+#   1. Firebase 콘솔 -> 프로젝트 설정 -> 서비스 계정 -> "새 비공개 키 생성" 으로 JSON 받기
+#   2. GitHub repo Settings -> Secrets and variables -> Actions -> New repository secret
+#      이름 FIREBASE_SERVICE_ACCOUNT, 값 = JSON 파일 내용 전체. 등록 후 받은 파일은 지운다.
+#   3. Firestore 규칙에 rates 읽기 허용 추가 (deploy/firestore.rules.mytrip)
+#   4. Actions 탭 -> Update exchange rates -> Run workflow
+# 예약 실행과 Run workflow 버튼은 이 파일이 기본 브랜치(main)에 있어야 동작한다.
+on:
+  schedule:
+    - cron: "0 */3 * * *" # UTC 기준. 한국 시간으로도 00, 03, ... 21시 정각 (팀 함수와 같다)
+  workflow_dispatch: # Actions 탭에서 수동 실행
+
+permissions:
+  contents: read
+
+concurrency: rates
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: deploy/rates
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: node deploy/rates/update-rates.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

@@ -1,0 +1,23 @@
+// 내 Firebase(mytrip-fddfb)에 적용할 Firestore 규칙.
+// Firebase 콘솔 -> Firestore Database -> 규칙 탭에 붙여넣고 "게시"한다.
+// 지금은 저장소 루트의 팀 규칙(firestore.rules)과 내용이 같다. 팀 파일이 바뀌어도 내 프로젝트
+// 규칙은 이 파일 기준으로 둔다.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 사용자 데이터: 본인만 읽고 쓴다.
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == uid;
+    }
+
+    // 환율: 앱이 로그인 전(main 의 RateApi.load)에 읽으므로 누구나 읽을 수 있어야 한다.
+    // 쓰기는 막는다. GitHub Actions 는 서비스 계정(IAM)으로 쓰므로 이 규칙과 무관하다.
+    match /rates/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
