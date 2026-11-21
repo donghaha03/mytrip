@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
 import 'expense_detail_page.dart';
+import 'OCR/ocr_screen.dart';
 import 'api/api.dart';
 
 class LedgerPage extends StatefulWidget {
@@ -429,24 +430,53 @@ class _LedgerPageState extends State<LedgerPage> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: SizedBox(
                           height: 54,
-                          child: FilledButton.icon(
-                            onPressed: () => _addExpense(trip),
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text(
-                              '지출 추가하기',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () => _addExpense(trip),
+                                  icon: const Icon(Icons.add_rounded),
+                                  label: const Text(
+                                    '지출 추가하기',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    elevation: 3,
+                                  ),
+                                ),
                               ),
-                            ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () => openReceiptOcr(context, trip),
+                                  icon: const Icon(Icons.receipt_long_outlined),
+                                  label: const Text(
+                                    '영수증 OCR',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    elevation: 3,
+                                  ),
+                                ),
                               ),
-                              elevation: 3,
-                            ),
+                            ],
                           ),
                         ),
                       ),

@@ -7,10 +7,25 @@ import '../api/api.dart';
 import 'api/ocr_api.dart';
 import 'consent_screen.dart';
 import 'ocr_style.dart';
+import 'receipt_expense_screen.dart';
 
-/// 사진을 고르거나 찍어 영수증을 인식하고 결과를 보여준다. 저장은 하지 않는다.
+/// 장부의 "영수증 OCR" 버튼이 부른다. 영수증으로 지출을 추가하는 흐름
+/// (사진 → 동의 → 인식 → 내용 확인 → 저장)을 열고, 저장되면 안내 문구를 띄운다.
+Future<void> openReceiptOcr(BuildContext context, Trip trip) async {
+  final saved = await Navigator.of(context)
+      .push<bool>(MaterialPageRoute(builder: (_) => OcrScreen(trip: trip)));
+  if (saved == true && context.mounted) {
+    showOcrMessage(context, '지출이 추가되었습니다.');
+  }
+}
+
+/// 사진을 고르거나 찍어 영수증을 인식하고 결과를 보여준다.
+///
+/// [trip]을 넘기면 결과 아래에 "이 내용으로 지출 추가" 버튼이 생기고, 저장하면 true로
+/// 닫힌다. 넘기지 않으면(단독 실행) 결과만 보여주고 저장하지 않는다.
 class OcrScreen extends StatefulWidget {
-  const OcrScreen({super.key});
+  const OcrScreen({super.key, this.trip});
+  final Trip? trip;
 
   @override
   State<OcrScreen> createState() => _OcrScreenState();
@@ -53,9 +68,9 @@ class _OcrScreenState extends State<OcrScreen> {
   Future<bool> _ensureConsent({bool manage = false}) async {
     if (!manage && await OcrApi.consent() == true) return true;
     if (!mounted) return false;
-    final accepted = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const OcrConsentScreen()),
-    );
+    final accepted = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const OcrConsentScreen()));
     return accepted == true;
   }
 
@@ -86,6 +101,19 @@ class _OcrScreenState extends State<OcrScreen> {
     if (mounted) setState(() => _language = language);
   });
 
+  /// 인식 결과를 지출 입력 화면으로 넘기고, 저장됐으면 이 화면도 닫는다.
+  Future<void> _addExpense(Trip trip, OcrReceipt receipt) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ReceiptExpenseScreen(
+          trip: trip,
+          draft: ExpenseDraft.fromReceipt(receipt, tripCurrency: trip.currency),
+        ),
+      ),
+    );
+    if (saved == true && mounted) Navigator.of(context).pop(true);
+  }
+
   String _money(double? value, String? currency) => value == null
       ? '확인 필요'
       : '${localAmt(value)}${currency == null ? '' : ' $currency'}';
@@ -93,8 +121,20 @@ class _OcrScreenState extends State<OcrScreen> {
   @override
   Widget build(BuildContext context) {
     final receipt = _receipt;
+    final trip = widget.trip;
     return Scaffold(
       backgroundColor: AppColors.bg,
+      bottomNavigationBar: trip == null || receipt == null
+          ? null
+          : SafeArea(
+              minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: FilledButton(
+                key: const ValueKey('ocr-add-expense'),
+                onPressed: _busy ? null : () => _addExpense(trip, receipt),
+                style: ocrPrimaryButton,
+                child: const Text('이 내용으로 지출 추가'),
+              ),
+            ),
       appBar: ocrAppBar(
         '영수증 인식',
         actions: [
