@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../AppColors.dart';
 import '../api/api.dart';
 import 'api/ocr_api.dart';
+import 'camera_screen.dart';
 import 'consent_screen.dart';
 import 'ocr_style.dart';
 import 'receipt_expense_screen.dart';
@@ -53,16 +54,28 @@ class _OcrScreenState extends State<OcrScreen> {
     }
   }
 
-  Future<void> _pick({required bool camera}) => _run(() async {
-    final photo = await OcrApi.pickPhoto(camera: camera);
-    if (photo == null || !mounted) return; // 선택 취소
-    setState(() {
-      _photo = photo;
-      _receipt = null;
-      _language = null;
-      _translations.clear();
-    });
+  void _setPhoto(Uint8List photo) => setState(() {
+    _photo = photo;
+    _receipt = null;
+    _language = null;
+    _translations.clear();
   });
+
+  Future<void> _pick() => _run(() async {
+    final photo = await OcrApi.pickPhoto(camera: false);
+    if (photo == null || !mounted) return; // 선택 취소
+    _setPhoto(photo);
+  });
+
+  /// 앱 안 촬영 화면을 연다. 거기서 "이 사진으로 인식"을 눌렀으면 바로 인식한다.
+  Future<void> _shoot() async {
+    final photo = await Navigator.of(context).push<Uint8List>(
+      MaterialPageRoute(builder: (_) => const OcrCameraScreen()),
+    );
+    if (photo == null || !mounted) return; // 찍지 않고 돌아옴
+    _setPhoto(photo);
+    await _recognize();
+  }
 
   /// 동의했으면 true. 아직이면 동의 화면을 띄워 결정을 받는다.
   Future<bool> _ensureConsent({bool manage = false}) async {
@@ -152,7 +165,7 @@ class _OcrScreenState extends State<OcrScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _busy ? null : () => _pick(camera: true),
+                    onPressed: _busy ? null : _shoot,
                     style: ocrOutlinedButton,
                     icon: const Icon(Icons.photo_camera_outlined),
                     label: const Text('사진 촬영'),
@@ -161,7 +174,7 @@ class _OcrScreenState extends State<OcrScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _busy ? null : () => _pick(camera: false),
+                    onPressed: _busy ? null : _pick,
                     style: ocrOutlinedButton,
                     icon: const Icon(Icons.photo_library_outlined),
                     label: const Text('사진 선택'),
