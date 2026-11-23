@@ -1,0 +1,156 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
+import 'package:flutter/widgets.dart';
+
+import '../../api/api_exception.dart';
+
+const _needsHttps = '이 환경에서는 카메라를 사용할 수 없어요. HTTPS 주소에서 열거나 사진 선택을 이용해주세요.';
+
+/// 카메라 오류를 사용자에게 보여줄 문구로 바꾼다. 코드는 camera 플러그인(웹·Android·iOS)이 주는 값.
+@visibleForTesting
+String cameraErrorMessage(Object error) =>
+    switch (error is CameraException ? error.code : '') {
+      'CameraAccessDenied' ||
+      'CameraAccessDeniedWithoutPrompt' ||
+      'CameraAccessRestricted' ||
+      'NotAllowedError' =>
+        '카메라 권한이 거부되었어요. 브라우저의 사이트 권한이나 기기 설정에서 카메라를 허용하거나 사진 선택을 이용해주세요.',
+      'cameraNotFound' ||
+      'NotFoundError' => '사용할 수 있는 카메라가 없어요. 사진 선택을 이용해주세요.',
+      'cameraNotReadable' ||
+      'NotReadableError' => '다른 앱이 카메라를 사용 중일 수 있어요. 다른 앱을 닫고 다시 시도해주세요.',
+      'cameraSecurity' ||
+      'cameraType' ||
+      'cameraNotSupported' ||
+      'SecurityError' => _needsHttps,
+      _ => '카메라를 열지 못했어요. 다시 시도하거나 사진 선택을 이용해주세요.',
+    };
+
+/// 후면 카메라를 고르고, 없으면 첫 카메라를 쓴다. 카메라가 없으면 null.
+@visibleForTesting
+CameraDescription? backCamera(List<CameraDescription> cameras) =>
+    cameras.isEmpty
+    ? null
+    : cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+
+/// 좌우가 뒤집힌 사진을 바로잡아 PNG로 돌려준다.
+@visibleForTesting
+Future<Uint8List> unmirror(Uint8List bytes) async {
+  final codec = await ui.instantiateImageCodec(bytes);
+  final image = (await codec.getNextFrame()).image;
+  final recorder = ui.PictureRecorder();
+  ui.Canvas(recorder)
+    ..translate(image.width.toDouble(), 0)
+    ..scale(-1, 1)
+    ..drawImage(image, ui.Offset.zero, ui.Paint());
+  final flipped = await recorder.endRecording().toImage(
+    image.width,
+    image.height,
+  );
+  final data = await flipped.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  flipped.dispose();
+  return data!.buffer.asUint8List();
+}
+
+/// 앱 화면 안에서 쓰는 카메라. `camera` 패키지는 이 파일에서만 쓴다.
+///
+///   final camera = await OcrCamera.open();   후면 카메라 켜기 (권한 요청 포함)
+///   camera.preview(overlay: ...)             미리보기 위젯
+///   await camera.capture()                   촬영 -> JPEG 바이트
+///   await camera.close()                     카메라 놓기 (화면을 나가거나 가려질 때)
+///
+/// 실패하면 사용자에게 보여줄 문구가 담긴 [ApiException]을 던진다.
+class OcrCamera {
+  @visibleForTesting
+  OcrCamera({
+    required this.preview,
+    required this.capture,
+    required this.close,
+  });
+
+  /// 미리보기. [overlay]는 영상 위에 영상과 같은 크기로 겹쳐 그린다.
+  final Widget Function({Widget? overlay}) preview;
+  final Future<Uint8List> Function() capture;
+  final Future<void> Function() close;
+
+  /// 테스트에서 가짜 카메라를 끼울 때만 바꾼다.
+  @visibleForTesting
+  static Future<OcrCamera> Function()? openForTest;
+
+  static Future<OcrCamera> open() async {
+    final fake = openForTest;
+    if (fake != null) return fake();
+    // 브라우저는 HTTPS(또는 localhost)가 아니면 카메라를 주지 않는다.
+    if (kIsWeb &&
+        Uri.base.scheme != 'https' &&
+        !['localhost', '127.0.0.1', '::1'].contains(Uri.base.host)) {
+      throw const ApiException(_needsHttps);
+    }
+    CameraController? controller;
+    try {
+      final camera = backCamera(await availableCameras());
+      if (camera == null) throw CameraException('cameraNotFound', null);
+      // 사진 선택(OcrApi.pickPhoto)의 긴 변 2000px 제한에 맞춘다. veryHigh = 1920×1080이고
+      // 웹·Android·iOS 모두 촬영 크기가 이 값을 따른다. 소리는 쓰지 않으므로 마이크 권한도 묻지 않는다.
+      // ponytail: 크기를 플러그인 설정에 맡긴다. 더 큰 사진을 주는 기기가 나오면 여기서 줄인다
+      // (그때까지는 OcrApi의 12MB 한도가 막는다).
+      final opened = controller = CameraController(
+        camera,
+        ResolutionPreset.veryHigh,
+        enableAudio: false,
+      );
+      await opened.initialize();
+      // 웹 플러그인은 후면이 아닌 카메라(노트북 웹캠 등)를 셀카로 보고 미리보기와 사진을 모두
+      // 좌우로 뒤집는다. 영수증 글자가 거꾸로 찍히므로 둘 다 되돌린다.
+      // ponytail: 되돌린 사진은 PNG라 JPEG보다 크다(1920×1080 기준 수 MB, 서버 한도 안).
+      // 웹캠 촬영이 느리면 웹 전용 JPEG 인코딩으로 바꾼다.
+      final mirrored =
+          kIsWeb && camera.lensDirection != CameraLensDirection.back;
+      return OcrCamera(
+        preview: ({overlay}) => _preview(opened, overlay, mirrored),
+        capture: () async {
+          try {
+            final shot = await (await opened.takePicture()).readAsBytes();
+            return mirrored ? await unmirror(shot) : shot;
+          } catch (_) {
+            throw const ApiException('촬영하지 못했어요. 잠시 후 다시 촬영해주세요.');
+          }
+        },
+        close: opened.dispose,
+      );
+    } catch (e) {
+      try {
+        await controller?.dispose();
+      } catch (_) {}
+      throw ApiException(cameraErrorMessage(e));
+    }
+  }
+
+  static Widget _preview(
+    CameraController controller,
+    Widget? overlay,
+    bool mirrored,
+  ) {
+    if (!kIsWeb) return CameraPreview(controller, child: overlay);
+    // 웹은 브라우저가 이미 화면 방향에 맞춘 영상을 준다. CameraPreview는 세로 화면에서 비율을
+    // 한 번 더 뒤집어 영상을 크게 잘라내므로, 영상 크기 그대로의 비율로 직접 그린다.
+    final size = controller.value.previewSize;
+    return AspectRatio(
+      aspectRatio: size == null || size.isEmpty ? 3 / 4 : size.aspectRatio,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Transform.flip(flipX: mirrored, child: controller.buildPreview()),
+          ?overlay,
+        ],
+      ),
+    );
+  }
+}

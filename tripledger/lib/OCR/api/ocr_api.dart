@@ -11,6 +11,7 @@ import '../../api/api_exception.dart';
 import '../models/ocr_receipt.dart';
 
 export '../models/expense_draft.dart';
+export 'ocr_camera.dart';
 export '../models/ocr_receipt.dart';
 
 /// 영수증 인식 중계 서버(Claude Haiku). 다른 서버로 바꾸려면 빌드할 때
@@ -43,7 +44,8 @@ String? receiptDataUrl(Uint8List bytes) {
 
 /// 영수증 인식(OCR) API. 화면은 이 클래스만 부른다.
 ///
-///   OcrApi.pickPhoto(camera: true)   사진 촬영/선택 (취소하면 null)
+///   OcrApi.pickPhoto(camera: false)  사진첩에서 선택 (취소하면 null)
+///   OcrCamera.open()                 앱 화면 안 촬영 (ocr_camera.dart)
 ///   OcrApi.consent / setConsent      사진 전송 동의 조회·저장
 ///   OcrApi.recognize(bytes)          영수증 한 장 인식 -> OcrReceipt
 ///   OcrApi.translate(names, 'ko')    품목 이름 번역
@@ -64,7 +66,8 @@ class OcrApi {
   /// 동의 화면에 보여줄 중계 서버 주소.
   static String get serverOrigin => server.origin;
 
-  /// 카메라로 찍거나 사진첩에서 고른 사진. 취소하면 null.
+  /// 사진첩에서 고른 사진. 취소하면 null. `camera: true`는 기기의 카메라 앱으로 넘어가므로
+  /// 화면에서는 쓰지 않고, 앱 안 촬영은 [OcrCamera]를 쓴다.
   static Future<Uint8List?> pickPhoto({required bool camera}) async {
     final fake = pickPhotoForTest;
     if (fake != null) return fake(camera);

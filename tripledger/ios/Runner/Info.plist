@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>영수증을 촬영해 지출로 추가하는 데 카메라를 사용합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>영수증 사진을 골라 지출로 추가하는 데 사진 보관함을 사용합니다.</string>
 </dict>
 </plist>
