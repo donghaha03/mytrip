@@ -1,0 +1,55 @@
+# 고른 브랜치의 Android debug APK를 빌드해서 Actions 아티팩트로 올린다(폰에 설치해 확인하는 용도).
+# 실행: Actions 탭 -> "Build debug APK" -> Run workflow -> ref 에 브랜치 이름 입력(기본 feature/receipt-ocr).
+# Firebase 설정은 바꿔 끼우지 않는다. 그 브랜치의 firebase_options.dart 와 google-services.json 을 그대로 쓴다.
+name: Build debug APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 빌드할 브랜치·태그·커밋
+        type: string
+        default: feature/receipt-ocr
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tripledger # Flutter 앱은 저장소 루트가 아니라 여기 있다
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0 # pubspec 의 Dart ^3.13.2 / Flutter >=3.47.0 충족
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - run: flutter build apk --debug
+
+      # 아티팩트 이름에는 '/'를 쓸 수 없어 '-'로 바꾼다 (feature/receipt-ocr -> feature-receipt-ocr).
+      - name: Artifact name
+        id: artifact
+        env:
+          REF: ${{ inputs.ref }}
+        run: echo "name=triper-apk-${REF//\//-}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: tripledger/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
