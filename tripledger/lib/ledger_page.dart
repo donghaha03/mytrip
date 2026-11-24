@@ -67,6 +67,7 @@ class _LedgerPageState extends State<LedgerPage> {
         initialPaymentMethod: receipt?.paymentMethod, // [OCR]
         initialDate: receipt?.date, // [OCR]
         initialCurrency: receipt?.currency, // [OCR]
+        initialNote: _unsupportedCurrencyNote(receipt), // [OCR]
       ),
     );
 
@@ -90,7 +91,21 @@ class _LedgerPageState extends State<LedgerPage> {
 
     if (receipt == null || !mounted) return;
 
+    // 지원하지 않는 통화면 금액을 비워 둔 이유를 알린다.
+    final note = _unsupportedCurrencyNote(receipt);
+    if (note != null) _showMessage(note);
+
     await _addExpense(trip, receipt);
+  }
+
+  /// 영수증 통화가 지원하지 않는 통화(예: CAD)일 때의 안내. 아니면 null.
+  /// 이때 금액은 채우지 않는다(다른 통화 금액이 여행 통화로 저장되는 것을 막음).
+  String? _unsupportedCurrencyNote(Receipt? receipt) {
+    final currency = receipt?.unsupportedCurrency;
+
+    return currency == null
+        ? null
+        : '지원하지 않는 통화($currency)라 금액을 직접 입력해주세요.';
   }
 
   // --------------------------------------------------
@@ -1446,6 +1461,7 @@ class AddExpenseSheet extends StatefulWidget {
     this.initialPaymentMethod, // [OCR]
     this.initialDate, // [OCR]
     this.initialCurrency, // [OCR]
+    this.initialNote, // [OCR]
   });
 
   final Trip trip;
@@ -1460,6 +1476,7 @@ class AddExpenseSheet extends StatefulWidget {
   final String? initialPaymentMethod; // cash 또는 card
   final DateTime? initialDate; // null이면 저장 시각
   final String? initialCurrency; // null이면 여행 통화
+  final String? initialNote; // 시트 위쪽에 보여줄 안내 (예: 지원하지 않는 통화)
 
   @override
   State<AddExpenseSheet> createState() => _AddExpenseSheetState();
@@ -1676,8 +1693,20 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                 style: const TextStyle(color: Color(0xFF8791A3), fontSize: 13),
               ),
               // ==================================================
-              // [OCR] 영수증에서 읽은 날짜 안내 (추가)
+              // [OCR] 영수증 안내 (추가)
+              // 시트가 열려 있는 동안 스낵바는 시트 뒤에 가려지므로 여기에도 보여준다.
               // ==================================================
+              if (widget.initialNote != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  widget.initialNote!,
+                  style: const TextStyle(
+                    color: primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               if (widget.initialDate != null) ...[
                 const SizedBox(height: 4),
                 Text(

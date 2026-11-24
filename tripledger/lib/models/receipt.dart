@@ -5,8 +5,12 @@ import '../constants.dart';
 /// 읽지 못한 값은 null(장소는 빈 문자열)이며, 사용자가 시트에서 확인·수정한 뒤 저장한다.
 class Receipt {
   final String place; // 가맹점 (최대 50자)
-  final double? amount; // 최종 결제액
+  final double? amount; // 최종 결제액. 지원하지 않는 통화면 null
   final String? currency; // 앱이 환율을 아는 통화만. null이면 여행 통화를 쓴다
+
+  /// 영수증에서 읽었지만 앱이 환율을 모르는 통화(예: CAD). 이때 [amount]는 비운다.
+  /// 그 금액을 여행 통화 금액으로 저장하면 안 되기 때문이다.
+  final String? unsupportedCurrency;
   final DateTime? date; // 영수증 날짜 + 지금 시각. null이면 지금
   final String category; // categoryIcons의 키 중 하나
   final String paymentMethod; // cash 또는 card
@@ -15,6 +19,7 @@ class Receipt {
     this.place = '',
     this.amount,
     this.currency,
+    this.unsupportedCurrency,
     this.date,
     this.category = '기타',
     this.paymentMethod = 'cash',
@@ -30,6 +35,14 @@ class Receipt {
     final amount = json['amount'];
     final currency = json['currency'];
     final category = json['category'];
+
+    // 목록 밖 통화는 RateApi가 환율을 몰라 저장할 수 없다.
+    // 통화를 아예 못 읽은 경우(null·빈 값)는 여행 통화로 보고 금액을 그대로 둔다.
+    final supported = currency == 'KRW' || currencies.contains(currency);
+    final unsupported =
+        !supported && currency is String && currency.trim().isNotEmpty
+        ? currency.trim()
+        : null;
 
     // 영수증에는 날짜만 있으므로 시각은 지금으로 채운다(같은 날 지출의 정렬 순서 유지).
     // 없는 날짜(02-30)나 미래 날짜는 잘못 읽은 것으로 보고 버린다.
@@ -61,13 +74,12 @@ class Receipt {
 
     return Receipt(
       place: place.length > 50 ? place.substring(0, 50) : place,
-      amount: amount is num && amount.isFinite && amount > 0
+      amount:
+          unsupported == null && amount is num && amount.isFinite && amount > 0
           ? amount.toDouble()
           : null,
-      // 목록 밖 통화는 RateApi가 환율을 몰라 저장할 수 없다.
-      currency: currency == 'KRW' || currencies.contains(currency)
-          ? currency as String
-          : null,
+      currency: supported ? currency as String : null,
+      unsupportedCurrency: unsupported,
       date: date,
       category: categoryIcons.containsKey(category) ? category as String : '기타',
       paymentMethod: card ? 'card' : 'cash',

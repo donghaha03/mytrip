@@ -93,7 +93,11 @@ class ReceiptApi {
       throw unreadable;
     }
     // 가맹점도 금액도 못 읽었으면 채울 것이 없다.
-    if (receipt.place.isEmpty && receipt.amount == null) throw unreadable;
+    if (receipt.place.isEmpty &&
+        receipt.amount == null &&
+        receipt.unsupportedCurrency == null) {
+      throw unreadable;
+    }
     return receipt;
   }
 

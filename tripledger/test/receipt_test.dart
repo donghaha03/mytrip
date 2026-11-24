@@ -99,6 +99,41 @@ void main() {
       expect(read({}).currency, isNull);
     });
 
+    test('지원하지 않는 통화(CAD)면 금액을 비우고 원래 통화를 남긴다', () {
+      final receipt = read({
+        'merchant': 'SAMPLE DINER',
+        'date': '2026-11-22',
+        'currency': 'CAD',
+        'amount': 16.85,
+        'category': '식비',
+        'paymentMethod': 'card',
+      });
+      // 16.85 CAD가 여행 통화 금액(예: 16.85엔)으로 저장되면 안 된다.
+      expect(receipt.amount, isNull);
+      expect(receipt.currency, isNull);
+      expect(receipt.unsupportedCurrency, 'CAD');
+      // 나머지는 그대로 채운다.
+      expect(receipt.place, 'SAMPLE DINER');
+      expect(receipt.date, DateTime(2026, 11, 22, 15, 30));
+      expect(receipt.category, '식비');
+      expect(receipt.paymentMethod, 'card');
+    });
+
+    test('통화를 못 읽었으면(null·빈 값) 여행 통화로 보고 금액을 그대로 둔다', () {
+      for (final currency in [null, '', '  ', 840]) {
+        final receipt = read({'currency': currency, 'amount': 16.85});
+        expect(receipt.amount, 16.85, reason: '$currency');
+        expect(receipt.currency, isNull, reason: '$currency');
+        expect(receipt.unsupportedCurrency, isNull, reason: '$currency');
+      }
+      // 지원하는 통화는 금액과 통화를 모두 남긴다.
+      final usd = read({'currency': 'USD', 'amount': 16.85});
+      expect(
+        (usd.amount, usd.currency, usd.unsupportedCurrency),
+        (16.85, 'USD', null),
+      );
+    });
+
     test('날짜: 없거나 잘못됐거나 미래면 null(저장 시각 사용)', () {
       expect(read({'date': '2026-11-24'}).date, DateTime(2026, 11, 24, 15, 30));
       expect(read({'date': '2026-11-25'}).date, isNull); // 미래
@@ -152,6 +187,18 @@ void main() {
       expect((jsonDecode(sent.body) as Map).keys, [
         'image',
       ], reason: '사진 말고는 보내지 않는다');
+    });
+
+    test('지원하지 않는 통화뿐이어도 인식 실패로 보지 않는다', () async {
+      ReceiptApi.client = MockClient(
+        (_) async => json({
+          'draft': {'currency': 'CAD', 'amount': 16.85},
+        }),
+      );
+      await ReceiptApi.saveConsent();
+      final receipt = await ReceiptApi.scan(png);
+      expect(receipt.amount, isNull);
+      expect(receipt.unsupportedCurrency, 'CAD');
     });
 
     test('실패는 사용자에게 보여줄 문구가 담긴 ApiException', () async {
@@ -238,6 +285,28 @@ void main() {
       expect(find.text('금액은 KRW 기준으로 입력하세요.'), findsOneWidget);
       expect(find.text('금액 (KRW)'), findsOneWidget);
       expect(find.textContaining('영수증 날짜 2026.11.22'), findsOneWidget);
+    });
+
+    testWidgets('지원하지 않는 통화 영수증: 금액은 빈칸, 안내를 시트에 보여준다', (tester) async {
+      final receipt = read({
+        'merchant': 'SAMPLE DINER',
+        'currency': 'CAD',
+        'amount': 16.85,
+      });
+      await open(
+        tester,
+        AddExpenseSheet(
+          trip: trip,
+          initialPlace: receipt.place,
+          initialAmount: receipt.amount,
+          initialCurrency: receipt.currency,
+          initialNote: '지원하지 않는 통화(CAD)라 금액을 직접 입력해주세요.',
+        ),
+      );
+      expect(field(tester, 0), 'SAMPLE DINER');
+      expect(field(tester, 1), '');
+      expect(find.text('금액 (JPY)'), findsOneWidget);
+      expect(find.textContaining('지원하지 않는 통화(CAD)'), findsOneWidget);
     });
 
     testWidgets('소수 금액과 잘못된 초기값', (tester) async {
