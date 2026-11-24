@@ -52,6 +52,7 @@ for (const [file, merchant, total, category] of cases.filter(([file]) => !only |
   assert.equal(draft.currency, file === 'receipt_consumption_tax.png' ? 'JPY' : 'KRW');
   assert.equal(draft.amount, total, 'Subtotal/tax must not be added to final total.');
   assert.equal(draft.category, category, 'Merchant and purchased items must inform category.');
+  assert.ok(['card', 'cash', null].includes(draft.paymentMethod), 'Payment method is card, cash or null (unclear).');
   if (file === 'receipt_landscape.png') {
     assert.equal(draft.items.length, 1);
     assert.equal(draft.items[0].name, 'Americano');

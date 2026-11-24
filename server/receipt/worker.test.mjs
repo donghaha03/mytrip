@@ -8,7 +8,7 @@ import { validateTranslation } from './contract.mjs';
 const image = `data:image/png;base64,${(await readFile(new URL('../../test/fixtures/receipt_en.png', import.meta.url))).toString('base64')}`;
 const accessCode = 'fixture-access-code-0123456789-abcd';
 const env = { ANTHROPIC_API_KEY: 'fixture-anthropic-key-not-a-real-credential', RECEIPT_ACCESS_CODE: accessCode };
-const draft = { merchant: 'TEST CAFE', date: '2026-10-04', currency: 'KRW', amount: 11000, category: '식비',
+const draft = { merchant: 'TEST CAFE', date: '2026-10-04', currency: 'KRW', amount: 11000, category: '식비', paymentMethod: 'card',
   taxes: [], adjustments: { taxFree: null, exemptedTax: null, taxFreeBase: null, discount: null, currency: null, details: [] },
   items: [{ name: 'Americano', quantity: 1, unit_price: 5000, amount: 5000 }], warnings: [] };
 const message = (value, stop_reason = 'end_turn') => ({ id: 'msg_fixture', type: 'message', role: 'assistant', model: CLAUDE_MODEL,
@@ -71,6 +71,22 @@ test('refused, truncated, missing and invalid results cannot become review draft
     message({ ...draft, items: [{ ...draft.items[0], quantity: 1.5 }] }), message({ ...draft, secret: 'ignored?' })]) {
     assert.throws(() => readClaude(value));
   }
+});
+
+test('payment method is card, cash or null; older drafts without it still pass', () => {
+  for (const paymentMethod of ['card', 'cash', null])
+    assert.equal(readClaude(message({ ...draft, paymentMethod })).paymentMethod, paymentMethod);
+  const { paymentMethod, ...older } = draft;
+  assert.deepEqual(readClaude(message(older)), older);
+  for (const bad of ['credit', 'CARD', '', 'visa', 1, true, ['card'], { type: 'card' }])
+    assert.throws(() => readClaude(message({ ...draft, paymentMethod: bad })), `${JSON.stringify(bad)} must be rejected`);
+  // The model must always answer the field (null when unclear), in a form structured outputs accepts.
+  assert.ok(claudeSchema.required.includes('paymentMethod'));
+  assert.deepEqual(claudeSchema.properties.paymentMethod, { anyOf: [{ type: 'string', enum: ['card', 'cash'] }, { type: 'null' }] });
+  const { system } = claudeBody(image);
+  assert.match(system, /Set paymentMethod only from the printed tender/);
+  assert.match(system, /never classify merely from payment method/);
+  assert.match(system, /Do not include card numbers/);
 });
 
 test('taxes and applied adjustments keep printed values without changing the paid total', () => {
