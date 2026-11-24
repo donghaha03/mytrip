@@ -74,15 +74,15 @@ test('refused, truncated, missing and invalid results cannot become review draft
 });
 
 test('payment method is card, cash or null; older drafts without it still pass', () => {
-  for (const paymentMethod of ['card', 'cash', null])
+  for (const paymentMethod of ['card', 'cash', 'unknown', null])
     assert.equal(readClaude(message({ ...draft, paymentMethod })).paymentMethod, paymentMethod);
   const { paymentMethod, ...older } = draft;
   assert.deepEqual(readClaude(message(older)), older);
   for (const bad of ['credit', 'CARD', '', 'visa', 1, true, ['card'], { type: 'card' }])
     assert.throws(() => readClaude(message({ ...draft, paymentMethod: bad })), `${JSON.stringify(bad)} must be rejected`);
-  // The model must always answer the field (null when unclear), in a form structured outputs accepts.
+  // The model must always answer the field (unknown when unclear), in a form structured outputs accepts.
   assert.ok(claudeSchema.required.includes('paymentMethod'));
-  assert.deepEqual(claudeSchema.properties.paymentMethod, { anyOf: [{ type: 'string', enum: ['card', 'cash'] }, { type: 'null' }] });
+  assert.deepEqual(claudeSchema.properties.paymentMethod, { type: 'string', enum: ['card', 'cash', 'unknown'] });
   const { system } = claudeBody(image);
   assert.match(system, /Set paymentMethod only from the printed tender/);
   assert.match(system, /never classify merely from payment method/);
