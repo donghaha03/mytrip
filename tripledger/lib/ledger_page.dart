@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
 import 'expense_detail_page.dart';
+import 'receipt_scan_page.dart'; // [OCR]
 import 'api/api.dart';
 
 class LedgerPage extends StatefulWidget {
@@ -52,13 +53,21 @@ class _LedgerPageState extends State<LedgerPage> {
       );
   }
 
-  Future<void> _addExpense(Trip trip) async {
+  Future<void> _addExpense(Trip trip, [Receipt? receipt]) async { // [OCR]
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.white,
-      builder: (_) => AddExpenseSheet(trip: trip),
+      builder: (_) => AddExpenseSheet(
+        trip: trip,
+        initialPlace: receipt?.place, // [OCR]
+        initialAmount: receipt?.amount, // [OCR]
+        initialCategory: receipt?.category, // [OCR]
+        initialPaymentMethod: receipt?.paymentMethod, // [OCR]
+        initialDate: receipt?.date, // [OCR]
+        initialCurrency: receipt?.currency, // [OCR]
+      ),
     );
 
     if (!mounted) return;
@@ -66,6 +75,22 @@ class _LedgerPageState extends State<LedgerPage> {
     if (result == true) {
       _showMessage('지출이 추가되었습니다.');
     }
+  }
+
+  // ==================================================
+  // [OCR] 영수증 OCR (추가)
+  // 영수증을 인식한 뒤 그 값으로 지출 추가 시트를 채워서 연다.
+  // ==================================================
+
+  Future<void> _scanReceipt(Trip trip) async {
+    final receipt = await Navigator.push<Receipt>(
+      context,
+      MaterialPageRoute(builder: (_) => const ReceiptScanPage()),
+    );
+
+    if (receipt == null || !mounted) return;
+
+    await _addExpense(trip, receipt);
   }
 
   // --------------------------------------------------
@@ -429,24 +454,57 @@ class _LedgerPageState extends State<LedgerPage> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: SizedBox(
                           height: 54,
-                          child: FilledButton.icon(
-                            onPressed: () => _addExpense(trip),
-                            icon: const Icon(Icons.add_rounded),
-                            label: const Text(
-                              '지출 추가하기',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
+                          // [OCR] 버튼 하나를 Row로 감싸 둘로 나눔 (지출 추가하기 버튼 내용은 그대로)
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () => _addExpense(trip),
+                                  icon: const Icon(Icons.add_rounded),
+                                  label: const Text(
+                                    '지출 추가하기',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    elevation: 3,
+                                  ),
+                                ),
                               ),
-                            ),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                              // ==================================================
+                              // [OCR] 영수증 OCR 버튼 (추가)
+                              // ==================================================
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () => _scanReceipt(trip),
+                                  icon: const Icon(Icons.receipt_long_outlined),
+                                  label: const Text(
+                                    '영수증 OCR',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: primary,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    elevation: 3,
+                                  ),
+                                ),
                               ),
-                              elevation: 3,
-                            ),
+                            ],
                           ),
                         ),
                       ),
@@ -1379,9 +1437,29 @@ class _DonutPainter extends CustomPainter {
 // ==================================================
 
 class AddExpenseSheet extends StatefulWidget {
-  const AddExpenseSheet({super.key, required this.trip});
+  const AddExpenseSheet({
+    super.key,
+    required this.trip,
+    this.initialPlace, // [OCR]
+    this.initialAmount, // [OCR]
+    this.initialCategory, // [OCR]
+    this.initialPaymentMethod, // [OCR]
+    this.initialDate, // [OCR]
+    this.initialCurrency, // [OCR]
+  });
 
   final Trip trip;
+
+  // ==================================================
+  // [OCR] 영수증 인식 결과로 미리 채울 값 (추가)
+  // 모두 선택 인자이고, 넘기지 않으면 기존과 똑같이 빈 시트로 열린다.
+  // ==================================================
+  final String? initialPlace;
+  final double? initialAmount;
+  final String? initialCategory;
+  final String? initialPaymentMethod; // cash 또는 card
+  final DateTime? initialDate; // null이면 저장 시각
+  final String? initialCurrency; // null이면 여행 통화
 
   @override
   State<AddExpenseSheet> createState() => _AddExpenseSheetState();
@@ -1402,7 +1480,33 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
   void initState() {
     super.initState();
     _category = categoryIcons.keys.first;
+
+    // ==================================================
+    // [OCR] 영수증 인식 결과로 입력 칸 채우기 (추가)
+    // ==================================================
+    final category = widget.initialCategory;
+    if (category != null && categoryIcons.containsKey(category)) {
+      _category = category;
+    }
+
+    final paymentMethod = widget.initialPaymentMethod;
+    if (paymentMethod == 'cash' || paymentMethod == 'card') {
+      _paymentMethod = paymentMethod!;
+    }
+
+    _placeController.text = widget.initialPlace ?? '';
+
+    final amount = widget.initialAmount;
+    if (amount != null && amount > 0) {
+      // 12000.0 -> "12000", 12.5 -> "12.5"
+      _amountController.text = amount == amount.roundToDouble()
+          ? amount.toStringAsFixed(0)
+          : amount.toString();
+    }
   }
+
+  /// [OCR] 입력·저장에 쓰는 통화. 영수증 통화가 없으면 기존대로 여행 통화.
+  String get _currency => widget.initialCurrency ?? widget.trip.currency;
 
   @override
   void dispose() {
@@ -1524,8 +1628,9 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
         category: _category,
         place: _placeController.text.trim(),
         amount: amount,
-        currency: widget.trip.currency,
+        currency: _currency, // [OCR]
         paymentMethod: _paymentMethod,
+        date: widget.initialDate, // [OCR] null이면 기존처럼 현재 시각
       );
 
       if (!mounted) return;
@@ -1567,9 +1672,22 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                '금액은 ${widget.trip.currency} 기준으로 입력하세요.',
+                '금액은 $_currency 기준으로 입력하세요.', // [OCR]
                 style: const TextStyle(color: Color(0xFF8791A3), fontSize: 13),
               ),
+              // ==================================================
+              // [OCR] 영수증에서 읽은 날짜 안내 (추가)
+              // ==================================================
+              if (widget.initialDate != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '영수증 날짜 ${dayOnly(widget.initialDate!)}로 저장돼요. 내용을 확인해 주세요.',
+                  style: const TextStyle(
+                    color: Color(0xFF8791A3),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
               const SizedBox(height: 25),
 
               const _ExpenseFieldLabel('카테고리'),
@@ -1604,7 +1722,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
               ),
 
               const SizedBox(height: 13),
-              _ExpenseFieldLabel('금액 (${widget.trip.currency})'),
+              _ExpenseFieldLabel('금액 ($_currency)'), // [OCR]
               TextFormField(
                 controller: _amountController,
                 keyboardType: const TextInputType.numberWithOptions(
@@ -1612,7 +1730,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                 ),
                 decoration: _inputDecoration(
                   hint: '예: 1500',
-                  suffix: Text(widget.trip.currency),
+                  suffix: Text(_currency), // [OCR]
                 ),
                 validator: (value) {
                   final amount = double.tryParse(
