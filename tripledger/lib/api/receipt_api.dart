@@ -5,13 +5,14 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/receipt.dart';
 import 'api_exception.dart';
 
 /// 영수증 인식(OCR) API
-/// - 사진을 인식 서버(중계 서버 -> Claude Haiku)로 보내 [Receipt]를 받는다
+/// - 앨범에서 사진을 고르고(pickPhoto), 인식 서버(중계 서버 -> Claude Haiku)로 보내 [Receipt]를 받는다
 /// - 키·액세스 코드는 서버에만 있고 앱에는 없다
 /// - 저장(Firestore)은 하지 않는다. 저장은 기존 ExpenseApi.add 그대로
 class ReceiptApi {
@@ -25,9 +26,30 @@ class ReceiptApi {
   static const String _consentVersion = 'claude-haiku-v1';
   static const String _consentKey = 'receipt_consent:$_consentVersion';
 
-  /// 테스트에서 가짜 서버를 끼울 때만 바꾼다.
+  // 아래 둘은 테스트에서 가짜 서버·가짜 사진을 끼울 때만 바꾼다.
   @visibleForTesting
   static http.Client client = http.Client();
+  @visibleForTesting
+  static Future<Uint8List?> Function()? pickPhotoForTest;
+
+  /// 앨범에서 영수증 사진을 고른다. 취소하면 null. `image_picker` 패키지는 여기서만 쓴다.
+  /// 앱 안 촬영은 ReceiptCamera(receipt_camera.dart)를 쓴다.
+  static Future<Uint8List?> pickPhoto() async {
+    final fake = pickPhotoForTest;
+    if (fake != null) return fake();
+    try {
+      // 큰 사진은 줄여서 보낸다(서버 한도와 전송 시간).
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2000,
+        maxHeight: 2000,
+        imageQuality: 85,
+      );
+      return await file?.readAsBytes();
+    } catch (_) {
+      throw const ApiException('사진을 불러오지 못했어요. 사진 접근 권한을 확인해주세요.');
+    }
+  }
 
   /// 사진을 외부 서버로 보내는 데 동의했는지 (이 기기에 저장)
   static Future<bool> hasConsent() async =>

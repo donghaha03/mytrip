@@ -1,6 +1,8 @@
 // [OCR] 영수증 OCR 기능 (feature/receipt-ocr)
 import 'dart:convert';
+import 'dart:ui' as ui;
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tripapp/api/api.dart';
+import 'package:tripapp/api/receipt_camera.dart';
 import 'package:tripapp/ledger_page.dart';
 import 'package:tripapp/receipt_scan_page.dart';
 
@@ -332,7 +335,7 @@ void main() {
         'draft': {'merchant': 'SAMPLE CAFE', 'amount': 12000, 'category': '식비'},
       }),
     );
-    ReceiptScanPage.pickForTest = () async => png;
+    ReceiptApi.pickPhotoForTest = () async => png;
     // 카메라가 한 대도 없는 기기
     const cameraChannel = MethodChannel('plugins.flutter.io/camera');
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -341,7 +344,7 @@ void main() {
     );
     addTearDown(() {
       ReceiptApi.client = http.Client();
-      ReceiptScanPage.pickForTest = null;
+      ReceiptApi.pickPhotoForTest = null;
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         cameraChannel,
         null,
@@ -387,5 +390,181 @@ void main() {
     expect(result?.amount, 12000.0);
     expect(result?.category, '식비');
     expect(tester.takeException(), isNull);
+  });
+
+  group('ReceiptCamera', () {
+    CameraDescription lens(String name, CameraLensDirection direction) =>
+        CameraDescription(
+          name: name,
+          lensDirection: direction,
+          sensorOrientation: 0,
+        );
+
+    test('후면 카메라를 먼저 고르고, 없으면 첫 카메라를 쓴다', () {
+      final front = lens('front', CameraLensDirection.front);
+      final back = lens('back', CameraLensDirection.back);
+      final external = lens('webcam', CameraLensDirection.external);
+      expect(backCamera([front, back]), back);
+      expect(backCamera([external, front]), external);
+      expect(backCamera([]), isNull);
+    });
+
+    test('카메라 오류를 사용자 문구로 바꾼다', () {
+      String message(String code) =>
+          cameraErrorMessage(CameraException(code, null));
+      for (final code in [
+        'CameraAccessDenied', // 웹·Android·iOS
+        'CameraAccessDeniedWithoutPrompt', // iOS: 설정에서 꺼 둠
+        'CameraAccessRestricted', // iOS: 보호자 제한
+        'NotAllowedError', // 웹: 브라우저 오류 이름 그대로
+      ]) {
+        expect(message(code), contains('권한이 거부'), reason: code);
+        expect(message(code), contains('앨범'), reason: code);
+      }
+      expect(message('cameraNotFound'), contains('카메라가 없어요'));
+      expect(message('cameraNotReadable'), contains('다른 앱이 카메라를 사용 중'));
+      expect(message('cameraSecurity'), contains('이 환경에서는'));
+      expect(message('somethingElse'), contains('카메라를 열지 못했어요'));
+      expect(cameraErrorMessage(StateError('x')), contains('앨범'));
+    });
+
+    testWidgets('좌우가 뒤집힌 사진을 바로잡는다', (tester) async {
+      await tester.runAsync(() async {
+        // 왼쪽 빨강, 오른쪽 파랑인 2×1 사진.
+        final recorder = ui.PictureRecorder();
+        ui.Canvas(recorder)
+          ..drawRect(
+            const Rect.fromLTWH(0, 0, 1, 1),
+            Paint()..color = const Color(0xFFFF0000),
+          )
+          ..drawRect(
+            const Rect.fromLTWH(1, 0, 1, 1),
+            Paint()..color = const Color(0xFF0000FF),
+          );
+        final source = await recorder.endRecording().toImage(2, 1);
+        final bytes = (await source.toByteData(format: ui.ImageByteFormat.png))!
+            .buffer
+            .asUint8List();
+
+        final flipped = await unmirror(bytes);
+        final image = (await (await ui.instantiateImageCodec(
+          flipped,
+        )).getNextFrame()).image;
+        final pixels = (await image.toByteData())!.buffer.asUint8List();
+        expect((image.width, image.height), (2, 1));
+        expect(pixels.sublist(0, 4), [0, 0, 255, 255]); // 왼쪽이 파랑
+        expect(pixels.sublist(4, 8), [255, 0, 0, 255]); // 오른쪽이 빨강
+      });
+    });
+  });
+
+  group('촬영 화면 (가짜 카메라)', () {
+    late int opened, closed;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({
+        'receipt_consent:claude-haiku-v1': true,
+      });
+      opened = closed = 0;
+      ReceiptCamera.openForTest = () async {
+        opened++;
+        return ReceiptCamera(
+          preview: ({overlay}) =>
+              Stack(children: [const Text('미리보기'), ?overlay]),
+          capture: () async => png,
+          close: () async => closed++,
+        );
+      };
+      addTearDown(() {
+        ReceiptCamera.openForTest = null;
+        ReceiptApi.client = http.Client();
+        ReceiptApi.pickPhotoForTest = null;
+      });
+    });
+
+    testWidgets('미리보기 → 촬영 → 재촬영 → 이 사진으로 인식', (tester) async {
+      var requests = 0;
+      ReceiptApi.client = MockClient((_) async {
+        requests++;
+        return json({
+          'draft': {'merchant': 'SAMPLE CAFE', 'amount': 12000},
+        });
+      });
+      // 촬영할 때는 앨범(image_picker)을 열지 않는다.
+      ReceiptApi.pickPhotoForTest = () async => fail('앨범을 열면 안 된다');
+
+      Receipt? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async => result = await Navigator.push<Receipt>(
+                context,
+                MaterialPageRoute(builder: (_) => const ReceiptScanPage()),
+              ),
+              child: const Text('열기'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('열기'));
+      await tester.pumpAndSettle();
+      // 이미 동의했으면 동의 화면을 다시 띄우지 않는다.
+      expect(find.text('동의하고 계속'), findsNothing);
+      expect(find.text('미리보기'), findsOneWidget);
+      expect((opened, closed), (1, 0));
+
+      await tester.tap(find.text('촬영'));
+      await tester.pumpAndSettle();
+      // 찍은 뒤에는 카메라를 놓고 사진을 보여준다.
+      expect((opened, closed), (1, 1));
+      expect(find.text('미리보기'), findsNothing);
+
+      await tester.tap(find.text('재촬영'));
+      await tester.pumpAndSettle();
+      expect((opened, closed), (2, 1));
+      expect(find.text('미리보기'), findsOneWidget);
+
+      await tester.tap(find.text('촬영'));
+      await tester.pumpAndSettle();
+      expect(requests, 0); // 확인하기 전에는 아무것도 보내지 않는다.
+      await tester.tap(find.text('이 사진으로 인식'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ReceiptScanPage), findsNothing);
+      expect(requests, 1);
+      expect(result?.place, 'SAMPLE CAFE');
+      expect((opened, closed), (2, 2));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('화면이 가려지면 카메라를 놓고, 돌아오면 다시 켠다. 나가면 놓는다', (tester) async {
+      addTearDown(
+        () => tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        ),
+      );
+      await tester.pumpWidget(const MaterialApp(home: ReceiptScanPage()));
+      await tester.pumpAndSettle();
+      expect((opened, closed), (1, 0));
+
+      // 권한 창처럼 잠깐 포커스만 잃는 것(inactive)으로는 끄지 않는다.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pumpAndSettle();
+      expect((opened, closed), (1, 0));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pumpAndSettle();
+      expect((opened, closed), (1, 1));
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect((opened, closed), (2, 1));
+      expect(find.text('미리보기'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      expect((opened, closed), (2, 2));
+    });
   });
 }

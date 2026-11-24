@@ -13,7 +13,8 @@
 // │          AccountApi.deleteAccount (회원 탈퇴: 데이터 + 계정 삭제)
 // ├ 여행      TripApi.watchAll / watch / get / add / update / updateBudget / delete
 // ├ 지출      ExpenseApi.watchAll / add / update / delete / restore
-// ├ 영수증    ReceiptApi.scan / hasConsent / saveConsent  // [OCR]
+// ├ 영수증    ReceiptApi.scan / pickPhoto / hasConsent / saveConsent  // [OCR]
+// │          ReceiptCamera.open -> preview / capture / close (앱 안 촬영)  // [OCR]
 // ├ 환율      RateApi.load / krwPer / toKrw / fromKrw / lastFetched
 // ├ 계산      LedgerCalc.spentKrw / remainingKrw / usedRatio / byCategory ...
 // └ 표시      won() / localAmt() / dateShort() / dayOnly()
@@ -33,4 +34,5 @@ export 'expense_api.dart';
 export 'ledger_calc.dart';
 export 'rate_api.dart';
 export 'receipt_api.dart'; // [OCR]
+export 'receipt_camera.dart' show ReceiptCamera; // [OCR]
 export 'trip_api.dart';
