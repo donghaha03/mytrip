@@ -25,6 +25,8 @@ dependencies:
   google_sign_in: ^7.2.0
   kakao_flutter_sdk_user: ^2.0.1
   naver_login_flutter: ^4.0.0
+  image_picker: ^1.2.4 # [OCR] 앨범에서 영수증 사진 선택
+  camera: ^0.12.0 # [OCR] 앱 안에서 영수증 촬영
 
 dev_dependencies:
   flutter_test:
